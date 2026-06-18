@@ -1,0 +1,60 @@
+# ---------------------------------------------------------------------------
+# Deploy settings for the block-autoregressive SANA WAM (dual_system / autoregressive).
+#
+# scripts/deploy.py and policy_server.build_server_from_config dispatch to
+# ARInferenceEngine for this architecture (see openwam/deploy/build_engine).
+# The engine is STATEFUL closed-loop: one AR step per generate(), persistent
+# KV cache across steps. That imposes two hard requirements below — greedy
+# policy mode and async disabled — see openwam/deploy/ar_engine.py.
+# ---------------------------------------------------------------------------
+checkpoint_path: null          # --ckpt-dir on the CLI overrides this.
+device: cuda:0
+server:
+  host: "0.0.0.0"
+  ws_port: 8850
+  http_port: 8848
+
+# ---------------------------------------------------------------------------
+# Inference parameters (populate cfg.inference; read by ARInferenceEngine).
+# num_frames / video_num_frames / height / width are auto-filled from the
+# checkpoint dataloader when omitted (policy_server.build_server_from_config /
+# scripts/deploy.py); the engine also recomputes them defensively.
+# ---------------------------------------------------------------------------
+inference:
+  video_steps: 4              # flow-matching steps for each predicted video chunk
+  action_steps: 4             # flow-matching steps for each predicted action chunk
+  seed: 0
+  shift: 5.0
+
+  # --- AR deploy-semantics knobs (eval-verification targets; handoff §2c) ---
+  ar_obs_chunk_mode: rolling_buffer   # rolling_buffer (default) | repeat_frame (debug)
+  ar_obs_latent_band: auto            # auto (leading@step0, trailing after — training-matched) | leading | trailing
+  # per_step (default): each chunk's per-chunk AdaLN proprio delta = current measured
+  #   state — in-distribution with proprio_per_chunk training. single: latch the
+  #   episode's first state for ALL chunks (off-distribution for the per-chunk deltas;
+  #   only matches the clip-level context token — debug/ablation only).
+  ar_proprio_mode: per_step
+  # ar_action_tokens_per_chunk: 24    # optional override; else derived from num_frames / num_chunks
+
+# ---------------------------------------------------------------------------
+# Policy execution — GREEDY IS MANDATORY for the AR engine.
+# Each generate() ingests exactly one realized obs and advances the cache by one
+# chunk; receding-horizon / temporal-ensembling / async would double-advance or
+# reorder the cache and break AR frame alignment.
+# ---------------------------------------------------------------------------
+policy:
+  execute_horizon: null       # null => greedy: drain the full chunk, then re-generate
+  temporal_ensemble: false    # MUST be false for AR
+  # obs_history must hold a full raw frame window (>= dataloader.num_frames) so the
+  # engine can rebuild the obs clip at the training pixel cadence (video_stride).
+  history_len: 64
+
+# ---------------------------------------------------------------------------
+# Deploy-time optimizations.
+# ---------------------------------------------------------------------------
+optimization:
+  decode_video: false         # action-only; the AR engine does not decode video at deploy
+  async_inference:
+    mode: none                # MUST stay none for AR
+  prompt_embed_cache:
+    maxsize: 32

@@ -1,0 +1,69 @@
+[project]
+name = "sana-wam"
+version = "0.1.0"
+description = "SANA block-autoregressive (diffusion-forcing) world-action model — standalone."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # core
+    "torch==2.7.1",
+    "torchvision",
+    "numpy>=1.24,<3",
+    "einops>=0.7,<1",
+    "safetensors>=0.4,<1",
+    "omegaconf>=2.3,<3",
+    "PyYAML>=6,<7",
+    "tqdm>=4.66,<5",
+    # data
+    "h5py>=3.8,<4",
+    "Pillow>=10,<13",
+    "opencv-python>=4.7,<5",
+    "scipy>=1.10,<2",
+    "imageio[ffmpeg]>=2.28,<3",
+    "av>=12",
+    "ftfy>=6.1,<7",
+    "regex",
+    # SANA upstream (diffusion.* package on third_party/Sana sys.path)
+    "transformers>=5.5,<6",
+    "diffusers>=0.30",
+    "timm",
+    "mmcv-lite",
+    "mmengine",
+    "sentencepiece>=0.1.99,<1",
+    "protobuf>=4.25,<7",
+    # deploy server
+    "aiohttp>=3.9,<4",
+    "websockets>=11",
+    "pytz>=2026.2",
+    "qwen-vl-utils>=0.0.14",
+]
+
+[project.optional-dependencies]
+deepspeed = ["deepspeed>=0.14"]
+dev = ["pytest>=8,<10", "ruff>=0.4,<1"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sana_wam"]
+
+[tool.uv]
+# torch is pinned to 2.7.1 (+cu128 on the H200 box); install via the explicit
+# PyTorch CUDA index below to match the SANA weight-load / flash-attn ABI.
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "gpu: test requires GPU",
+    "data: test requires RoboTwin data",
+]
