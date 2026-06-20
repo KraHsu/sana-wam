@@ -2,10 +2,10 @@
 # Deploy settings for the block-autoregressive SANA WAM (dual_system / autoregressive).
 #
 # scripts/deploy.py and policy_server.build_server_from_config dispatch to
-# ARInferenceEngine for this architecture (see openwam/deploy/build_engine).
+# the AR inference engine for this architecture (see sana_wam/deploy/ar_engine.py).
 # The engine is STATEFUL closed-loop: one AR step per generate(), persistent
 # KV cache across steps. That imposes two hard requirements below — greedy
-# policy mode and async disabled — see openwam/deploy/ar_engine.py.
+# policy mode and async disabled — see sana_wam/deploy/ar_engine.py.
 # ---------------------------------------------------------------------------
 checkpoint_path: null          # --ckpt-dir on the CLI overrides this.
 device: cuda:0

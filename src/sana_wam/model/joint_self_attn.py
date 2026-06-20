@@ -127,7 +127,7 @@ class DualSystemSelfAttnArchitecture(BaseWAMArchitecture):
 
         Dispatches on ``video_backbone.attn_kernel``:
 
-        - ``"softmax"`` (default for Wan/Cosmos25): plain
+        - ``"softmax"`` (default for softmax backbones): plain
           :class:`MoTJointDriver` with SDPA.
         - ``"linear_relu"`` (SANA): :class:`SanaMoTJointDriver` with cumsum
           linear-attention. The action backbone must also be configured for
@@ -204,8 +204,8 @@ class DualSystemSelfAttnArchitecture(BaseWAMArchitecture):
     def _iter_zero3_external_params(self):
         """Raw-access leaves read by the MoT driver outside the owners' ``__call__``.
 
-        - ``vb._dit.blocks[i].modulation`` (Wan / Cosmos25) is read inside
-          ``pre_attn_at_layer_for_compile`` (``wan_adapter.py:536``)
+        - ``vb._dit.blocks[i].modulation`` (softmax backbones) is read inside
+          ``pre_attn_at_layer_for_compile``
         - ``vb._dit.blocks[i].scale_shift_table`` (SANA) is read inside
           ``SanaMSVideoSplit.block_pre_attn`` (``blocks_split.py:271``) — the
           AdaLN parameter on SANA blocks (analog of Wan ``modulation``); under
@@ -253,14 +253,9 @@ class DualSystemSelfAttnArchitecture(BaseWAMArchitecture):
             seq_lens = pipeline_inputs["seq_lens"].to(device=action_context.device)
             positions = torch.arange(action_context.shape[1], device=action_context.device)
             action_context_mask = positions.unsqueeze(0) < seq_lens.unsqueeze(1)
-        # Opt every Wan backbone into 4D + clean-prefix-aligned t_mod (mirrors
-        # TI2V's native ``seperated_timestep + fuse_vae_embedding_in_latents``
-        # path; TI2V itself fires that path first so these kwargs are inert for
-        # it). VACE and I2V do NOT emit ``first_frame_latents`` (VACE routes
-        # its first-frame condition through ``vace_context``; I2V uses the
-        # ``y`` channel), so for them ``zero_clean_prefix_t_mod`` is
-        # structurally inert — kept on only so the joint MoT driver gets the
-        # 4D ``t_mod`` it needs. ``setdefault`` so explicit callers can still
+        # Opt into 4D + clean-prefix-aligned t_mod so the joint MoT driver gets
+        # the 4D ``t_mod`` it needs (inert when the backbone emits no
+        # ``first_frame_latents``). ``setdefault`` so explicit callers can still
         # pass False.
         pipeline_inputs.setdefault("force_per_token_t_mod", True)
         pipeline_inputs.setdefault("zero_clean_prefix_t_mod", True)

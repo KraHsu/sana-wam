@@ -1,26 +1,23 @@
-"""``SanaVideoBackbone`` — OpenWAM VideoBackbone wrapper around SANA-Video.
+"""``SanaVideoBackbone`` — sana-wam VideoBackbone wrapper around SANA-Video.
 
 Owns a :class:`SanaPipe` (DiT + VAE + text encoder) and exposes the standard
 ``prepare → run_block × N → finalize`` lifecycle plus the
-``pre_attn_at_layer`` / ``post_attn_at_layer`` split that a future
-``SanaMoTJointDriver`` will consume.
+``pre_attn_at_layer`` / ``post_attn_at_layer`` split that ``SanaMoTJointDriver``
+consumes.
 
-Phase 0 scope:
 - ``prepare``, ``run_block``, ``finalize``: bit-equivalent to upstream
   ``SanaMSVideo.forward`` for per-sample timesteps.
 - ``pre_attn_at_layer``: returns the rotated and unrotated kernel-applied
-  Q/K so a downstream driver can implement cumsum-linear-attn over a
-  heterogeneous sequence. ``attn_kernel`` property advertises ``linear_relu``
-  for driver dispatch.
-- All other VideoBackbone abstract methods are stubbed with a clear
-  ``NotImplementedError`` — they are not needed for the Phase 0 numerical
-  equivalence tests and will be filled in alongside Phase 4 deploy work.
+  Q/K so the driver can implement cumsum-linear-attn over a heterogeneous
+  sequence. The ``attn_kernel`` property advertises ``linear_relu`` for
+  driver dispatch.
+- VideoBackbone methods not used by this model raise ``NotImplementedError``.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Optional, Tuple
+from typing import Any, Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -34,16 +31,11 @@ from sana_wam.model.video_backbone.sana.pipeline_builder import (
     build_sana_pipeline,
 )
 
-if TYPE_CHECKING:
-    from sana_wam.model.inference_inputs import InferenceInputs
-
 
 def _pil_video_to_tensor(frames: Any) -> Tensor:
     """``list[list[PIL.Image]]`` → ``(B, 3, T, H, W)`` float in ``[-1, 1]``.
 
-    Mirrors ``cosmos25/pipeline_wrapper._pil_video_to_tensor`` — same convention
-    used across OpenWAM (uint8 RGB → ``/127.5 - 1``). Kept private here so the
-    SANA backbone doesn't depend on the Cosmos25 module.
+    Standard convention (uint8 RGB → ``/127.5 - 1``).
     """
     import numpy as np
 
@@ -67,7 +59,7 @@ logger = logging.getLogger(__name__)
 
 
 class SanaVideoBackbone(VideoBackbone):
-    """SANA-Video backbone for OpenWAM.
+    """SANA-Video backbone for sana-wam.
 
     Owns a :class:`SanaPipe`; never exposes it. External code accesses
     capabilities through the VideoBackbone ABC.
@@ -106,10 +98,9 @@ class SanaVideoBackbone(VideoBackbone):
 
         # Opt-in clean-prefix (current-frame) conditioning. Default False keeps
         # SANA pure text-to-video (byte-identical to existing checkpoints). When
-        # True, preprocess_input / prepare_inputs_for_inference emit
-        # first_frame_latents + num_clean_prefix_frames=1, and ``prepare``
-        # switches the split-forward to per-frame timestep modulation (frame-0
-        # at t=0). See plan: add current-observation conditioning to SANA WAM.
+        # True, ``preprocess_input`` emits first_frame_latents +
+        # num_clean_prefix_frames=1, and ``prepare`` switches the split-forward
+        # to per-frame timestep modulation (frame-0 at t=0).
         self._use_first_frame_cond = bool(pipe.config.get("use_first_frame_cond", False))
 
         # SanaPipe is @dataclass (not nn.Module), so `self._pipe = pipe`
@@ -232,10 +223,9 @@ class SanaVideoBackbone(VideoBackbone):
 
     @property
     def video_attention_mask_mode(self) -> str:
-        """SANA-Video uses ``first_frame_causal`` semantics in OpenWAM joint
-        MoT (matching the FastWAM default). Phase 3+ ``SanaMoTJointDriver``
-        relies on this; Phase 0 doesn't read it but the value is set now so the
-        contract is stable across phases."""
+        """SANA-Video uses ``first_frame_causal`` semantics in sana-wam joint
+        MoT (matching the FastWAM default); ``SanaMoTJointDriver`` relies on
+        this."""
         return "first_frame_causal"
 
     def build_video_to_video_mask(
@@ -285,13 +275,13 @@ class SanaVideoBackbone(VideoBackbone):
 
     @property
     def attn_kernel(self) -> str:
-        """Driver dispatch hook (read by :class:`DualSystemSelfAttnArchitecture`
-        in Phase 3). ``"linear_relu"`` tells the architecture to construct
+        """Driver dispatch hook (read by :class:`DualSystemSelfAttnArchitecture`).
+        ``"linear_relu"`` tells the architecture to construct
         ``SanaMoTJointDriver`` instead of the SDPA-based ``MoTJointDriver``.
 
-        This property is intentionally NOT abstract on the base ABC — Wan /
-        Cosmos25 backbones don't define it and ``getattr(..., "softmax")`` at
-        the dispatch site lets them keep their existing path.
+        This property is intentionally NOT abstract on the base ABC — a softmax
+        backbone need not define it; ``getattr(..., "softmax")`` at the dispatch
+        site lets it keep the SDPA path.
         """
         return "linear_relu"
 
@@ -304,11 +294,11 @@ class SanaVideoBackbone(VideoBackbone):
 
         Accepts two equivalent input shapes:
 
-        - SANA-native (Phase 0 / GPU smoke):
+        - SANA-native:
             ``x: (B, C, T, H, W)``, ``timestep: (B,)``,
             ``y: (B, 1, L, D)``, ``mask: (B, 1, 1, L)`` int/bool
 
-        - OpenWAM architecture flow (``BaseWAMArchitecture.compute_loss``):
+        - sana-wam architecture flow (``BaseWAMArchitecture.compute_loss``):
             ``latents: (B, C, T, H, W)``, ``timestep: (B,)``,
             ``context: (B, L, D)``, optionally ``context_mask: (B, L) bool``
             or ``seq_lens: (B,) long``.
@@ -377,19 +367,17 @@ class SanaVideoBackbone(VideoBackbone):
         num_clean = int(pipeline_inputs.get("num_clean_prefix_frames", 0) or 0)
         per_frame_t_mod = self._use_first_frame_cond and num_clean > 0
 
-        # SANA's split.prepare doesn't consume the rest of the OpenWAM keys
+        # SANA's split.prepare doesn't consume the rest of the sana-wam keys
         # (``input_latents``, ``num_clean_prefix_frames``, ``height``, ``width``,
-        # ``num_frames``, ``vace_context``, ``first_frame_latents``,
-        # ``actions``, ``proprio``, padding masks, etc.). Drop them so we don't
-        # collide with the upstream ``**kwargs`` slot.
+        # ``num_frames``, ``first_frame_latents``, ``actions``, ``proprio``,
+        # padding masks, etc.). Drop them so we don't collide with the upstream
+        # ``**kwargs`` slot.
         for k in (
             "input_latents",
             "num_clean_prefix_frames",
             "height",
             "width",
             "num_frames",
-            "vace_context",
-            "vace_scale",
             "first_frame_latents",
             "fuse_vae_embedding_in_latents",
             "clip_feature",
@@ -465,7 +453,7 @@ class SanaVideoBackbone(VideoBackbone):
         )
 
     # ----------------------------------------------------------------
-    # ABC: joint self-attention split (Phase 3-ready, available in Phase 0)
+    # ABC: joint self-attention split
     # ----------------------------------------------------------------
 
     def pre_attn_at_layer(
@@ -493,34 +481,7 @@ class SanaVideoBackbone(VideoBackbone):
         return state
 
     # ----------------------------------------------------------------
-    # ABC: action injection (Phase 0 scope: not supported)
-    # ----------------------------------------------------------------
-
-    def inject_action_tokens(
-        self,
-        state: BlockLoopState,
-        action_tokens: Tensor,
-        n_action: int,
-        *,
-        timestep: Optional[Tensor] = None,
-    ) -> BlockLoopState:
-        # SharedBackbone path. Not part of Phase 0 — SanaVideoBackbone only
-        # supports DualSystem (joint cross/self-attn) for now.
-        raise NotImplementedError(
-            "SanaVideoBackbone.inject_action_tokens: SharedBackbone path is out "
-            "of scope for Phase 0 of the SANA integration. See "
-            "plans/sana_mot_integration_plan.md §8 for the deferred work."
-        )
-
-    def extract_action_tokens(
-        self, state: BlockLoopState, n_action: int
-    ) -> Tuple[BlockLoopState, Tensor]:
-        raise NotImplementedError(
-            "SanaVideoBackbone.extract_action_tokens: see inject_action_tokens."
-        )
-
-    # ----------------------------------------------------------------
-    # ABC: preprocessing / decoding / device (deferred — Phase 4)
+    # ABC: preprocessing / decoding / device (not used by this model)
     # ----------------------------------------------------------------
 
     def preprocess_input(
@@ -542,7 +503,7 @@ class SanaVideoBackbone(VideoBackbone):
         """Convert a raw sample → dict consumable by ``BaseWAMArchitecture.compute_loss``.
 
         SANA-Video is text-to-video; first-frame conditioning is out of scope
-        here (see plan §8). ``FirstFrameConditioningTransform`` may inject
+        here. ``FirstFrameConditioningTransform`` may inject
         ``first_frame_image`` / ``ref_images`` into the sample — those are
         silently dropped via ``**kw`` so the T2V semantics stay clean.
 
@@ -554,8 +515,7 @@ class SanaVideoBackbone(VideoBackbone):
               ``self._pipe.text_encoder`` and ``self._pipe.tokenizer`` to be set.
             pre_encoded_text: ``(B, L, 2304)`` Gemma-2-2B last_hidden_state, or
               ``(L, 2304)`` (single sample, will be unsqueezed). Takes precedence
-              over ``text`` when both are present (cache > live, matching the
-              Cosmos25 contract).
+              over ``text`` when both are present (cache > live).
             input_latents: ``(B, 16, T_lat, H_lat, W_lat)`` pre-encoded latents;
               when set, the VAE encode step is skipped.
 
@@ -624,7 +584,7 @@ class SanaVideoBackbone(VideoBackbone):
             "input_latents": input_latents,
             "context": context,
             "seq_lens": seq_lens,
-            "num_clean_prefix_frames": 0,  # SANA is pure T2V; no TI2V prefix injection.
+            "num_clean_prefix_frames": 0,  # SANA is pure T2V; no clean-prefix injection.
             "height": vid_H,
             "width": vid_W,
             "num_frames": vid_T,
@@ -632,10 +592,9 @@ class SanaVideoBackbone(VideoBackbone):
         if self._use_first_frame_cond:
             # Clean-prefix conditioning: latent frame 0 (= the first frame of the
             # training window = the current observation) is supplied clean.
-            # ``base.compute_loss`` clean-replaces ``latents[:, :, 0:1]`` with this
-            # every step and trims it from the loss; ``prepare`` modulates it at
-            # t=0 (per-frame t-mod). Inference overrides this in
-            # ``prepare_inputs_for_inference`` with the live observation frame.
+            # The training loss clean-replaces ``latents[:, :, 0:1]`` with this
+            # and trims it from the loss; ``prepare`` modulates it at t=0
+            # (per-frame t-mod).
             out["first_frame_latents"] = input_latents[:, :, :1].clone()
             out["num_clean_prefix_frames"] = 1
         for name, value in (
@@ -664,120 +623,6 @@ class SanaVideoBackbone(VideoBackbone):
         with torch.no_grad():
             out = encoder(**enc, output_hidden_states=False)
         return out.last_hidden_state
-
-    def prepare_inputs_for_inference(self, inputs: "InferenceInputs") -> dict:
-        """Build the inference ``inputs_shared`` dict for :meth:`BaseWAMArchitecture.generate`.
-
-        SANA-Video is pure text-to-video (no TI2V / VACE / first-frame
-        conditioning), so this is the minimal analogue of
-        ``Cosmos25VideoBackbone.prepare_inputs_for_inference``:
-
-        - text → ``context`` / ``seq_lens`` via :meth:`preprocess_input`
-          (cache ``pre_encoded_text`` > live Gemma), and
-        - a seeded Gaussian ``latents`` tensor at the Wan2.1-VAE latent geometry
-          (4× temporal-causal, 8× spatial, ``z_dim=16``) that the joint
-          denoising loop steps from.
-
-        Classifier-free guidance: when ``cfg_scale > 1.0`` an ``uncond_context``
-        is materialised from the empty prompt (or a caller-supplied
-        ``uncond_pre_encoded_text``); at ``cfg_scale == 1.0`` it is ``None`` and
-        the CFG branch in ``generate`` is skipped.
-        """
-        if inputs.vace_video is not None:
-            raise NotImplementedError("SanaVideoBackbone does not support VACE conditioning at inference.")
-
-        has_cache = inputs.pre_encoded_text is not None
-        has_live = getattr(self._pipe, "text_encoder", None) is not None
-        if not (has_cache or has_live):
-            raise ValueError(
-                "SanaVideoBackbone.prepare_inputs_for_inference has no prompt source: pass "
-                "`pre_encoded_text` or configure `video_backbone.text_encoder_name`."
-            )
-        cfg_scale = float(inputs.cfg_scale)
-        if cfg_scale < 1.0:
-            raise ValueError(f"cfg_scale must be >= 1.0; got {inputs.cfg_scale!r}.")
-
-        device, dtype = self._device, self._dtype
-        num_frames, height, width = int(inputs.num_frames), int(inputs.height), int(inputs.width)
-
-        # Wan2.1 VAE latent geometry — same stride contract Cosmos uses.
-        T_lat = 1 + (num_frames - 1) // 4
-        H_lat, W_lat = height // 8, width // 8
-        # `preprocess_input` needs a shape-correct latent only to skip the VAE
-        # encode; its content is discarded — `latents` below is the real noise.
-        placeholder_latents = torch.zeros((1, 16, T_lat, H_lat, W_lat), dtype=dtype, device=device)
-
-        preproc = self.preprocess_input(
-            text=None if has_cache else inputs.prompt,
-            pre_encoded_text=inputs.pre_encoded_text,
-            input_latents=placeholder_latents,
-            height=height,
-            width=width,
-            num_frames=num_frames,
-        )
-
-        gen = torch.Generator(device="cpu").manual_seed(int(inputs.seed))
-        init_noise = torch.randn(placeholder_latents.shape, generator=gen, dtype=torch.float32).to(
-            device=device, dtype=dtype
-        )
-
-        inputs_shared: dict = dict(preproc)
-        inputs_shared["latents"] = init_noise
-        if self._use_first_frame_cond:
-            # Clean-prefix conditioning at inference: VAE-encode the live
-            # observation frame and supply it as latent frame 0. The base
-            # generate loop re-applies it every denoising step; ``prepare``
-            # modulates it at t=0. We hard-raise rather than silently fall back
-            # to blind text-to-video (which is exactly the failure mode this
-            # flag fixes).
-            if self._pipe.vae is None:
-                raise RuntimeError(
-                    "use_first_frame_cond=True requires a loaded VAE to encode the "
-                    "observation frame; build the pipeline with vae_path set."
-                )
-            ff = inputs.first_frame_image
-            if isinstance(ff, (list, tuple)):
-                ff = ff[0] if ff else None
-            if ff is None:
-                raise ValueError(
-                    "use_first_frame_cond=True requires `first_frame_image` (the current "
-                    "observation) at inference, but none was provided."
-                )
-            ff = ff.convert("RGB").resize((width, height))
-            ff_clip = _pil_video_to_tensor([[ff]]).to(device=device, dtype=dtype)  # (1,3,1,H,W)
-            with torch.no_grad():
-                ff_lat = self._pipe.vae.encode([ff_clip[0]], device=device, tiled=True)
-            ff_lat = ff_lat.to(device=device, dtype=dtype)  # (1,16,1,H_lat,W_lat)
-            init_noise[:, :, : ff_lat.shape[2]] = ff_lat
-            inputs_shared["first_frame_latents"] = ff_lat
-            inputs_shared["num_clean_prefix_frames"] = 1
-        else:
-            inputs_shared["first_frame_latents"] = None
-            inputs_shared["num_clean_prefix_frames"] = 0
-        inputs_shared["fuse_vae_embedding_in_latents"] = False
-        inputs_shared["vace_context"] = None
-        inputs_shared["vace_scale"] = 1.0
-        inputs_shared["seed"] = int(inputs.seed)
-        inputs_shared["tiled"] = bool(inputs.tiled)
-        inputs_shared["sigma_shift"] = (
-            float(inputs.shift) if inputs.shift is not None else float(getattr(self._pipe, "flow_shift", 5.0))
-        )
-        inputs_shared["num_inference_steps"] = int(inputs.num_inference_steps)
-        inputs_shared["cfg_scale"] = cfg_scale
-        inputs_shared["cfg_merge"] = bool(inputs.cfg_merge)
-
-        if cfg_scale > 1.0:
-            if inputs.uncond_pre_encoded_text is not None:
-                unc = inputs.uncond_pre_encoded_text
-                if unc.dim() == 2:
-                    unc = unc.unsqueeze(0)
-                inputs_shared["uncond_context"] = unc.to(device=device, dtype=dtype)
-            else:
-                inputs_shared["uncond_context"] = self._encode_text("").to(device=device, dtype=dtype)
-        else:
-            inputs_shared["uncond_context"] = None
-
-        return inputs_shared
 
     def get_submodule(self, name: str) -> nn.Module | None:
         return getattr(self._pipe, name, None)

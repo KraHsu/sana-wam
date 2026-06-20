@@ -156,7 +156,7 @@ def convert_rotation(
 # Convenience helpers for RoboTwin HDF5 xyzw quaternion ↔ 6D rotation
 #
 # RoboTwin HDF5 stores quaternions as xyzw (scipy default) while
-# OpenWAM's convert_rotation() uses wxyz.  These thin wrappers handle
+# the rotation utilities here use wxyz.  These thin wrappers handle
 # the convention swap so callers don't have to think about it.
 # ---------------------------------------------------------------------------
 

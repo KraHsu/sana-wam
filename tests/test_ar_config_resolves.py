@@ -1,6 +1,6 @@
 """CPU gate (no SANA weights): the AR train config flattens correctly.
 
-Replaces the openwam registry-resolution test. Pins that
+Pins that
 ``configs/train_ar_sana.yaml`` carries the canonical AR knobs + linear_relu
 kernel and that ``flatten_model_cfg`` merges architecture/action_backbone/
 video_backbone into the flat dict the architecture ``__init__`` consumes.

@@ -10,8 +10,8 @@ class BaseActionDataset(ABC, torch.utils.data.Dataset):
     """Action dataset base class.
 
     Every concrete dataset must return a dict with at least ``video`` and
-    ``action`` tensors.  Optional fields include ``prompt``,
-    ``reference_image``, and ``context_video`` (VACE conditioning).
+    ``action`` tensors.  Optional fields include ``prompt`` and
+    ``reference_image``.
     """
 
     @abstractmethod
@@ -25,7 +25,6 @@ class BaseActionDataset(ABC, torch.utils.data.Dataset):
             action:          Tensor (T, action_dim)
             prompt:          str
             reference_image: List[PIL.Image], optional
-            context_video:   List[PIL.Image], optional (VACE conditioning)
 
         Note: video is returned as PIL Images (not Tensors) because the
         legacy WanVideoPipeline.preprocess_video handles cropping, resizing,

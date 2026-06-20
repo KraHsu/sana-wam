@@ -1,4 +1,4 @@
-"""Phase 3 (driver): SanaARMoTJointDriver._mixed_attention ≡ AR dense oracle.
+"""SanaARMoTJointDriver._mixed_attention ≡ AR dense oracle.
 
 Validates that the driver-level reshape + descriptor plumbing routes the
 concatenated ``[v_noisy, v_clean, a_noisy, a_clean]`` sequence through the

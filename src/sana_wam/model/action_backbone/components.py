@@ -1,7 +1,6 @@
 """Shared components for action model architectures.
 
-These building blocks are reused across DualSystem (``ActionDiT``) and
-SharedBackbone (``SharedVanillaActionBackbone`` / ``SharedMoEActionBackbone``).
+These building blocks are used by the action backbone (``ActionDiT``).
 """
 
 import logging
@@ -279,8 +278,8 @@ class ActionOutputMLP(nn.Module):
     Unlike `ActionOutputHead` (LayerNorm + AdaLN + Linear, zero-init output
     for a stable start), this head is a plain Linear -> ReLU -> Linear stack
     with small-random weight initialization (N(0, 0.02), zero bias) on both
-    layers. Used by SharedBackbone / MoE architectures; DualSystem's
-    ActionDiT decodes with a single ``Linear(dim, action_dim)``.
+    layers. An alternative action-output head; ``ActionDiT`` itself decodes
+    with a single ``Linear(dim, action_dim)``.
 
     Args:
         input_dim:  Hidden size of incoming action tokens (= video_dim).

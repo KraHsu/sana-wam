@@ -1,16 +1,14 @@
-"""SANA-Video backbone integration for OpenWAM.
+"""SANA-Video backbone integration for sana-wam.
 
-This sub-package wires NVlabs/SANA into the OpenWAM ``VideoBackbone`` ABC.
+This sub-package wires NVlabs/SANA into the sana-wam ``VideoBackbone`` ABC.
 Public entry point is :class:`SanaVideoBackbone`; the registry is set up in
 ``sana_wam.model.video_backbone.__init__`` so config-driven instantiation works
 via ``build_video_backbone("sana_video_2b", cfg)``.
 
-Phase 0 scope (this commit): scaffolding only — the adapter loads
-``SanaMSVideo`` from ``third_party/Sana``, runs the standard
+The adapter loads ``SanaMSVideo`` from ``third_party/Sana``, runs the standard
 ``prepare → run_block × N → finalize`` lifecycle, and exposes
-``pre_attn_at_layer`` returning the dual-track (rotated + unrotated) Q/K
-that a future ``SanaMoTJointDriver`` will need. No MoT integration yet —
-see ``plans/sana_mot_integration_plan.md`` for the broader roadmap.
+``pre_attn_at_layer`` returning the dual-track (rotated + unrotated) Q/K that
+``SanaMoTJointDriver`` consumes for mixed attention.
 """
 
 # SANA's upstream Python tree is rooted at ``third_party/Sana/`` and uses
@@ -41,7 +39,7 @@ if _SANA_ROOT is not None and str(_SANA_ROOT) not in _sys.path:
 # torch 2.7 + CUDA 12.8. We install ``mmcv-lite`` + ``mmengine`` instead and
 # back-fill the missing symbol here so the SANA import chain loads cleanly.
 # Must run BEFORE any ``diffusion.*`` import — kept in this package's __init__
-# so it fires the first time anything touches the OpenWAM SANA adapter.
+# so it fires the first time anything touches the sana-wam SANA adapter.
 try:
     import types as _types
 

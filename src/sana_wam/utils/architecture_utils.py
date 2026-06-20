@@ -23,13 +23,13 @@ def downsample_video_mask_to_latent(
     padded only if ALL frames in the group are padded.
 
     Modes:
-      - ``skip_first=True`` (FastWAM / Wan TI2V): latent[0] is the conditioning
-        frame and excluded from loss; the returned mask covers tail latent
-        steps only (shape ``T_latent_tail = ceil((T_video - 1) / k)``). This
-        matches the Wan loss path which trims pred/target via ``[:, :, 1:]``.
-      - ``skip_first=False`` (Cosmos T2V, no first-frame conditioning): all
-        latents — including latent[0] — are predicted, so the mask must
-        include frame 0 too (shape ``T_latent = 1 + T_latent_tail``).
+      - ``skip_first=True``: latent[0] is the conditioning frame and excluded
+        from loss; the returned mask covers tail latent steps only (shape
+        ``T_latent_tail = ceil((T_video - 1) / k)``), matching a loss path that
+        trims pred/target via ``[:, :, 1:]``.
+      - ``skip_first=False`` (no first-frame conditioning): all latents —
+        including latent[0] — are predicted, so the mask must include frame 0
+        too (shape ``T_latent = 1 + T_latent_tail``).
 
     Args:
         video_is_pad: (..., T_video) bool, True=padded.

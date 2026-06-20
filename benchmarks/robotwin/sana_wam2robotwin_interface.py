@@ -1,7 +1,7 @@
-"""RoboTwin eval adapter for the OpenWAM Policy Server.
+"""RoboTwin eval adapter for the sana-wam Policy Server.
 
 Loaded by RoboTwin's ``eval_policy.py`` via ``--policy_name``. It
-communicates with a running OpenWAM HTTP server instead of loading model
+communicates with a running sana-wam HTTP server instead of loading model
 weights directly, so the RoboTwin client environment only needs::
 
     numpy, opencv-python, Pillow   (see requirements.txt)
@@ -14,13 +14,13 @@ Protocol overview:
 
 Server default ports: WS=8850, HTTP=8848.
 
-Camera mapping from RoboTwin to the OpenWAM server's fixed client API names:
+Camera mapping from RoboTwin to the sana-wam server's fixed client API names:
 
-    RoboTwin              →  OpenWAM client field
+    RoboTwin              →  sana-wam client field
     head_camera           →  head_camera        (required)
     left_camera           →  left_wrist_camera  (optional)
     right_camera          →  right_wrist_camera (optional)
-    front_camera          →  dropped (not part of the OpenWAM contract)
+    front_camera          →  dropped (not part of the sana-wam contract)
 
 All image preprocessing (resize, multi-view composition) and prompt
 wrapping happen server-side, driven by the checkpoint's saved
@@ -70,10 +70,10 @@ def _load_step_lim_overrides(path: str) -> Dict[str, int]:
         with open(path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
     except (yaml.YAMLError, OSError) as exc:
-        print(f"[OpenWAMClient] Failed to load step_lim overrides from {path}: {exc}")
+        print(f"[SanaWAMClient] Failed to load step_lim overrides from {path}: {exc}")
         return {}
     if not isinstance(data, dict):
-        print(f"[OpenWAMClient] {path} must be a task_name->int mapping; ignoring.")
+        print(f"[SanaWAMClient] {path} must be a task_name->int mapping; ignoring.")
         return {}
     out: Dict[str, int] = {}
     for k, v in data.items():
@@ -82,7 +82,7 @@ def _load_step_lim_overrides(path: str) -> Dict[str, int]:
         # would be nearly impossible to debug from a one-line override log.
         if isinstance(v, bool) or not isinstance(v, int):
             print(
-                f"[OpenWAMClient] Skipping step_lim override {k!r}={v!r}: "
+                f"[SanaWAMClient] Skipping step_lim override {k!r}={v!r}: "
                 f"value must be a plain int (got {type(v).__name__})"
             )
             continue
@@ -139,7 +139,7 @@ def _apply_step_lim_override(task_env) -> None:
         if not _MISSING_TASK_NAME_WARNED:
             _MISSING_TASK_NAME_WARNED = True
             print(
-                "[OpenWAMClient] step_lim overrides loaded but TASK_ENV.task_name "
+                "[SanaWAMClient] step_lim overrides loaded but TASK_ENV.task_name "
                 f"is missing/empty ({task_name!r}); overrides will not be applied."
             )
         return
@@ -151,11 +151,11 @@ def _apply_step_lim_override(task_env) -> None:
     key = (task_name, override)
     if key not in _LOGGED_OVERRIDES:
         _LOGGED_OVERRIDES.add(key)
-        print(f"[OpenWAMClient] step_lim override: {task_name} {prev} -> {override}")
+        print(f"[SanaWAMClient] step_lim override: {task_name} {prev} -> {override}")
 
 
 class ModelClient:
-    """RoboTwin ``ModelClient`` backed by the OpenWAM Policy Server.
+    """RoboTwin ``ModelClient`` backed by the sana-wam Policy Server.
 
     The server manages action chunking internally, so this client calls
     ``POST /predict`` every step and lets the server decide whether to run
@@ -177,8 +177,8 @@ class ModelClient:
     ) -> None:
         """
         Args:
-            host:            OpenWAM server hostname / IP.
-            http_port:       OpenWAM HTTP port (default 8848).
+            host:            sana-wam server hostname / IP.
+            http_port:       sana-wam HTTP port (default 8848).
             send_state:      Whether to include the robot proprioceptive state
                              vector in the ``/predict`` request.
             state_dim:       Optional expected proprio dimension. When set, the
@@ -198,7 +198,7 @@ class ModelClient:
         _VALID_ACTION_TYPES = ("qpos", "ee")
         if action_type not in _VALID_ACTION_TYPES:
             raise ValueError(
-                f"[OpenWAMClient] Unsupported action_type={action_type!r}; "
+                f"[SanaWAMClient] Unsupported action_type={action_type!r}; "
                 f"expected one of {_VALID_ACTION_TYPES}. "
                 f"Note: EEF-mode training uses 'ee' (NOT 'eef')."
             )
@@ -220,13 +220,13 @@ class ModelClient:
         for field in _DEPRECATED_YAML_FIELDS:
             if field in kwargs:
                 print(
-                    f"[OpenWAMClient] Ignored legacy config field '{field}'={kwargs[field]!r}. "
+                    f"[SanaWAMClient] Ignored legacy config field '{field}'={kwargs[field]!r}. "
                     f"Server decides multi-view and camera layout from the checkpoint's "
                     f"config.yaml — drop this field from policy_config.yml."
                 )
 
         print(
-            f"[OpenWAMClient] server={self._server} send_state={send_state} "
+            f"[SanaWAMClient] server={self._server} send_state={send_state} "
             f"state_dim={state_dim} "
             f"request_timeout={request_timeout}s action_type={action_type} "
             f"action_indices={action_indices} debug={debug} debug_dir={debug_dir}"
@@ -240,13 +240,13 @@ class ModelClient:
         while time.monotonic() < deadline:
             try:
                 if client.get(self._server, "/health").get("status") == "healthy":
-                    print(f"[OpenWAMClient] Server healthy at {self._server}")
+                    print(f"[SanaWAMClient] Server healthy at {self._server}")
                     return
             except Exception as exc:
                 last_exc = exc
             time.sleep(poll_interval)
         raise RuntimeError(
-            f"OpenWAM server did not become healthy within {timeout_s}s at {self._server}. Last error: {last_exc}"
+            f"sana-wam server did not become healthy within {timeout_s}s at {self._server}. Last error: {last_exc}"
         )
 
     def reset(self, task_description: str = "") -> None:
@@ -263,11 +263,11 @@ class ModelClient:
             if self._debug:
                 ep_dir = os.path.join(self._debug_dir, f"ep{self._episode:04d}")
                 os.makedirs(ep_dir, exist_ok=True)
-                print(f"[OpenWAMClient] debug images → {ep_dir}")
+                print(f"[SanaWAMClient] debug images → {ep_dir}")
         self._task_description = task_description
         result = client.reset(self._server, timeout=30)
         if result.get("status") != "ok":
-            raise RuntimeError(f"[OpenWAMClient] Server reset failed: {result}")
+            raise RuntimeError(f"[SanaWAMClient] Server reset failed: {result}")
 
     def _save_debug_step(
         self,
@@ -338,14 +338,14 @@ class ModelClient:
         if self._send_state:
             if state_arr is None:
                 raise ValueError(
-                    "[OpenWAMClient] send_state=True requires example['state']. "
+                    "[SanaWAMClient] send_state=True requires example['state']. "
                     "New proprio-conditioned checkpoints need this field; set "
                     "send_state=false only for checkpoints trained without state."
                 )
             state_np = np.asarray(state_arr, dtype=np.float32).reshape(-1)
             if self._state_dim is not None and state_np.size != self._state_dim:
                 raise ValueError(
-                    f"[OpenWAMClient] Extracted state_dim={state_np.size}, expected {self._state_dim}. "
+                    f"[SanaWAMClient] Extracted state_dim={state_np.size}, expected {self._state_dim}. "
                     "Check policy_config.yml: action_type/state_dim must match the checkpoint's "
                     "dataloader.action_mode and architecture.state_dim."
                 )
@@ -433,7 +433,7 @@ def eval(TASK_ENV, model: ModelClient, observation: dict) -> None:
 
     RoboTwin exposes three per-camera entries under ``observation["observation"]``
     (``head_camera`` / ``left_camera`` / ``right_camera``). They map positionally
-    to the OpenWAM client API's fixed fields (head / left_wrist / right_wrist).
+    to the sana-wam client API's fixed fields (head / left_wrist / right_wrist).
     ``front_camera`` is ignored — it's not part of the server contract.
     """
     _apply_step_lim_override(TASK_ENV)

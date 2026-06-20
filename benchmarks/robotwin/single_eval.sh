@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run a single RoboTwin task evaluation against an already-running OpenWAM server.
+# Run a single RoboTwin task evaluation against an already-running sana-wam server.
 #
 # Usage:
 #   bash single_eval.sh <task_name> <task_config> <ckpt_setting> <gpu_id> [http_port] [host]
@@ -7,10 +7,10 @@
 # Args:
 #   task_name    — RoboTwin task (e.g. adjust_bottle)
 #   task_config  — demo_clean | demo_randomized
-#   ckpt_setting — label used in result filenames (e.g. openwam)
+#   ckpt_setting — label used in result filenames (e.g. sana_wam)
 #   gpu_id       — CUDA device for the RoboTwin simulator process
-#   http_port    — OpenWAM HTTP port  (default: 8848, env: ROBOTWIN_HTTP_PORT)
-#   host         — OpenWAM server host (default: 127.0.0.1, env: ROBOTWIN_POLICY_HOST)
+#   http_port    — sana-wam HTTP port  (default: 8848, env: ROBOTWIN_HTTP_PORT)
+#   host         — sana-wam server host (default: 127.0.0.1, env: ROBOTWIN_POLICY_HOST)
 #
 # Required env vars:
 #   ROBOTWIN_PATH    — path to the RoboTwin repository
@@ -34,7 +34,7 @@ robotwin_eval_script="${SCRIPT_DIR}/eval_policy_wrapper.py"
 
 task_name="$1"
 task_config="$2"
-ckpt_setting="${3:-openwam}"
+ckpt_setting="${3:-sana_wam}"
 gpu_id="${4:-0}"
 http_port="${5:-${ROBOTWIN_HTTP_PORT:-8848}}"
 host="${6:-${ROBOTWIN_POLICY_HOST:-127.0.0.1}}"
@@ -77,7 +77,7 @@ maybe_configure_sapien_egl() {
 }
 
 # Inject runtime host and http_port into a temp config
-runtime_config="$(mktemp "${TMPDIR:-/tmp}/openwam_policy_config.XXXXXX.yml")"
+runtime_config="$(mktemp "${TMPDIR:-/tmp}/sana_wam_policy_config.XXXXXX.yml")"
 trap 'rm -f "${runtime_config}"' EXIT
 
 sed \
@@ -86,7 +86,7 @@ sed \
     "${policy_config_template}" > "${runtime_config}"
 
 export CUDA_VISIBLE_DEVICES="${gpu_id}"
-# PYTHONPATH: RoboTwin modules + this directory (for openwam2robotwin_interface.py)
+# PYTHONPATH: RoboTwin modules + this directory (for sana_wam2robotwin_interface.py)
 export PYTHONPATH="${ROBOTWIN_PATH}:${SCRIPT_DIR}:${PYTHONPATH:-}"
 export MPLCONFIGDIR="${MPLCONFIGDIR:-${TMPDIR:-/tmp}/matplotlib}"
 maybe_configure_sapien_egl
@@ -108,4 +108,4 @@ PYTHONUNBUFFERED=1 PYTHONWARNINGS=ignore::UserWarning \
     --task_config      "${task_config}" \
     --ckpt_setting     "${ckpt_setting}" \
     --seed             "${seed}" \
-    --policy_name      "openwam2robotwin_interface"
+    --policy_name      "sana_wam2robotwin_interface"

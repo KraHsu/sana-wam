@@ -37,7 +37,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "log_dir",
         type=Path,
-        help="DLC/shared evaluation log directory, e.g. .../openwam_all_dlc_run123",
+        help="DLC/shared evaluation log directory, e.g. .../sana_wam_all_dlc_run123",
     )
     parser.add_argument(
         "-o",

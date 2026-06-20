@@ -1,11 +1,11 @@
-policy_name: openwam2robotwin_interface
+policy_name: sana_wam2robotwin_interface
 task_name: null
 task_config: null
 ckpt_setting: null
 seed: null
 instruction_type: unseen
 
-# --- OpenWAM Policy Server connection ---
+# --- sana-wam Policy Server connection ---
 host: "127.0.0.1"
 http_port: 8848           # patched at runtime by single_eval.sh
 

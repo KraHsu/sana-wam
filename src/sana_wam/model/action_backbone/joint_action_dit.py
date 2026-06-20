@@ -1,8 +1,8 @@
-"""Shared ActionDiT for OpenWAM joint video-action architectures.
+"""Shared ActionDiT for the joint video-action architecture.
 
-Dual-system and tri-system architectures share this module. It owns the
-action-side parameters and exposes both a standalone cross-attention path and
-a split pre/post interface for mixed self-attention drivers.
+The dual-system architecture uses this module. It owns the action-side
+parameters and exposes both a standalone cross-attention path and a split
+pre/post interface for mixed self-attention drivers.
 
 Three variants share this module:
 
@@ -525,7 +525,7 @@ class ActionDiT(ActionBackbone):
         ``"softmax"`` (default) routes through the existing SDPA-based
         :class:`MoTJointDriver`. ``"linear_relu"`` selects the SANA-style
         cumsum linear-attention path provided by
-        :class:`SanaMoTJointDriver` (plans/sana_mot_integration_plan.md §3.2).
+        :class:`SanaMoTJointDriver`.
 
         When ``linear_relu`` is selected, :meth:`pre_attn_at_layer` applies
         ReLU to Q/K **between** RMSNorm and RoPE (mirroring SANA's
@@ -782,7 +782,7 @@ class ActionDiT(ActionBackbone):
         carry their own diffusion timestep. With ``token_timesteps=None`` the
         original per-sample path is byte-identical. ``frame_ids`` ``(T_action,)``
         tags each token with its modality-parity chunk index for framed RoPE
-        (Phase 2) and the AR attention descriptor (Phase 3).
+        and the AR attention descriptor.
         """
         from sana_wam.model.base import ActionState
 
@@ -860,7 +860,7 @@ class ActionDiT(ActionBackbone):
         additionally carries ``q_unrot`` and ``k_unrot`` (ReLU'd, pre-RoPE Q/K
         in MoT ``(B, S, H*D)`` layout) and ``uses_linear_attn=True``, matching
         the contract that :class:`SanaMoTJointDriver` expects (mirrors
-        ``openwam/model/video_backbone/sana/blocks_split.py::block_pre_attn``).
+        ``sana_wam/model/video_backbone/sana/blocks_split.py::block_pre_attn``).
         """
         ret = self.pre_attn_at_layer_for_compile(layer_id, astate)
         if self._attn_kernel == "linear_relu":
@@ -894,7 +894,7 @@ class ActionDiT(ActionBackbone):
         ``attn_kernel == "softmax"`` or a 6-tuple
         ``(q, k, v, post_state, q_unrot, k_unrot)`` for ``"linear_relu"``.
         The two arities are intentional — keeping the softmax tuple at four
-        elements preserves the existing compile contract for Wan/Cosmos25
+        elements preserves the existing compile contract for softmax
         consumers, while the extended tuple lets the SANA driver pull the
         unrotated ReLU'd Q/K it needs for SANA's dual-track denominator.
         """

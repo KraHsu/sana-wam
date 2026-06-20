@@ -40,19 +40,6 @@ _JOINT_ACTION_DIM = 14  # aloha-agilex qpos vector
 
 
 # ---------------------------------------------------------------------------
-# Per-backbone supported resolutions
-#
-# "vace"  — Wan2.1-VACE-1.3B / 14B: limited to training resolutions tested by Wan team.
-# "ti2v"  — Wan2.2-TI2V-5B: only requires height % 32 == 0 and width % 32 == 0.
-# None    — unknown/unspecified backbone: falls back to divisibility-by-32 check.
-# ---------------------------------------------------------------------------
-
-BACKBONE_SUPPORTED_RESOLUTIONS: dict = {
-    "vace": {(480, 832), (720, 1280)},
-    "ti2v": None,  # any (h%32==0, w%32==0) is valid
-}
-
-# ---------------------------------------------------------------------------
 # RoboTwin 2.0 task split (42 train / 8 holdout)
 #
 # Holdout tasks cover diverse skill types so each category retains training
@@ -363,15 +350,8 @@ class RoboTwinDataset(BaseActionDataset):
         if action_mode not in ("joint", "eef"):
             raise ValueError(f"action_mode must be 'joint' or 'eef', got '{action_mode}'")
 
-        # Validate resolution against backbone constraints.
-        _supported = BACKBONE_SUPPORTED_RESOLUTIONS.get(backbone, None) if backbone else None
-        if _supported is not None:
-            if (height, width) not in _supported:
-                supported_str = ", ".join(f"{h}x{w}" for h, w in sorted(_supported))
-                raise ValueError(
-                    f"backbone='{backbone}' only supports resolutions: {supported_str}. Got {height}x{width}."
-                )
-        elif height % 32 != 0 or width % 32 != 0:
+        # Validate resolution: VAE downsamples by 16, patch size 2 → must be /32.
+        if height % 32 != 0 or width % 32 != 0:
             raise ValueError(
                 f"Resolution {height}x{width} must be divisible by 32 (VAE downsamples by 16, patch size 2)."
             )
@@ -406,7 +386,7 @@ class RoboTwinDataset(BaseActionDataset):
         # the historical Wan VAE rule.
         #   causal_temporal=True : first frame is its own latent token, so the
         #     remaining ``num_video_frames - 1`` frames must be divisible by
-        #     ``temporal_compression`` (Wan VAE = 4, V-JEPA 2.1 = 2).
+        #     ``temporal_compression`` (e.g. 4 for the Wan VAE).
         #   causal_temporal=False: uniform tubelets, so ``num_video_frames``
         #     itself must be divisible by ``temporal_compression``.
         _check_temporal_divisibility(self.num_video_frames, self.temporal_compression, self.causal_temporal)
@@ -521,7 +501,7 @@ class RoboTwinDataset(BaseActionDataset):
                 max_start = max(0, ep_len - self._raw_window_len)
             else:
                 # FastWAM-aligned tail semantics, constrained to starts with at
-                # least one valid future action label under OpenWAM's t+1 action
+                # least one valid future action label under the t+1 action
                 # alignment. Tail windows are padded and masked out in the loss.
                 max_start = max(0, ep_len - 2)
             for start in range(0, max_start + 1, self.window_stride):
@@ -667,12 +647,10 @@ class RoboTwinDataset(BaseActionDataset):
         elif split == "val":
             print(f"  Val: exhaustive windows ({len(self._window_index)} samples)")
 
-        # ---- Optional pre-encoded text cache (e.g. Cosmos-Reason1 for the
-        # Cosmos25 backbone, pre-computed via
-        # ``sana_wam.dataloader.reason1_embedding_computation``). When the
-        # cache_dir is set, every sample dict will carry a
-        # ``pre_encoded_text`` (L, D) tensor that the architecture threads to
-        # ``vb.preprocess_input``. Wan backbones drop it silently via ``**kw``.
+        # ---- Optional pre-encoded text cache. When the cache_dir is set, every
+        # sample dict will carry a ``pre_encoded_text`` (L, D) tensor that the
+        # architecture threads to ``vb.preprocess_input``; backbones that don't
+        # consume it drop it silently via ``**kw``.
         self._text_embedding_transform = None
         if text_embedding_cache_dir:
             from sana_wam.dataloader.transforms.text_embedding_cache import (
@@ -921,7 +899,6 @@ class RoboTwinDataset(BaseActionDataset):
 
         return {
             "video": sampled_video,
-            "vace_video": None,
             "first_frame_image": [sampled_video[0]],
             "action": action_tensor,
             "action_mask": action_mask,
@@ -1195,8 +1172,8 @@ class MultiTaskRoboTwinDataset(BaseActionDataset):
                             return default
                         return value
 
-                    wait_timeout_s = _env_positive_float("OPENWAM_STATS_WAIT_TIMEOUT_S", 12 * 60 * 60)
-                    poll_interval_s = _env_positive_float("OPENWAM_STATS_POLL_INTERVAL_S", 10)
+                    wait_timeout_s = _env_positive_float("SANA_WAM_STATS_WAIT_TIMEOUT_S", 12 * 60 * 60)
+                    poll_interval_s = _env_positive_float("SANA_WAM_STATS_POLL_INTERVAL_S", 10)
 
                     print(
                         f"[normalizer] No pre-computed {_scope_label} stats at default location: "

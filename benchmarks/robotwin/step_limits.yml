@@ -8,7 +8,7 @@
 #   - Tasks NOT listed here keep RoboTwin's original value (or its
 #     built-in fallback of 1000 when the upstream file also lacks
 #     the task).
-#   - Override is applied by `openwam2robotwin_interface.py` at the
+#   - Override is applied by `sana_wam2robotwin_interface.py` at the
 #     start of every episode, so you can tweak a number and rerun
 #     without touching the RoboTwin source tree.
 #

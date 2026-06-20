@@ -1,8 +1,8 @@
 """View over upstream ``SanaMSVideo`` exposing prepare / per-block / finalize.
 
-This is the *heart* of the Phase 0 scaffold. It re-decomposes
+This re-decomposes
 ``SanaMSVideo.forward`` (`third_party/Sana/diffusion/model/nets/sana_multi_scale_video.py:590`)
-into three pieces that fit the OpenWAM block-loop contract:
+into three pieces that fit the block-loop contract:
 
 1. ``prepare(x, timestep, y, mask)`` — patchify, t_embed, t_block (6-scale
    AdaLN modulation), y_embed, RoPE freqs. Returns a dict that the adapter
@@ -11,7 +11,7 @@ into three pieces that fit the OpenWAM block-loop contract:
    call; identical to the loop body at ``sana_multi_scale_video.py:653-664``.
 3. ``finalize(x, t, f, h, w)`` — ``final_layer + unpatchify``.
 
-For the joint-MoT path (Phase 3+), the per-block forward is further split
+For the joint-MoT path, the per-block forward is further split
 into ``block_pre_attn`` + ``native_attn`` + ``block_post_attn`` — matching
 the layout in ``SanaVideoMSBlock.forward`` lines 256-333 and
 ``LiteLAReLURope.forward`` at ``sana_blocks.py:340-388``. ``block_pre_attn``
@@ -123,15 +123,15 @@ class SanaMSVideoSplit:
     does not re-register parameters. The owning ``SanaVideoBackbone`` is the
     ``nn.Module`` boundary.
 
-    Phase 0 contract:
+    Contract:
       - :meth:`prepare` + N× :meth:`run_block` + :meth:`finalize` produces
         bit-equivalent output to ``self._dit(x, timestep, y, mask)`` for the
         ``len(timestep.shape) <= 2`` (per-sample, non-frame-aware) path.
       - :meth:`block_pre_attn` + :meth:`native_attn` + :meth:`block_post_attn`
         is bit-equivalent to ``self._dit.blocks[i].forward(...)``.
 
-    Future (Phase 3) hook: ``post_state["q_unrot"]``/``["k_unrot"]`` lets a
-    derivative ``SanaMoTJointDriver`` skip ``native_attn`` and run its own
+    Hook: ``post_state["q_unrot"]``/``["k_unrot"]`` lets
+    ``SanaMoTJointDriver`` skip ``native_attn`` and run its own
     cumsum-linear-attn over a heterogeneous sequence.
     """
 
@@ -294,7 +294,7 @@ class SanaMSVideoSplit:
             # only / inference paths the adapter constructs an "all-attend"
             # mask before calling prepare.
             raise ValueError(
-                "SanaMSVideoSplit.prepare requires a caption ``mask`` when DISABLE_XFORMERS=1 (the OpenWAM default)."
+                "SanaMSVideoSplit.prepare requires a caption ``mask`` when DISABLE_XFORMERS=1 (the default)."
             )
 
         return {
@@ -319,8 +319,8 @@ class SanaMSVideoSplit:
         """Run a single upstream block — equivalent to one iteration of the
         loop at ``sana_multi_scale_video.py:653-664``.
 
-        This is the path used by the OpenWAM video-only loop. The
-        joint-MoT path (Phase 3+) drives ``block_pre_attn`` + ``native_attn``
+        This is the path used by the video-only loop. The
+        joint-MoT path drives ``block_pre_attn`` + ``native_attn``
         + ``block_post_attn`` instead.
         """
         block = self._dit.blocks[block_id]
@@ -363,7 +363,7 @@ class SanaMSVideoSplit:
         """Run norm1 + AdaLN modulate + QKV proj + qk_norm + ReLU + RoPE.
 
         Returns ``(tilde_q, tilde_k, v, post_state)`` with ``tilde_q/tilde_k/v``
-        shaped ``(B, S, H*D)`` to match the OpenWAM MoT contract. The
+        shaped ``(B, S, H*D)`` to match the MoT contract. The
         ``post_state`` dict has:
 
         - ``residual_x``, ``gate_msa``, ``shift_mlp``, ``scale_mlp``, ``gate_mlp``,
@@ -410,7 +410,7 @@ class SanaMSVideoSplit:
         k = attn.k_norm(k).transpose(-1, -2)
         v_raw = v.transpose(-1, -2)  # (B, C, N)
 
-        # Upstream stores heads on dim=-3: (B, h, h_d, N). The OpenWAM MoT
+        # Upstream stores heads on dim=-3: (B, h, h_d, N). The MoT
         # contract wants (B, S, H*D) — we keep BOTH representations so this
         # function is the one place where the layout pivot is done.
         h_count = C // attn.dim
@@ -455,9 +455,9 @@ class SanaMSVideoSplit:
         Reproduces ``sana_blocks.py:378-385`` — the matmuls and dual-track
         normalization. Returns the attention output in MoT layout
         ``(B, S, H*D)``, **before** the o_proj (which lives in
-        :meth:`block_post_attn`). Phase 0 calls this from ``run_block`` to
+        :meth:`block_post_attn`). ``run_block`` calls this to
         verify the split is numerically equivalent to running
-        ``block.forward`` directly. Phase 3+ ``SanaMoTJointDriver`` bypasses
+        ``block.forward`` directly. ``SanaMoTJointDriver`` bypasses
         this method and runs its own mixed-attention over a concatenated
         video+action sequence.
         """
@@ -524,7 +524,7 @@ class SanaMSVideoSplit:
                 return (g * val.reshape(B, Fdim, tpf, C)).reshape(B, N, C)
 
         # Optional secondary flash-attention residual (sana_multi_scale_video.py:298-299).
-        # Phase 0 assumes ``additional_flash_attn=None`` (the 2B config), so
+        # Assumes ``additional_flash_attn=None`` (the 2B config), so
         # ``flash_attn_additional`` is None.
         if per_frame:
             x = post_state["residual_x"] + block.drop_path(_pf_gate(gate_msa, proj_out))

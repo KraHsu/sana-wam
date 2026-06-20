@@ -1,18 +1,17 @@
 """Pure-math primitives for SANA-style linear attention under arbitrary masks.
 
-This module hosts the math that a future :class:`SanaMoTJointDriver`
-(plans/sana_mot_integration_plan.md §3) substitutes for SDPA's softmax in
-:meth:`MoTJointDriver._mixed_attention`. It is intentionally **driver-agnostic**
-and free of OpenWAM type imports so the same primitive can be reused by
+This module hosts the math that :class:`SanaMoTJointDriver` substitutes for
+SDPA's softmax in :meth:`MoTJointDriver._mixed_attention`. It is intentionally **driver-agnostic**
+and free of architecture-specific type imports so the same primitive can be reused by
 inference paths, unit tests, and ablation scripts.
 
-Layout convention — matches plan §1.1 / §2.2:
+Layout convention:
 
 - ``tilde_q``, ``tilde_k``: ``(B, H, N, d)`` — rotated, kernel-applied (ReLU).
 - ``phi_q``, ``phi_k``:     ``(B, H, N, d)`` — kernel-applied (ReLU), **NOT**
   rotated. They carry the denominator's row-sum and must keep the original
   (un-RoPE'd) values so the dual-track normalization that SANA pretrained
-  with stays intact (see plans/sana_mot_math_conflict.md §1).
+  with stays intact.
 - ``v``:                    ``(B, H, N, d)``.
 - Output:                   ``(B, H, N, d)``.
 
@@ -23,9 +22,9 @@ identity
 
 to compute the result in ``O(N · d²)`` time. :func:`_expanded_linear_attn`
 below computes the same quantity in the ``O(N²)`` mask-aware form — the
-slow but unambiguous reference that Phase 2's cumsum implementation will
-be checked against. The two are mathematically identical when ``mask`` is
-``None`` (Phase 1.2 test); for masked sequences only the expanded form
+slow but unambiguous reference that the cumsum implementation is checked
+against. The two are mathematically identical when ``mask`` is
+``None``; for masked sequences only the expanded form
 is correct because the fused form folds N out of existence before the
 mask is applied.
 
@@ -74,7 +73,7 @@ def _expanded_linear_attn(
         SANA's pretrained "two-track" formulation diverges from a standard
         linear attention here: it needs the un-rotated K to keep the
         normalization positive (rotated K can be negative after the complex
-        rotation), see plans/sana_mot_math_conflict.md §1.
+        rotation).
     mask
         Optional ``(N, N)`` or broadcastable bool/float tensor. ``True`` /
         nonzero means "the query at row ``i`` is allowed to see the key at
@@ -92,7 +91,7 @@ def _expanded_linear_attn(
     -----
     Allocates two ``(B, H, N, N)`` matrices — quadratic in sequence length.
     Intended for tests and as a fallback when :func:`_mask_to_chunk_index`
-    (Phase 2) cannot reduce the mask to a monotonic block layout.
+    cannot reduce the mask to a monotonic block layout.
     """
     if tilde_q.dim() != 4 or tilde_k.dim() != 4 or v.dim() != 4:
         raise ValueError(
@@ -128,7 +127,7 @@ def _mask_to_chunk_index(mask: Tensor) -> Optional[List[int]]:
         M[i, j] == 1   iff   chunk(j) <= chunk(i)
 
     where ``chunk(i)`` is the chunk that token ``i`` belongs to. All three
-    ``video_attention_mask_mode`` values that OpenWAM ships
+    ``video_attention_mask_mode`` values
     (``bidirectional`` / ``first_frame_causal`` / ``per_frame_causal``, see
     :meth:`WanVideoBackbone.build_video_to_video_mask`) compose with the
     FastWAM-Joint ``[Sv+Sa, Sv+Sa]`` topology — action↔action True,
@@ -275,10 +274,9 @@ def _chunked_linear_attn(
     -----
     The per-chunk loop is in Python — vectorizing across chunks loses the
     monotonic-block savings (cumsum cannot start "from the future"). For
-    OpenWAM's typical 3-chunk first-frame-causal mask this loop runs three
+    the typical 3-chunk first-frame-causal mask this loop runs three
     times per layer per forward; for the 81-frame per-frame-causal fallback
-    it runs 82 times. The plan's risk register §7 notes the per-frame mode
-    as a likely future fused-kernel target.
+    it runs 82 times. The per-frame mode is a likely future fused-kernel target.
     """
     if tilde_q.dim() != 4 or tilde_k.dim() != 4 or v.dim() != 4:
         raise ValueError(

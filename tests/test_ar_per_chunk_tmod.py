@@ -1,4 +1,4 @@
-"""Phase 1: per-token (AR) timestep conditioning degenerates to per-sample.
+"""Per-token (AR) timestep conditioning degenerates to per-sample.
 
 The AR path lets each action token carry its own diffusion timestep so the
 duplicated ``[noisy | clean]`` sequence (and different chunks within the noisy

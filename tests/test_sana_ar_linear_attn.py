@@ -1,4 +1,4 @@
-"""Phase 0 gate: SANA autoregressive structured linear attention ≡ dense oracle.
+"""SANA autoregressive structured linear attention ≡ dense oracle.
 
 The AR fast path :func:`_ar_chunked_linear_attn` realizes the LingBot-VA
 block-causal attention topology (clean/noise duplicated sequence, modality-parity

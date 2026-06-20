@@ -1,4 +1,4 @@
-"""Phase 5 (engine primitive): single-chunk cache-aware DiT pass.
+"""Single-chunk cache-aware DiT pass.
 
 Exercises SanaARMoTJointDriver.run_ar_chunk_through_backbone on a mini SANA video
 backbone: ingesting a clean chunk populates the linear-state cache, and a later

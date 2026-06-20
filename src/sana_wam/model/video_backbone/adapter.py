@@ -1,9 +1,7 @@
 """Backbone-agnostic interface for the WAM architecture/backbone split.
 
-The video DiT block loop is backbone-specific (Wan-specific patchify, RoPE,
-VACE, SP, ...). The action injection logic is
-architecture-specific (DualSystem cross/self attention, SharedBackbone
-vanilla/MoE). This module defines the contract between the two:
+The video DiT block loop is backbone-specific (patchify, RoPE, ...). This
+module defines the contract between the backbone and the architecture:
 
 - :class:`VideoBackbone` exposes the block loop to architectures via three
   methods: ``prepare()`` / ``run_block()`` / ``finalize()``.  Architectures
@@ -15,8 +13,8 @@ vanilla/MoE). This module defines the contract between the two:
   ``state.x``, ``state.t_mod``, ``state.freqs`` between calls (e.g. to
   concat/slice action tokens, extend RoPE, extend per-token t_mod).
 
-Concrete implementations live alongside their backbone code
-(e.g. ``wan_adapter.py`` parallel to the ``wan/`` folder).
+The concrete implementation is
+:class:`~sana_wam.model.video_backbone.sana.SanaVideoBackbone`.
 """
 
 from __future__ import annotations
@@ -38,14 +36,6 @@ class BlockLoopState:
     ``prepare()`` and the first ``run_block()`` call (e.g. to append action
     tokens, extend RoPE freqs, extend per-token t_mod).
 
-    Inject / extract contract (SharedBackbone path):
-        ``inject_action_tokens`` extends ``x`` (sequence dim) and, in
-        per-token t_mod mode, also extends ``freqs`` and ``t_mod`` to match.
-        ``extract_action_tokens`` removes the shared-token tail from ``x`` and
-        keeps sequence-shaped ``freqs`` / per-token ``t_mod`` aligned with the
-        remaining video tokens. Architectures must call ``inject`` and
-        ``extract`` in matched pairs.
-
     Fields marked "backbone-internal" are managed by the backbone and should
     not be modified by architecture code.
     """
@@ -63,15 +53,11 @@ class BlockLoopState:
     w: int = 0
 
     # --- Per-frame token layout (backbone-internal) ---
-    # For native VAE / V-JEPA-style encoders ``tokens_per_frame_patch == h*w``
-    # and ``tokens_per_frame_special == 0``; for VGGT-Omega-style encoders
-    # with ``spec.has_special_tokens=True`` the per-frame block in the DiT
-    # self-attn sequence is ``[special | patches]`` of length
-    # ``tokens_per_frame_special + tokens_per_frame_patch`` (which is 497
-    # for the VGGT-Omega-1B-512 path: 17 special + 24×20 patches). Stored
-    # explicitly so video-slice arithmetic in ``inject_shared_tokens`` /
-    # ``finalize`` / mask construction does not have to re-infer the
-    # special-token count from the latent tensor shape.
+    # For the native VAE path ``tokens_per_frame_patch == h*w`` and
+    # ``tokens_per_frame_special == 0``. Encoders that prepend per-frame special
+    # tokens set ``tokens_per_frame_special > 0`` so the per-frame block is
+    # ``[special | patches]``; stored explicitly so video-slice arithmetic and
+    # mask construction need not re-infer the count from the latent shape.
     tokens_per_frame_special: int = 0
     tokens_per_frame_patch: int = 0
 
@@ -80,8 +66,6 @@ class BlockLoopState:
 
     # --- Optional fields ---
     reference_prefix_len: int = 0  # Deprecated: reference_latents path removed (23246ba). Kept for API compat.
-    vace_hints: Optional[list] = None
-    vace_scale: float = 1.0
     sp_pad_shape: int = 0
     use_gradient_checkpointing: bool = False
     use_gradient_checkpointing_offload: bool = False
@@ -174,11 +158,10 @@ class VideoBackbone(ABC, nn.Module):
     def context_dim(self) -> Optional[int]:
         """Per-token dim of the text/context embedding produced by ``preprocess_input``.
 
-        Returned by backbones whose text encoder output dim differs from Wan's
-        4096 (e.g. Cosmos). Architectures that need to size cross-attention
+        Returned by backbones whose text encoder output dim differs from the
+        legacy 4096 default. Architectures that need to size cross-attention
         projections may consult this when ``cfg.text_dim`` is unset. Default
-        ``None`` keeps existing Wan configs unaffected — they still fall back
-        to the legacy 4096 default.
+        ``None`` falls back to the 4096 default.
         """
         return None
 
@@ -188,20 +171,15 @@ class VideoBackbone(ABC, nn.Module):
 
         When ``True``, :meth:`BaseWAMArchitecture.preprocess` passes
         ``skip_first=True`` to ``downsample_video_mask_to_latent`` so the
-        ``video_is_pad`` mask is sized to ``T_lat - 1`` (the loss-side
-        shape-detect fallback in :meth:`_compute_video_loss` then trims
-        ``noise_pred`` to match).
+        ``video_is_pad`` mask is sized to ``T_lat - 1``.
 
-        Override this when the backbone's *configuration* (not the input
-        batch) guarantees ``latent[0]`` is conditioning. Wan I2V is the
-        canonical example: its image conditioning rides on the ``y`` channel
-        rather than the ``first_frame_latents`` input key, so the per-batch
-        signal ``inputs.get("first_frame_latents") is not None`` would miss it.
-
-        Backbones that condition on ``latent[0]`` only on *some* batches
-        (TI2V / VACE / cosmos25 TI2V — driven by ``first_frame_latents`` in
-        the inputs dict) should leave this at the default ``False``; the
-        per-batch signal in ``preprocess`` already covers them.
+        Override this when the backbone's *configuration* (not the input batch)
+        guarantees ``latent[0]`` is conditioning — i.e. the first-frame
+        condition is carried on a side channel rather than the per-batch
+        ``first_frame_latents`` input key. Backbones that condition on
+        ``latent[0]`` only on *some* batches (driven by ``first_frame_latents``)
+        should leave this at the default ``False``; the per-batch signal in
+        ``preprocess`` already covers them. SANA is text-to-video → ``False``.
         """
         return False
 
@@ -323,7 +301,7 @@ class VideoBackbone(ABC, nn.Module):
 
         Single source of truth for the video-side shift: both
         :meth:`BaseWAMArchitecture.init_training_schedulers` (training)
-        and ``openwam/deploy/joint_engine.py::generate`` (inference)
+        and the deploy inference path (inference)
         consult this property, so train/inference sigma grids cannot drift
         apart regardless of which yaml file is loaded.
 
@@ -366,7 +344,7 @@ class VideoBackbone(ABC, nn.Module):
 
     @abstractmethod
     def prepare(self, **pipeline_inputs) -> BlockLoopState:
-        """Pre-block-loop setup: patchify, freqs, t_mod, VACE, SP.
+        """Pre-block-loop setup: patchify, freqs, t_mod.
 
         Returns a ``BlockLoopState`` that the architecture may modify before
         calling ``run_block``.
@@ -375,7 +353,7 @@ class VideoBackbone(ABC, nn.Module):
 
     @abstractmethod
     def run_block(self, block_id: int, state: BlockLoopState) -> BlockLoopState:
-        """Execute a single DiT block (+ VACE hint).
+        """Execute a single DiT block.
 
         Gradient checkpointing is handled internally — transparent to the
         architecture.  The architecture may inspect/modify ``state.x`` after
@@ -385,7 +363,7 @@ class VideoBackbone(ABC, nn.Module):
 
     @abstractmethod
     def finalize(self, state: BlockLoopState) -> Tensor:
-        """Post-block-loop: head + SP gather + reference removal + unpatchify.
+        """Post-block-loop: head + unpatchify.
 
         Returns ``(B, C, T, H, W)`` video noise prediction.
         """
@@ -423,87 +401,11 @@ class VideoBackbone(ABC, nn.Module):
     ) -> BlockLoopState:
         """Continue from where ``pre_attn_at_layer`` left off:
         ``block.gate(residual_x, gate_msa, block.self_attn.o(attn_out))`` →
-        cross-attn → FFN, then any backbone-specific post-block residuals
-        (VACE)."""
+        cross-attn → FFN, then any backbone-specific post-block residuals."""
         raise NotImplementedError(
             f"{type(self).__name__} does not implement post_attn_at_layer; "
             "joint self-attention is not supported on this backbone."
         )
-
-    # ================================================================
-    # Action token injection — SharedBackbone path (2)
-    # ================================================================
-
-    @abstractmethod
-    def inject_action_tokens(
-        self,
-        state: BlockLoopState,
-        action_tokens: Tensor,
-        n_action: int,
-        *,
-        timestep: Optional[Tensor] = None,
-    ) -> BlockLoopState:
-        """Append action tokens to the video sequence in ``state``.
-
-        Handles backbone-specific concerns (RoPE extension, per-token t_mod)
-        so architectures don't need to know about them.
-
-        Args:
-            state: Current block loop state (modified in-place and returned).
-            action_tokens: (B, n_action, dim) projected action tokens.
-            n_action: Number of action tokens.
-            timestep: Action diffusion timestep (for per-token t_mod backbones).
-
-        Returns:
-            Updated state with action tokens appended to ``state.x``.
-        """
-        ...
-
-    @abstractmethod
-    def extract_action_tokens(
-        self,
-        state: BlockLoopState,
-        n_action: int,
-    ) -> Tuple[BlockLoopState, Tensor]:
-        """Slice action tokens off the end of the video sequence.
-
-        Args:
-            state: Current block loop state (modified in-place and returned).
-            n_action: Number of trailing action tokens to extract.
-
-        Returns:
-            (updated_state, action_tokens) where action_tokens is (B, n_action, dim).
-        """
-        ...
-
-    def inject_shared_tokens(
-        self,
-        state: BlockLoopState,
-        action_tokens: Tensor,
-        n_action: int,
-        *,
-        state_tokens: Optional[Tensor] = None,
-        n_state: int = 0,
-        timestep: Optional[Tensor] = None,
-    ) -> BlockLoopState:
-        """Append action tokens plus optional state tokens.
-
-        Backbones that support SharedBackbone must override this explicitly.
-        """
-        raise NotImplementedError(f"{type(self).__name__} does not implement inject_shared_tokens.")
-
-    def extract_shared_tokens(
-        self,
-        state: BlockLoopState,
-        n_action: int,
-        *,
-        n_state: int = 0,
-    ) -> Tuple[BlockLoopState, Tensor]:
-        """Extract action tokens from an action/state tail.
-
-        Backbones that support SharedBackbone must override this explicitly.
-        """
-        raise NotImplementedError(f"{type(self).__name__} does not implement extract_shared_tokens.")
 
     # ================================================================
     # Unified preprocessing (1)
@@ -513,25 +415,23 @@ class VideoBackbone(ABC, nn.Module):
     def preprocess_input(self, *, frames=None, text=None, **kw) -> dict:
         """Unified preprocessing entry point.
 
-        Takes raw data (PIL frames, text strings, optional VACE video,
-        first-frame image, etc.) and returns a dict of tensors ready for
-        the denoising loop. Internally handles: video preprocessing, VAE
-        encoding, text encoding, VACE context assembly, TI2V first-frame
-        handling — all backbone-specific details are encapsulated here.
+        Takes raw data (PIL frames, text strings, first-frame image, etc.) and
+        returns a dict of tensors ready for the denoising loop. Internally
+        handles video preprocessing, VAE encoding, and text encoding — all
+        backbone-specific details are encapsulated here.
 
         Args:
             frames: List of video clips, each a list of PIL Images.
             text: List of text prompts.
             **kw: Backbone-specific inputs. Recognized optional kwargs include
-                ``vace_video``, ``first_frame_image``, ``ref_images`` and
-                ``pre_encoded_text`` (``(B, L, D)`` tensor of cached prompt
-                embeddings, e.g. Reason1 for Cosmos25 — backbones that don't
-                consume it drop it silently via ``**kw``).
+                ``first_frame_image``, ``ref_images`` and ``pre_encoded_text``
+                (``(B, L, D)`` tensor of cached prompt embeddings — backbones
+                that don't consume it drop it silently via ``**kw``).
 
         Returns:
             Dict with at least: ``input_latents``, ``context``, ``seq_lens``.
-            May also include ``vace_context``, ``ref_latents``,
-            ``first_frame_latents``, ``height``, ``width``, ``num_frames``, etc.
+            May also include ``first_frame_latents``, ``height``, ``width``,
+            ``num_frames``, etc.
         """
         ...
 
@@ -541,7 +441,7 @@ class VideoBackbone(ABC, nn.Module):
 
     @abstractmethod
     def get_submodule(self, name: str) -> nn.Module | None:
-        """Get a named sub-module (dit, vae, text_encoder, vace, ...).
+        """Get a named sub-module (dit, vae, text_encoder, ...).
 
         Used by trainer for freeze/to(device) and DeepSpeed wrapping.
         Returns None if the named module does not exist.
@@ -557,45 +457,6 @@ class VideoBackbone(ABC, nn.Module):
         use the DeepSpeed-managed module.
         """
         ...
-
-    # ================================================================
-    # External encoder spec validation (1)
-    # ================================================================
-
-    # Fields that must match bit-for-bit between an external encoder's spec
-    # and the host backbone's expected spec. ``pixel_range`` is deliberately
-    # excluded — it is an encoder-internal normalization detail that the
-    # backbone never inspects.
-    _ENCODER_SPEC_REQUIRED_FIELDS: Tuple[str, ...] = (
-        "z_dim",
-        "spatial_compression",
-        "temporal_compression",
-        "causal_temporal",
-    )
-
-    @classmethod
-    def validate_encoder_spec(cls, got, want) -> None:
-        """Fail-fast when an external encoder's spec disagrees with what the
-        host backbone needs.
-
-        Args:
-            got: The encoder's actual :class:`VideoEncoderSpec` (from loaded weights).
-            want: The backbone's expected spec, OR ``None`` when the backbone
-                has no concrete contract to enforce (e.g. its native VAE has
-                already been released).
-
-        Raises:
-            ValueError: With a list of mismatching fields. Callers handle
-                ``is_reversible=False`` upstream by either skipping this call
-                or constructing a relaxed ``want`` — this method has no
-                special-case knowledge of reversibility.
-        """
-        if want is None:
-            return
-        mismatched = [f for f in cls._ENCODER_SPEC_REQUIRED_FIELDS if getattr(got, f) != getattr(want, f)]
-        if mismatched:
-            details = ", ".join(f"{f}: got={getattr(got, f)!r}, want={getattr(want, f)!r}" for f in mismatched)
-            raise ValueError(f"encoder spec mismatch on {mismatched}: {details}")
 
     # ================================================================
     # Decoding (1)

@@ -1,4 +1,4 @@
-"""Phase 3 (forward): DualSystemARArchitecture end-to-end forward smoke.
+"""DualSystemARArchitecture end-to-end forward smoke.
 
 Wires a mini SANA video backbone + mini ActionDiT + AR MoT driver and runs one
 forward over a duplicated ``[noisy ++ clean]`` sequence, checking the noisy-copy

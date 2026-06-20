@@ -6,7 +6,7 @@ A checkpoint directory written by training must contain (so
   - ``checkpoint_step_<N>.safetensors`` — architecture ``state_dict``
   - ``action_stats.npy``             — for deploy-time (de)normalization
 
-Verbatim-ported from openwam's train/utils/checkpointing.py (self-contained).
+Self-contained — no external framework dependencies.
 """
 
 from __future__ import annotations

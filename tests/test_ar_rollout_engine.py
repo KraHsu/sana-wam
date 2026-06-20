@@ -1,4 +1,4 @@
-"""Phase 5 (engine): closed-loop AR rollout orchestrator.
+"""Closed-loop AR rollout orchestrator.
 
 Drives DualSystemARArchitecture.ar_rollout over a sequence of observation latents
 on a mini SANA video + ActionDiT, checking: each step yields a finite action

@@ -43,8 +43,6 @@ class CompiledMoTLoop:
             return False
         if use_gradient_checkpointing or use_gradient_checkpointing_offload:
             return False
-        if getattr(vstate, "vace_hints", None) is not None:
-            return False
         if getattr(vstate, "extras", {}).get("use_usp", False):
             return False
         payload = getattr(astate, "payload", None)
@@ -56,14 +54,11 @@ class CompiledMoTLoop:
 
         payload = astate.payload
         # Resolve sequence shapes from the backbone-populated f/h/w fields.
-        # ``vstate.x.shape[1]`` is identical to ``f*tokens_per_frame`` for
-        # backbones that carry a 3D ``(B, S, D)`` state (Wan), but for
-        # backbones whose ``state.x`` is natively 5D ``(B, T, H, W, D)``
-        # (Cosmos25) ``shape[1]`` is just ``T`` — wrong. Going through f and
-        # the shared ``compute_video_tokens_per_frame`` helper is the only
-        # formulation that works for both layouts AND for VGGT-Omega's
-        # per-frame ``[special | patches]`` interleaved layout (matches
-        # mot_driver.py:432).
+        # ``vstate.x.shape[1]`` equals ``f*tokens_per_frame`` for a 3D
+        # ``(B, S, D)`` state, but a natively 5D ``(B, T, H, W, D)`` state would
+        # make ``shape[1]`` just ``T``. Going through f and the shared
+        # ``compute_video_tokens_per_frame`` helper works for both layouts and
+        # for a per-frame ``[special | patches]`` layout.
         s_video = int(vstate.f) * self.driver._video_tokens_per_frame(vstate)
         s_action = payload.x_action.shape[1]
         attn_mask = self.driver._build_attention_mask(

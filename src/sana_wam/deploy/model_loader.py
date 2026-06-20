@@ -1,8 +1,7 @@
 """Load a SANA block-AR architecture from a training checkpoint directory.
 
-Slimmed from openwam's model_loader: there is one architecture and one video
-backbone, so this drops the registry resolution + the Cosmos25/Reason1/VLM/
-tri_system deploy branches. The on-disk contract is unchanged:
+There is exactly one architecture and one video backbone, so there is no
+registry resolution and no multi-backbone deploy branches. The on-disk contract:
   - ``config.yaml``                     — saved training config
   - ``checkpoint_step_<N>.safetensors`` — architecture state_dict
   - ``action_stats.npy``                — deploy (de)normalization

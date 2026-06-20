@@ -1,12 +1,12 @@
-"""Load a SANA-Video pipeline (DiT + VAE + text encoder) for OpenWAM.
+"""Load a SANA-Video pipeline (DiT + VAE + text encoder) for sana-wam.
 
 This wraps ``third_party/Sana`` upstream into a tiny ``SanaPipe`` object that
-``SanaVideoBackbone`` then drives through the OpenWAM block-loop contract.
+``SanaVideoBackbone`` then drives through the block-loop contract.
 The goal here is **not** to reimplement SANA — we hold references to upstream
-modules and feed them OpenWAM-shaped inputs. Pin-bumps of the submodule are
+modules and feed them sana-wam-shaped inputs. Pin-bumps of the submodule are
 transparent as long as the upstream class signatures wrapped here don't change.
 
-Phase 0 supports two pre-config'd variants: ``sana_video_2b_480p`` (the only
+Two pre-config'd variants are supported: ``sana_video_2b_480p`` (the only
 HF-published video model at time of writing) and ``mini`` (random-weight tiny
 model for unit tests). Real inference / training over the published 2B weights
 requires the upstream ``diffusion.model.builder`` chain — we lazy-import that
@@ -48,7 +48,7 @@ class SanaPipe:
 
     text_encoder: Optional[nn.Module] = None
     """Gemma-2-2B text encoder. Not bundled in the SANA HF ckpt — load
-    separately via OpenWAM's existing text-encoder utilities."""
+    separately via sana-wam's existing text-encoder utilities."""
 
     tokenizer: Optional[Any] = None
 
@@ -118,7 +118,7 @@ def build_sana_pipeline(
                 f"build_sana_pipeline(str) expects a directory, got: {cfg_or_path!r}"
             )
         # str-dir entry is a smoke/test shortcut for "give me a pipe straight
-        # from a HF bundle dir" — there's no OpenWAM ckpt in this shape, so
+        # from a HF bundle dir" — there's no sana-wam ckpt in this shape, so
         # the deploy self-contained fallback doesn't apply. Stay strict.
         spec = _spec_from_model_dir(cfg_or_path)
     elif isinstance(cfg_or_path, dict):
@@ -214,7 +214,7 @@ class _PipeSpec:
     SANA-Video upstream (``model_wrapper.py:17``)."""
     use_first_frame_cond: bool = False
     """Opt-in: condition the generated video on a clean frame-0 (the current
-    observation), TI2V-style. Default ``False`` keeps SANA pure text-to-video
+    observation). Default ``False`` keeps SANA pure text-to-video
     (byte-identical to existing checkpoints). When ``True`` the adapter sets
     ``first_frame_latents`` + ``num_clean_prefix_frames=1`` and the split-forward
     switches to per-frame timestep modulation (frame-0 at t=0)."""
@@ -409,7 +409,7 @@ def _spec_from_dict(d: dict, *, ckpt_dir: Optional[str] = None) -> _PipeSpec:
 
     Plain-dict entry; this is the **training-time** path —
     ``resolve_architecture_config`` returns plain dicts (not DictConfig),
-    so the OpenWAMTrainer / deploy loader land here. Auto-discovery +
+    so the trainer / deploy loader land here. Auto-discovery +
     foot-gun guard are shared with :func:`_spec_from_dictconfig` via
     :func:`_resolve_model_path_and_kwargs`. ``ckpt_dir`` is forwarded to
     distinguish deploy from training (deploy can self-contain).
@@ -557,7 +557,7 @@ def _load_text_encoder(name: Optional[str], *, device, dtype, ckpt_dir: Optional
     ``load_from_checkpoint_dir``) and ``from_pretrained`` fails because the
     weights file is missing but ``config.json`` is present, build a meta-
     initialised shell from the config. The trained text encoder weights
-    live in the OpenWAM safetensors (text_encoder is ``add_module``-
+    live in the sana-wam safetensors (text_encoder is ``add_module``-
     registered in ``SanaVideoBackbone.__init__``), so the subsequent
     ``architecture.load_checkpoint(...)`` fills the shell via
     ``load_state_dict(..., assign=True)`` (see ``base.py`` meta-tensor

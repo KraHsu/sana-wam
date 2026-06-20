@@ -138,12 +138,6 @@ def idm_compile_cfg(compile_cfg: Any) -> Any:
     return section
 
 
-def tri_system_compile_cfg(compile_cfg: Any) -> Any:
-    """Return the narrow tri-system trimodal MoT compile section."""
-
-    return _fast_path_compile_cfg(compile_cfg, "tri_system")
-
-
 def section_enabled(cfg: Any, default: bool = False) -> bool:
     """Return whether a compile section is enabled."""
 
@@ -176,5 +170,4 @@ __all__ = [
     "section_enabled",
     "self_attn_compile_cfg",
     "torch_compile_kwargs",
-    "tri_system_compile_cfg",
 ]

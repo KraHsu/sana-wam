@@ -1,4 +1,4 @@
-"""Phase 4: DualSystemARArchitecture.compute_loss — finite loss + gradient flow.
+"""DualSystemARArchitecture.compute_loss — finite loss + gradient flow.
 
 Builds a mini SANA video backbone + ActionDiT + AR driver, runs one AR
 flow-matching loss step over a tiny batch, and asserts: the loss dict is finite,

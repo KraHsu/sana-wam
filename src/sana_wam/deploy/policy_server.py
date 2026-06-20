@@ -339,7 +339,7 @@ class PolicyServer:
             async_config = resolve_async_inference_config(self.cfg, policy_cfg=policy_cfg)
             async_info = build_async_info(async_config, policy_cfg)
         return {
-            "model": "OpenWAM",
+            "model": "sana-wam",
             "total_requests": self._request_count,
             "avg_latency_ms": round(avg_latency, 2),
             "policy_config": {
@@ -676,8 +676,8 @@ def build_server_from_config(cfg, ckpt_dir: str, device: str = "cuda"):
     training_cfg, architecture = load_from_checkpoint_dir(ckpt_dir, device=device)
 
     # Mirror scripts/deploy.py: let dataloader provide inference frame/resolution
-    # fallbacks before merging deploy overrides on top, so server.predict() goes
-    # through architecture.generate() with the resolution and video length the
+    # fallbacks before merging deploy overrides on top, so server.predict() runs
+    # the AR inference engine with the resolution and video length the
     # checkpoint was trained at. ``num_frames`` is the raw action/state window;
     # ``video_num_frames`` is the Wan video length after video_stride.
     deploy_cfg = cfg if cfg is not None else OmegaConf.create({})
@@ -701,7 +701,7 @@ def build_server_from_config(cfg, ckpt_dir: str, device: str = "cuda"):
 
 
 def _build_argparser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Start the OpenWAM policy server.")
+    parser = argparse.ArgumentParser(description="Start the sana-wam policy server.")
     parser.add_argument(
         "--config",
         type=str,
@@ -764,7 +764,7 @@ def _build_argparser() -> argparse.ArgumentParser:
     parser.add_argument(
         "overrides",
         nargs="*",
-        help="Additional OmegaConf dotlist overrides, e.g. model/backbone=ti2v_5b",
+        help="Additional OmegaConf dotlist overrides, e.g. server.http_port=8849",
     )
     return parser
 
@@ -777,7 +777,7 @@ def _apply_async_cli_overrides(cfg, args):
 
 
 def main(argv: Optional[list[str]] = None):
-    """CLI entrypoint for running the OpenWAM policy server."""
+    """CLI entrypoint for running the sana-wam policy server."""
     from omegaconf import OmegaConf
 
     parser = _build_argparser()

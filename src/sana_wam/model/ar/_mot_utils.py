@@ -1,8 +1,7 @@
 """Shared helpers for MoT (Mixture-of-Transformers) driver implementations.
 
-Centralizes utilities used by both ``dual_system.mot_driver.MoTJointDriver``
-(and its IDM subclass) and ``tri_system.mot_driver.TriSystemMoTDriver``, so the
-two drivers don't drift on equivalent computations.
+Centralizes utilities shared by the MoT driver implementations so they don't
+drift on equivalent computations.
 """
 
 from __future__ import annotations
@@ -22,7 +21,7 @@ def compute_video_tokens_per_frame(vstate: "BlockLoopState", driver_name: str) -
     calling driver via ``driver_name``.
 
     Special-token aware: when the encoder declares
-    ``spec.has_special_tokens=True`` (currently: VGGT-Omega), the per-frame
+    ``spec.has_special_tokens=True``, the per-frame
     block in the DiT self-attn sequence is
     ``[special | patches]`` of length
     ``tokens_per_frame_special + tokens_per_frame_patch``. The MoT mask

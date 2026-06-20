@@ -1,9 +1,9 @@
 # sana-wam
 
-Standalone, simplified extraction of the **SANA block-autoregressive
-(diffusion-forcing) world-action model** (`dual_system_autoregressive`) from
-OpenWAM. Keeps only the AR path; drops the multi-backbone / registry / mega-base
-abstractions. Modern uv + `pyproject.toml` layout.
+Standalone **SANA block-autoregressive (diffusion-forcing) world-action model**
+(`dual_system_autoregressive`): a single AR architecture / backbone / dataset,
+with no multi-backbone registry or mega-base abstractions. Modern uv +
+`pyproject.toml` layout.
 
 A SANA-Video 2B linear-attention DiT denoiser + a dual-stream ActionDiT, coupled
 by joint attention, trained as a block-causal diffusion-forcing model (LingBot-VA
@@ -55,17 +55,16 @@ AR data constraint: `num_frames=49` → causal-VAE latent T=4, divisible by
 ```bash
 uv run python scripts/deploy.py --ckpt-dir outputs/<run> --device cuda:0
 # then drive it from the RoboTwin simulator (conda RoboTwin env):
-bash benchmarks/robotwin/single_eval.sh adjust_bottle demo_clean openwam <gpu> 8848 127.0.0.1
+bash benchmarks/robotwin/single_eval.sh adjust_bottle demo_clean sana_wam <gpu> 8848 127.0.0.1
 ```
 Greedy policy is mandatory (the AR KV cache is stateful closed-loop; async /
 receding-horizon / temporal-ensemble break cache alignment).
 
-## What was simplified vs OpenWAM
-- **Registry dropped** — one architecture / backbone / dataset, direct construction
-  (`config.flatten_model_cfg` replaces `resolve_architecture_config`).
-- **base.py** — only the AR-needed slice (proprio, prepare_inputs collation,
-  freeze, checkpoint I/O); the Wan/Cosmos/encoder/lerobot factories are gone.
-- **Trainer** — a ~250-line torchrun DDP + bf16 loop (manual grad all-reduce)
-  replaces the 1143-line accelerate/deepspeed `OpenWAMTrainer`. The on-disk
-  checkpoint contract is identical, so deploy round-trips.
-- **Deploy** — async/optimization paths removed (AR is sync-only).
+## Design notes
+- **No registry** — exactly one architecture / backbone / dataset, constructed
+  directly via `config.flatten_model_cfg`.
+- **Slim base.py** — only the AR-needed slice: proprio, `prepare_inputs`
+  collation, freeze, checkpoint I/O.
+- **Trainer** — a ~250-line torchrun DDP + bf16 loop with manual grad
+  all-reduce; the on-disk checkpoint contract round-trips to deploy.
+- **Deploy** — sync-only (the AR engine is a stateful closed-loop).

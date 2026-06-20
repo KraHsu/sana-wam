@@ -1,13 +1,12 @@
-"""Config flattening — replaces openwam's architecture registry resolution.
+"""Config flattening — build the flat cfg the architecture expects.
 
 The architecture ``__init__`` consumes a single flat ``DictConfig`` (reads keys
 via ``cfg.get(...)``). The training/deploy YAML keeps the readable nested shape
 (``model.architecture`` / ``model.action_backbone`` / ``model.video_backbone``);
 ``flatten_model_cfg`` merges them into the flat dict the architecture expects.
 
-This is the (registry-free) equivalent of openwam's
-``resolve_architecture_config`` flattening (registry.py:141-153), minus the
-framework/variant registry lookup — there is exactly one architecture here.
+There is no architecture registry: exactly one architecture is built directly,
+so flattening is a plain dict merge with no framework/variant registry lookup.
 """
 
 from __future__ import annotations

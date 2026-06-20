@@ -1,14 +1,14 @@
 """Load pre-computed text embeddings from disk and attach to dataset samples.
 
-The Cosmos25 backbone consumes a ``pre_encoded_text`` tensor on each sample
-(``(L, D)`` bf16; ``D=1024`` post-projection for Cosmos-Predict2.5 2B). Live
-encoding with Cosmos-Reason1 7B during training is expensive; instead we
-pre-compute once per unique caption (``python -m sana_wam.dataloader.reason1_
-embedding_computation ...``) and read the cached ``.safetensors`` here.
+When a checkpoint is trained against cached text embeddings, the backbone
+consumes a ``pre_encoded_text`` tensor on each sample (``(L, D)``) instead of
+running its text encoder live. Live encoding during training can be expensive;
+instead embeddings are pre-computed once per unique caption and read from a
+``.safetensors`` cache here.
 
 Cache layout (``<cache_dir>/``):
 
-    manifest.json           # metadata (reason1 ckpt sha, cosmos ckpt sha, dtype, count)
+    manifest.json           # metadata (encoder ckpt sha, dtype, count)
     empty.safetensors       # cached embedding of the empty string (CFG dropout target)
     <sha[:2]>/<sha256-of-prompt>.safetensors  # one per unique caption, key="pre_encoded_text"
 
@@ -23,9 +23,9 @@ This transform:
 * Attaches the result as ``sample["pre_encoded_text"]`` so the architecture
   (``BaseWAMArchitecture.prepare_inputs``) can thread it to the backbone.
 
-A missing cache file raises ``FileNotFoundError`` with the precompute
-command, since the alternative — silently dropping the field — would
-defeat the whole point of opting into the cache.
+A missing cache file raises ``FileNotFoundError``, since the alternative —
+silently dropping the field — would defeat the whole point of opting into the
+cache.
 """
 
 from __future__ import annotations
@@ -41,12 +41,10 @@ CACHE_LAYOUT = "sha256-prefix-v1"
 BUCKET_PREFIX_LEN = 2
 
 _PRECOMPUTE_HINT = (
-    "Run the offline precompute first:\n"
-    "  python -m sana_wam.dataloader.reason1_embedding_computation \\\n"
-    "      --reason1-ckpt /path/to/Cosmos-Reason1-7B \\\n"
-    "      --cosmos-ckpt  /path/to/Cosmos-Predict2.5-2B/base/post-trained/<uuid>_ema_bf16.pt \\\n"
-    "      --dataset-config configs/dataloader/robotwin.yaml \\\n"
-    "      --output-dir   <cache_dir>"
+    "Pre-compute the text embeddings for every caption into the cache dir "
+    "(one .safetensors per prompt, keyed by the SHA-256 of the prompt text, "
+    "plus empty.safetensors for the empty string) before enabling "
+    "text_embedding_cache_dir."
 )
 
 
@@ -84,7 +82,7 @@ def resolve_cache_path_for_sha(cache_dir: str, sha: str) -> str:
 
 
 class TextEmbeddingCacheTransform(ModalityTransform):
-    """Load pre-computed Reason1 text embeddings from a sha256-keyed cache.
+    """Load pre-computed text embeddings from a sha256-keyed cache.
 
     Args:
         cache_dir: Directory containing bucketed ``<sha[:2]>/<sha>.safetensors``

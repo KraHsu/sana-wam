@@ -1,8 +1,8 @@
 """Flow-matching scheduler adapter for SANA-Video.
 
-OpenWAM's training loop pulls four attributes off ``video_backbone.scheduler``:
+The training loop pulls four attributes off ``video_backbone.scheduler``:
 ``timesteps``, ``sigmas``, ``linear_timesteps_weights``, ``num_train_timesteps``
-(see ``openwam/model/base.py``). SANA-Video is rectified flow with an optional
+(see ``sana_wam/model/base.py``). SANA-Video is rectified flow with an optional
 shift parameter; this adapter mirrors the Wan ``FlowMatchScheduler`` public
 surface so SANA looks identical to the trainer.
 
@@ -35,7 +35,7 @@ class SanaFlowSchedulerAdapter:
         flow_shift: Rectified-flow shift parameter. Default ``3.0`` matches
             SANA-Video upstream (see module docstring).
         num_train_timesteps: Total training timestep budget (default 1000,
-            matches Wan / FLUX / Cosmos conventions).
+            the common rectified-flow convention).
     """
 
     def __init__(self, *, flow_shift: float = 3.0, num_train_timesteps: int = 1000):

@@ -205,15 +205,12 @@ class MoTJointDriver:
     def _video_tokens_per_frame(self, vstate: "BlockLoopState") -> int:
         """Tokens per video frame, derived from the spatial dims in vstate.
 
-        Delegates to :func:`compute_video_tokens_per_frame`, which is special-
-        token aware: when the encoder declares
-        ``spec.has_special_tokens=True`` (currently: VGGT-Omega) the per-frame
-        block in the DiT self-attn sequence is
+        Delegates to :func:`compute_video_tokens_per_frame`. Returns ``h * w``
+        for the native VAE layout; if an encoder declares per-frame special
+        tokens (``spec.has_special_tokens=True``) the per-frame block is
         ``[special | patches]`` and the helper returns
-        ``h * w + tokens_per_frame_special`` so the FastWAM-style v↔v mask
-        covers the full per-frame slot. Falls back to ``h * w`` for plain
-        ``(B, z, T, H, W)`` encoders (Wan VAE / V-JEPA 2.1) where
-        ``tokens_per_frame_special == 0``.
+        ``h * w + tokens_per_frame_special`` so the v↔v mask covers the full
+        per-frame slot.
         """
         return compute_video_tokens_per_frame(vstate, "MoTJointDriver")
 
@@ -265,8 +262,8 @@ class MoTJointDriver:
         INVARIANT (consumed by :meth:`_step_checkpointed`): this method must
         only reassign the two layer-varying tensor fields ``vstate.x`` and
         ``astate.payload.x_action``. It MUST NOT mutate any layer-invariant
-        field of ``vstate`` / ``astate`` in place — concretely, do not append
-        to ``vace_hints``, write into ``extras``, or mutate ``context`` /
+        field of ``vstate`` / ``astate`` in place — concretely, do not write
+        into ``extras`` or mutate ``context`` /
         ``freqs`` / ``t_mod``. ``_step_checkpointed`` runs this body inside
         ``torch.utils.checkpoint`` against shallow copies of the state
         objects; only ``x`` / ``x_action`` are isolated, everything else is
@@ -378,7 +375,7 @@ class MoTJointDriver:
         We avoid that by giving the closure shallow copies of the state
         containers (``copy.copy`` on the dataclass / payload — same field
         references, fresh wrappers). Layer-invariant fields like
-        ``context`` / ``freqs`` / ``t_mod`` / ``vace_hints`` / ``extras``
+        ``context`` / ``freqs`` / ``t_mod`` / ``extras``
         are still shared by reference (cheap), but the two tensor fields
         the body writes (``x`` / ``x_action``) live on the local copies so
         recompute never touches the outer references the caller and the
@@ -429,13 +426,11 @@ class MoTJointDriver:
         :meth:`step` for memory/compute trade-offs.
         """
         # Resolve sequence shapes from the backbone-populated f/h/w fields.
-        # ``vstate.x.shape[1]`` is identical to ``f*tokens_per_frame`` for
-        # backbones that carry a 3D ``(B, S, D)`` state (Wan), but for
-        # backbones whose ``state.x`` is natively 5D ``(B, T, H, W, D)``
-        # (Cosmos25) ``shape[1]`` is just ``T`` — wrong. Going through f and
-        # the shared ``compute_video_tokens_per_frame`` helper is the only
-        # formulation that works for both layouts AND for VGGT-Omega's
-        # per-frame ``[special | patches]`` interleaved layout.
+        # ``vstate.x.shape[1]`` equals ``f*tokens_per_frame`` for a 3D
+        # ``(B, S, D)`` state, but a natively 5D ``(B, T, H, W, D)`` state would
+        # make ``shape[1]`` just ``T``. Going through f and the shared
+        # ``compute_video_tokens_per_frame`` helper works for both layouts and
+        # for a per-frame ``[special | patches]`` layout.
         s_video = int(vstate.f) * self._video_tokens_per_frame(vstate)
         payload = astate.payload
         if payload is None or not hasattr(payload, "x_action"):

@@ -3,8 +3,7 @@
 Replaces the SDPA-based :meth:`MoTJointDriver._mixed_attention` with a cumsum
 expansion of SANA's ReLU-kernel linear attention, preserving the pretrained
 dual-track normalization (rotated phi(q)/phi(k) in the numerator, *un*-rotated
-phi(q)/phi(k) in the denominator — see plans/sana_mot_math_conflict.md §1)
-while supporting OpenWAM's joint mask topology (plan §1 closing example).
+phi(q)/phi(k) in the denominator) while supporting the joint mask topology.
 
 Two extensions of the base contract:
 
@@ -21,8 +20,6 @@ Two extensions of the base contract:
 Everything else — ``_build_joint_mask``, ``_build_attention_mask``,
 ``_video_tokens_per_frame``, ``run_joint_loop``, ``step``, ``_step_checkpointed``
 — is inherited unchanged.
-
-See plans/sana_mot_integration_plan.md §3 for the design discussion.
 """
 
 from __future__ import annotations
@@ -212,7 +209,7 @@ class SanaMoTJointDriver(MoTJointDriver):
                 "uses_linear_attn=True in post_state. Got "
                 f"video={vpost.get('uses_linear_attn')}, action={apost.get('uses_linear_attn')}. "
                 "Check that the backbones implement the linear-attn pre_attn_at_layer "
-                "contract (see openwam/model/video_backbone/sana/blocks_split.py)."
+                "contract (see sana_wam/model/video_backbone/sana/blocks_split.py)."
             )
 
         s_video = q_v.shape[1]

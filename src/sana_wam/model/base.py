@@ -1,25 +1,13 @@
-"""Abstract base class for WAM (World-Action Model) architectures.
+"""Abstract base class for the WAM (World-Action Model) architecture.
 
-Supported architecture families:
+The shipped architecture is **Dual-System** (``framework=dual_system``): a SANA
+video DiT plus a separate ActionDiT, coupled through MMDiT-style mixed attention
+at every layer (the ``joint_self_attn`` variant, driven by
+:class:`MoTJointDriver`). The block-autoregressive variant
+(:class:`DualSystemARArchitecture`) extends that with diffusion-forcing.
 
-1. **Shared Backbone** (`framework=shared_backbone`)
-   Action tokens are concatenated to the video DiT sequence and ride
-   through the shared blocks. Variants: `vanilla` (no extra capacity) /
-   `moe` (expert FFN at selected layers).
-
-2. **Dual-System** (`framework=dual_system`)
-   A separate ActionDiT consumes features from the video DiT. Variants:
-   `joint_cross_attn` (bridge cross-attention after a full video forward)
-   / `joint_self_attn` (MMDiT-style mixed attention at every layer, driven
-   by :class:`MoTJointDriver`).
-
-3. **Tri-System** (`framework=tri_system`)
-   Motus-style mixture of transformers: Wan video DiT + action expert +
-   frozen VLM / understanding expert, with mixed attention implemented via
-   the video backbone adapter.
-
-Each architecture composes the backbones it owns and implements its own
-``forward()``.
+The base composes a ``video_backbone`` and an ``action_backbone``; each concrete
+architecture implements its own ``forward()``.
 """
 
 import functools
@@ -38,7 +26,7 @@ from sana_wam.model.compile_options import compile_mode
 
 def _wrap_single_forward(module: nn.Module) -> None:
     """Wrap a single module's ``forward`` in ``torch.no_grad``. Idempotent."""
-    if getattr(module, "_openwam_no_grad_wrapped", False):
+    if getattr(module, "_sana_wam_no_grad_wrapped", False):
         return
     original_forward = module.forward
 
@@ -48,128 +36,35 @@ def _wrap_single_forward(module: nn.Module) -> None:
             return original_forward(*args, **kwargs)
 
     module.forward = wrapped
-    module._openwam_no_grad_wrapped = True
+    module._sana_wam_no_grad_wrapped = True
 
 
 def _wrap_forward_in_no_grad(module: nn.Module) -> None:
     """Wrap ``forward`` of ``module`` AND every submodule in its subtree in ``torch.no_grad``.
 
     Recursion matters because callers commonly bypass the root forward and call a
-    nested submodule directly. The canonical case in OpenWAM is
-    ``Qwen3VLBackbone.extract_features`` which calls ``self.vlm_model.model(...)``
-    (the inner ``Qwen3VLModel``, skipping the LM head) — wrapping only
-    ``vlm_model.forward`` would leave that path grad-tracking. Recursively wrapping
-    every descendant makes the semantic complete: any entry point into the frozen
-    subtree is in ``no_grad``.
+    nested submodule directly (e.g. an ``extract_features`` that calls an inner
+    model and skips an outer head) — wrapping only the root ``forward`` would
+    leave that path grad-tracking. Recursively wrapping every descendant makes
+    the semantic complete: any entry point into the frozen subtree is in
+    ``no_grad``.
 
     Idempotent — a marker attribute on each module prevents double-wrapping if
     ``freeze_modules`` runs more than once. ``nn.Module.modules()`` deduplicates
     via its internal memo, so cyclic registrations (e.g. test fakes with
     ``self.model = self``) are visited once.
 
-    Safe to apply to any module: if the caller already wraps the call in a
-    ``no_grad`` context (e.g. ``prepare_inputs``), the inner ``no_grad`` is a
-    no-op; if the caller is inside a grad-tracking forward (the tri_system VLM
-    case this actually saves memory in), it short-circuits activation saving.
-
     **Subtree-level semantic, not per-parameter**: a trainable child under a frozen
     parent will NOT receive gradients, because every descendant ``forward`` is
-    wrapped in ``no_grad``. For partial-freeze setups (e.g. LoRA on a frozen base,
-    or training only the LM head of an otherwise frozen VLM), do NOT pass the
-    parent's dotted path to ``freeze_modules``; pass the specific leaves you want
-    frozen instead. The current freeze list in ``configs/training_strategy/*.yaml``
-    only names complete subtrees, so this limitation does not bite today.
+    wrapped in ``no_grad``. For partial-freeze setups (e.g. LoRA on a frozen
+    base), do NOT pass the parent's dotted path to ``freeze_modules``; pass the
+    specific leaves you want frozen instead.
     """
     for sub in module.modules():
         _wrap_single_forward(sub)
 
 
 logger = logging.getLogger(__name__)
-
-# Prefix for VLM backbone parameters in the architecture state_dict.
-# VLM weights are saved as a separate checkpoint directory (not in safetensors)
-# to avoid tied-weight deduplication complexity.
-VLM_STATE_DICT_PREFIX = "vlm_backbone."
-
-# Substring marker for the Cosmos25 Reason1 text-encoder inner module.
-# Pre-self-containment checkpoints (saved with `text_encoder: none`) lack any
-# `_reason1_inner.*` keys, but a deploy run that resurrects the encoder by
-# setting `text_encoder: reason1_live` + `text_encoder_path: ...` will eager-
-# load real weights into a registered `_reason1_inner` submodule on the
-# pipeline wrapper. The strict safetensors load then surfaces those eager-
-# loaded params as `missing`; tolerating them is safe so long as the wrapper
-# has no meta tensors (the self-contained `from_empty` path uses meta and
-# MUST receive its weights from the safetensors — see `load_checkpoint`).
-REASON1_INNER_KEY_MARKER = "._reason1_inner."
-
-
-def _exclude_vlm_from_state_dict(state_dict: dict[str, "Tensor"]) -> dict[str, "Tensor"]:
-    """Filter out VLM backbone parameters from a state dict.
-
-    Note: this exclusion is prefix-based (``vlm_backbone.*``).  Future
-    trainable modules on the VLM (e.g. LoRA adapters) must be registered at
-    the architecture top level (as siblings of ``vlm_backbone``), NOT as
-    children under ``vlm_backbone``, otherwise they will be silently excluded
-    from the checkpoint.
-    """
-    return {k: v for k, v in state_dict.items() if not k.startswith(VLM_STATE_DICT_PREFIX)}
-
-
-def _looks_like_cosmos25_video_backbone(vb: Any) -> bool:
-    """Best-effort Cosmos25 check that avoids importing the heavy adapter."""
-    pipe = getattr(vb, "_pipe", None)
-    if pipe is None:
-        return False
-    vb_name = f"{type(vb).__module__}.{type(vb).__name__}"
-    if "cosmos25" in vb_name.lower():
-        return True
-    # Fallback for tests / wrappers: Cosmos25 exposes a DiT ``net`` plus the
-    # 2B text context dimension. This intentionally stays conservative.
-    return bool(hasattr(pipe, "net") and getattr(pipe, "context_dim", None) == 1024)
-
-
-def _ensure_cosmos25_reason1_self_contained(arch: "BaseWAMArchitecture") -> None:
-    """Fail fast before saving a non-self-contained Cosmos25 checkpoint."""
-    vb = getattr(arch, "video_backbone", None)
-    if not _looks_like_cosmos25_video_backbone(vb):
-        return
-    pipe = getattr(vb, "_pipe", None)
-    if getattr(pipe, "_reason1_inner", None) is not None:
-        return
-    cfg = getattr(arch, "cfg", None)
-    vb_cfg = arch._cfg_get(cfg, "video_backbone", None)
-    te_path = arch._cfg_get(vb_cfg, "text_encoder_path", None)
-    if te_path:
-        raise RuntimeError(
-            "Cosmos25 checkpoint save is missing `_pipe._reason1_inner` even though "
-            f"video_backbone.text_encoder_path={te_path!r} is set. Rebuild the model with "
-            "the current Cosmos25 pipeline_builder so Reason1 is loaded and registered "
-            "before saving."
-        )
-    raise RuntimeError(
-        "Cosmos25 checkpoint save requires the Reason1 encoder in safetensors for both "
-        "cache and live-encoder training modes, but `_pipe._reason1_inner` is absent and "
-        "`model.video_backbone.text_encoder_path` is unset. Set text_encoder_path to the "
-        "Cosmos-Reason1-7B bundle when constructing the training model."
-    )
-
-
-def _assert_decode_video_supported(vb) -> None:
-    """Fail-fast guard for ``generate(decode_video=True)`` against backbones
-    wired to an irreversible external encoder (DINOv3 / V-JEPA2 / VGGT).
-
-    Silently returning ``video=None`` would mask a config mismatch (the
-    caller asked for pixels but the encoder cannot produce them). Pulled
-    out of :meth:`BaseWAMArchitecture.generate` so it is independently
-    unit-testable without standing up the full denoising loop.
-    """
-    enc = getattr(vb, "_encoder", None)
-    if enc is not None and not enc.spec.is_reversible:
-        raise ValueError(
-            f"generate(decode_video=True) but the configured encoder "
-            f"({type(enc).__name__}) is irreversible (spec.is_reversible=False). "
-            "Pass decode_video=False to retrieve raw latents."
-        )
 
 
 if TYPE_CHECKING:
@@ -183,8 +78,7 @@ class ActionState:
 
     Only ``DualSystemSelfAttnArchitecture`` needs this — its action stream is
     threaded through ``MoTJointDriver``, which mutates the payload across
-    layers. SharedBackbone and DualSystem cross-attn don't go through this
-    container.
+    layers.
 
     Fields:
         action_latents: (B, T_action, action_dim) noisy actions (input to forward).
@@ -197,14 +91,6 @@ class ActionState:
     action_latents: Optional[Tensor] = None
     timestep: Optional[Tensor] = None
     payload: Optional[Any] = None
-
-
-# Large prime offset for the special-token noise sub-stream so it stays
-# decorrelated from the patches stream's ``Generator(seed)`` even if a
-# caller schedules adjacent batches with ``seeds = [base, base+1, ...]``.
-# (Picking a tiny offset like ``+1`` would alias the latents noise of
-# sample ``i`` onto the special noise of sample ``i-1``.)
-_SPECIAL_NOISE_SEED_OFFSET = 1_000_003
 
 
 class BaseWAMArchitecture(ABC, nn.Module):
@@ -234,9 +120,9 @@ class BaseWAMArchitecture(ABC, nn.Module):
         self._max_timestep_boundary = 1.0
         self._min_timestep_boundary = 0.0
 
-        # Optional action normalizer for deployment. ``generate`` uses it to
-        # return real-scale actions; deploy-side proprio preprocessing uses it
-        # to normalize raw robot state into the model's training space.
+        # Optional action normalizer for deployment. The deploy engine uses it
+        # to return real-scale actions; deploy-side proprio preprocessing uses
+        # it to normalize raw robot state into the model's training space.
         self.action_normalizer = None
 
         if cfg is not None:
@@ -253,8 +139,7 @@ class BaseWAMArchitecture(ABC, nn.Module):
     def _init_video_backbone(self, cfg):
         """Build the SANA video backbone (single-backbone project — no registry).
 
-        Two source shapes in ``cfg.video_backbone`` (mirrors the original
-        dispatch, minus the dropped Wan/Cosmos/external-encoder paths):
+        Two source shapes in ``cfg.video_backbone``:
         - ``_source`` present → deploy path (load from saved components dir/dict).
         - otherwise → training path (read ``video_backbone.*`` from the full cfg).
         """
@@ -265,127 +150,6 @@ class BaseWAMArchitecture(ABC, nn.Module):
             return
         source = self._cfg_get(vb_cfg, "_source", None)
         self.video_backbone = SanaVideoBackbone.from_pretrained(source if source is not None else cfg)
-
-
-    @staticmethod
-    def _compute_encoder_yaml_whitelist(enc_cfg, registry) -> set[str]:
-        """Encoder-aware allowed-yaml-keys set.
-
-        Always includes ``{"name", "model_path"}``; extends with the
-        ``optional_yaml_keys()`` set of the registered encoder class
-        named by ``enc_cfg["name"]`` (e.g. ``"vjepa2_1_forward"`` for
-        V-JEPA 2.1). Unknown encoder names yield just the base pair.
-
-        Failure ordering when the encoder name is unknown:
-        - if ``enc_cfg`` carries no extras beyond ``{name, model_path}``,
-          the caller's whitelist check passes and the downstream
-          ``build_video_encoder`` registry lookup raises the proper
-          ``KeyError`` with the available-encoders hint;
-        - if ``enc_cfg`` carries extras, the caller's whitelist check
-          raises ``ValueError`` first (the ``KeyError`` is masked). This
-          is intentional: an unknown encoder name + non-whitelisted field
-          is most likely a typo, and the whitelist diagnostic surfaces
-          both problems together.
-        """
-        base = {"name", "model_path"}
-        if isinstance(enc_cfg, dict):
-            enc_name = enc_cfg.get("name")
-        else:
-            enc_name = getattr(enc_cfg, "name", None)
-        if not enc_name or enc_name not in registry:
-            return base
-        return base | registry[enc_name].optional_yaml_keys()
-
-    @staticmethod
-    def _encoder_yaml_extras(enc_cfg, allowed: set[str]) -> set[str]:
-        """Keys present in ``enc_cfg`` with a non-null value that are NOT
-        in ``allowed``.
-
-        Yaml-``null`` is treated as "field absent" for whitelist purposes
-        so the framework yamls (``configs/model/backbone/wan.yaml``) can
-        keep an inline ``encoder:`` block with discoverability fields
-        like ``use_special_tokens: null`` — those fields stay visible to
-        operators but do not trip the whitelist when the active encoder
-        (e.g. V-JEPA 2.1, V-JEPA 2, Wan VAE) does not declare them in
-        ``optional_yaml_keys()``. An explicit non-null value still
-        triggers the whitelist error, so a user who actually sets the
-        field on the wrong encoder still gets a fail-fast.
-        """
-        if isinstance(enc_cfg, dict):
-            items = list(enc_cfg.items())
-        else:
-            # OmegaConf DictConfig — iterate via .items() if available,
-            # otherwise fall back to (key, getattr) pairs.
-            try:
-                items = list(enc_cfg.items())
-            except AttributeError:
-                items = [(k, getattr(enc_cfg, k, None)) for k in enc_cfg.keys()]
-        return {k for k, v in items if v is not None and k not in allowed}
-
-    @staticmethod
-    def _build_external_encoder_skeleton(enc_cfg, source, *, ckpt_dir=None):
-        """Deploy-time external encoder constructor.
-
-        Reads the encoder ``name`` (subject to the same yaml whitelist as
-        the training path) and reaches into the saved ``source`` dict for
-        the ``components`` list to find the ``attr == "vae"`` entry. That
-        entry's ``model_class`` / ``extra_kwargs`` is handed to the
-        encoder class's :meth:`VideoEncoder.from_skeleton` classmethod,
-        which instantiates the underlying module with zero weights. The
-        architecture's :meth:`load_checkpoint` strict load fills in the
-        weights immediately after.
-
-        ``ckpt_dir`` is forwarded to ``from_skeleton`` so encoders that
-        depend on side files can read them from the checkpoint dir itself,
-        not from the user-side weight directory. Two patterns coexist:
-        V-JEPA 2.1 prefers ``<ckpt_dir>/manifest.json`` and falls back to
-        ``encoder.model_path`` for older checkpoints; VGGT-Omega reads
-        ``<ckpt_dir>/encoder_meta/encoder_config.json`` strictly and
-        forbids any ``encoder.model_path`` fallback (plan §5.2).
-
-        Refuses to silently fall back to the native VAE path here: if the
-        cfg has an encoder block but the components list is missing a vae
-        entry (e.g. corrupted save), raise so the operator sees the
-        mismatch up front.
-        """
-        from sana_wam.model.video_backbone.encoder import _VIDEO_ENCODER_REGISTRY
-
-        # Deploy-side whitelist matches the training-side whitelist in
-        # ``_init_video_backbone`` — same field set, same plumbing via
-        # ``_compute_encoder_yaml_whitelist`` (encoder class extends the
-        # always-allowed ``{name, model_path}`` with its
-        # ``optional_yaml_keys()``). ``use_special_tokens`` is a deploy-time
-        # no-op here in the sense that the encoder's ``from_skeleton`` reads
-        # its effective value from ``encoder_meta/encoder_config.json``
-        # (written at train save) so train and deploy stay in sync even if
-        # the field is omitted / mis-set in the deploy-side ``config.yaml``.
-        allowed = BaseWAMArchitecture._compute_encoder_yaml_whitelist(enc_cfg, _VIDEO_ENCODER_REGISTRY)
-        extras = BaseWAMArchitecture._encoder_yaml_extras(enc_cfg, allowed)
-        if extras:
-            raise ValueError(
-                f"video_backbone.encoder allows only {sorted(allowed)} in yaml; got extra fields {sorted(extras)}."
-            )
-        enc_name = enc_cfg["name"] if isinstance(enc_cfg, dict) else enc_cfg.name
-        if enc_name not in _VIDEO_ENCODER_REGISTRY:
-            available = ", ".join(sorted(_VIDEO_ENCODER_REGISTRY)) or "(none)"
-            raise KeyError(f"Unknown video encoder '{enc_name}'. Available: {available}")
-
-        components = (source or {}).get("components") if isinstance(source, dict) else None
-        if not components:
-            raise RuntimeError(
-                "Deploy with encoder block but saved config has no "
-                "video_backbone.components — cannot reconstruct encoder skeleton. "
-                "Re-save the checkpoint with the current code, or strip the "
-                "encoder block from config.yaml to fall back to native VAE."
-            )
-        vae_entry = next((e for e in components if e.get("attr") == "vae"), None)
-        if vae_entry is None:
-            raise RuntimeError(
-                "Deploy with encoder block but components list has no attr=vae "
-                "entry to construct the encoder skeleton from."
-            )
-        encoder_cls = _VIDEO_ENCODER_REGISTRY[enc_name]
-        return encoder_cls.from_skeleton(vae_entry, encoder_cfg=enc_cfg, ckpt_dir=ckpt_dir)
 
     def _resolve_video_dim(self, cfg) -> int:
         """Resolve video_dim from config or video_backbone; raise if neither provides it."""
@@ -400,10 +164,9 @@ class BaseWAMArchitecture(ABC, nn.Module):
         """Resolve the action-side context (text) dim.
 
         Priority: explicit ``cfg.text_dim`` → ``video_backbone.context_dim`` →
-        ``default`` (4096, the Wan T5-XXL dim). Backbones whose text encoder
-        differs from Wan (e.g. Cosmos) report their context dim via
-        :attr:`VideoBackbone.context_dim`; older Wan configs that omit
-        ``text_dim`` keep working through the default.
+        ``default``. The backbone reports its text-encoder context dim via
+        :attr:`VideoBackbone.context_dim`; configs that omit ``text_dim`` fall
+        back to the default.
         """
         raw = self._cfg_get(cfg, "text_dim", None)
         if raw not in (None, 0):
@@ -418,8 +181,8 @@ class BaseWAMArchitecture(ABC, nn.Module):
     def backbones(self) -> dict[str, nn.Module]:
         """All backbone modules owned by this architecture.
 
-        Subclasses with additional backbones (e.g. TriSystem with a VLM
-        backbone) should override this to include them. The returned dict
+        Subclasses with additional backbones should override this to
+        include them. The returned dict
         is used by ``init_training_schedulers``, ``set_dtype_device``,
         ``move_frozen_to_device``, and ``get_component_specs`` to iterate
         over all backbones generically.
@@ -600,72 +363,31 @@ class BaseWAMArchitecture(ABC, nn.Module):
     # --- Checkpoint save / load ---
 
     def save_checkpoint(self, path: str) -> None:
-        """Save architecture state to safetensors.
-
-        VLM backbone parameters are excluded — the VLM checkpoint is saved
-        as a separate directory by the trainer. This avoids tied-weight
-        deduplication complexity and keeps the file small.
-        """
+        """Save architecture state to safetensors."""
         from safetensors.torch import save_file
 
-        _ensure_cosmos25_reason1_self_contained(self)
         state_dict = self.state_dict()
-        if getattr(self, "vlm_backbone", None) is not None:
-            state_dict = _exclude_vlm_from_state_dict(state_dict)
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         save_file(state_dict, path)
 
     def load_checkpoint(self, path: str, strict: bool = True) -> None:
         """Load architecture state from a safetensors checkpoint.
 
-        VLM backbone weights are not stored in the safetensors file (they
-        are saved as a separate directory). When a VLM backbone is present,
-        missing ``vlm_backbone.*`` keys are tolerated; unexpected or missing
-        non-VLM keys still raise under ``strict=True``.
-
-        Meta-device sub-modules (cosmos25 self-contained deploy: Reason1 /
-        VAE / DiT empty shells built via ``from_empty`` /
-        ``init_empty_weights``) need ``load_state_dict(..., assign=True)``
-        — the default in-place copy is a silent no-op against meta tensors
-        and leaves the shells unpopulated. ``assign=True`` rebinds the
-        parameter slot to the safetensors tensor instead. We only flip
-        the flag when meta params actually exist so the training-resume
-        path (real-device params, in-place copy preserves identity)
-        is unchanged.
+        Meta-device sub-modules (self-contained deploy: empty shells built via
+        ``from_empty`` / ``init_empty_weights``) need ``load_state_dict(...,
+        assign=True)`` — the default in-place copy is a silent no-op against
+        meta tensors and leaves the shells unpopulated. ``assign=True`` rebinds
+        the parameter slot to the safetensors tensor instead. We only flip the
+        flag when meta params actually exist so the training-resume path
+        (real-device params, in-place copy preserves identity) is unchanged.
         """
         from safetensors.torch import load_file
 
         state_dict = load_file(path)
-        has_vlm = getattr(self, "vlm_backbone", None) is not None
         has_meta = any(p.device.type == "meta" for p in self.parameters())
         missing, unexpected = self.load_state_dict(state_dict, strict=False, assign=has_meta)
-        # Backward compat for pre-self-containment Cosmos25 checkpoints: those
-        # were saved with `text_encoder: none`, so the safetensors has no
-        # `_reason1_inner.*` keys. If the deploy config now resurrects the
-        # encoder via `text_encoder_path`, the eager-loaded weights are
-        # already valid and the strict-load "missing" entries for that subtree
-        # are noise. Skip the exemption when the model has meta tensors —
-        # that branch (`from_empty` self-contained deploy) genuinely needs
-        # those keys from the safetensors and silent tolerance would leave
-        # uninitialized weights.
-        if missing and not has_meta:
-            tolerated = [k for k in missing if REASON1_INNER_KEY_MARKER in k]
-            if tolerated:
-                logger.info(
-                    "Tolerated %d missing %s* keys (encoder loaded externally from text_encoder_path)",
-                    len(tolerated),
-                    REASON1_INNER_KEY_MARKER.lstrip("."),
-                )
-                missing = [k for k in missing if REASON1_INNER_KEY_MARKER not in k]
-        if strict and not has_vlm:
-            if missing or unexpected:
-                raise RuntimeError(f"Strict load failed: missing={missing}, unexpected={unexpected}")
-        elif strict and has_vlm:
-            non_vlm_missing = [k for k in missing if not k.startswith(VLM_STATE_DICT_PREFIX)]
-            if non_vlm_missing or unexpected:
-                raise RuntimeError(
-                    f"Strict load failed (VLM keys excluded): missing={non_vlm_missing}, unexpected={unexpected}"
-                )
+        if strict and (missing or unexpected):
+            raise RuntimeError(f"Strict load failed: missing={missing}, unexpected={unexpected}")
 
     # --- Training: module management ---
 
@@ -674,7 +396,7 @@ class BaseWAMArchitecture(ABC, nn.Module):
 
         Single source of truth for the video α-shift:
         ``self.video_backbone.shift_video``. The same property is read by
-        ``openwam/deploy/joint_engine.py::generate`` at inference time, so
+        the deploy inference path at inference time, so
         the discrete training sigma buffer and the inference denoising
         trajectory are guaranteed to be sampled from the same shifted
         schedule — train/inference cannot drift regardless of which yaml
@@ -717,8 +439,7 @@ class BaseWAMArchitecture(ABC, nn.Module):
         For text_encoder / vae, which are already called under the
         ``@torch.no_grad()`` ``prepare_inputs`` decorator, the wrapper is a
         no-op (nested ``no_grad``). For modules called inside the training
-        forward graph (e.g. tri_system's frozen Qwen3-VL backbone), the
-        wrapper is what actually saves activation memory.
+        forward graph, the wrapper is what actually saves activation memory.
 
         Uses ``nn.Module.get_submodule()`` so dotted paths like
         ``video_backbone._pipe.text_encoder`` work naturally; unknown names
@@ -837,8 +558,8 @@ class BaseWAMArchitecture(ABC, nn.Module):
     def prepare_inputs(self, batch: list[dict]) -> dict:
         """Aggregate a list of dataset samples into a batched inputs dict.
 
-        Absorbs the per-sample field collection that previously lived in
-        ``OpenWAMTrainer._forward_batch``. The returned dict is designed to be
+        Absorbs the per-sample field collection used by the training forward
+        step. The returned dict is designed to be
         unpacked directly into ``compute_loss`` via ``**inputs``.
 
         Args:
@@ -864,7 +585,6 @@ class BaseWAMArchitecture(ABC, nn.Module):
 
         all_frames: list = []
         all_prompts: list = []
-        all_vace_videos: list = []
         all_ref_images: list = []
         all_pre_encoded_text: list = []
         all_actions: list = []
@@ -876,7 +596,6 @@ class BaseWAMArchitecture(ABC, nn.Module):
         for sample in samples:
             all_frames.append(sample["video"])
             all_prompts.append(sample["prompt"])
-            all_vace_videos.append(sample.get("vace_video"))
             all_ref_images.append(sample.get("first_frame_image"))
             all_pre_encoded_text.append(sample.get("pre_encoded_text"))
 
@@ -924,10 +643,10 @@ class BaseWAMArchitecture(ABC, nn.Module):
         if any(ref_flags) and not all(ref_flags):
             raise ValueError("Mixed reference images in batch: all samples must be consistent.")
 
-        # Optional per-sample pre-encoded text embedding (e.g. Reason1 cached
-        # offline for the Cosmos25 backbone). Backbones that don't consume it
-        # (Wan) silently drop the kwarg via ``**kw``. All-or-nothing per batch;
-        # uniform L required for fixed-shape stacking — padded variant deferred.
+        # Optional per-sample pre-encoded text embedding (cached offline).
+        # Backbones that don't consume it silently drop the kwarg via ``**kw``.
+        # All-or-nothing per batch; uniform L required for fixed-shape stacking
+        # — padded variant deferred.
         pre_text_flags = [t is not None for t in all_pre_encoded_text]
         preprocess_extra: dict = {}
         if any(pre_text_flags):
@@ -949,7 +668,7 @@ class BaseWAMArchitecture(ABC, nn.Module):
             if len(lens) > 1:
                 raise ValueError(
                     f"Inconsistent sequence length across pre_encoded_text batch: "
-                    f"{sorted(lens)}. Phase 3.x requires uniform L within a batch; "
+                    f"{sorted(lens)}. The AR path requires uniform L within a batch; "
                     f"padded variant is deferred."
                 )
             preprocess_extra["pre_encoded_text"] = torch.stack(
@@ -959,7 +678,6 @@ class BaseWAMArchitecture(ABC, nn.Module):
         preprocessed = self.preprocess(
             frames=all_frames,
             text=all_prompts,
-            vace_videos=all_vace_videos,
             ref_images=all_ref_images if ref_flags[0] else None,
             **preprocess_extra,
         )
@@ -988,30 +706,15 @@ class BaseWAMArchitecture(ABC, nn.Module):
             inputs["action_is_pad"] = torch.stack([~m for m in all_action_masks], dim=0).to(device=_device)
         if all_video_masks[0] is not None:
             # ``latent[0]`` is a clean conditioning frame (and must be excluded
-            # from the loss mask) when either:
-            #   (a) the input batch carries ``first_frame_latents`` (Wan TI2V
-            #       / cosmos25 TI2V — per-batch signal), in which case
-            #       ``base.compute_loss`` will clean-replace ``latents[:, :, 0:1]``
-            #       on every step; or
-            #   (b) the backbone's *configuration* always reserves ``latent[0]``
-            #       for conditioning (only TI2V via the
-            #       ``fuse_vae_embedding_in_latents`` / per-token-t=0 path
-            #       today).
-            # Wan I2V: side-channel ``y`` carries the first-frame reference;
-            # ``latent[0]`` itself is fully noised on both train and deploy
-            # and must be supervised — NOT in the skip list.
-            # Wan VACE: first-frame condition rides on ``vace_context``;
-            # video latents are fully noised, ``latent[0]`` enters the loss
-            # as a predicted frame. NOT in the skip list.
-            # Cosmos25 T2V: no first-frame conditioning at all — both
-            # signals off.
+            # from the loss mask) when either the batch carries
+            # ``first_frame_latents`` (per-batch first-frame conditioning) or the
+            # backbone's configuration always reserves ``latent[0]`` for
+            # conditioning (``needs_first_frame_skip``). SANA is text-to-video:
+            # neither holds, so ``latent[0]`` is a fully-noised, supervised frame.
             skip_first = inputs.get("first_frame_latents") is not None or self.video_backbone.needs_first_frame_skip
             # Pass the backbone's temporal_compression so the tail-grouping
-            # divisor matches the actual latent-T produced by the encoder.
-            # The default 4 in ``downsample_video_mask_to_latent`` is the Wan
-            # VAE legacy; for V-JEPA / other encoders it would silently emit
-            # a wrong-length mask. See VideoBackbone.temporal_compression for
-            # the source-of-truth contract.
+            # divisor matches the actual latent-T produced by the VAE. See
+            # VideoBackbone.temporal_compression for the source-of-truth contract.
             temporal_factor = int(self.video_backbone.temporal_compression)
             latent_masks = [
                 downsample_video_mask_to_latent(~m, temporal_factor=temporal_factor, skip_first=skip_first)
@@ -1084,769 +787,6 @@ class BaseWAMArchitecture(ABC, nn.Module):
         if registered_any:
             self._zero3_externals_registered = True
 
-    # --- Training: loss computation ---
-
-    def compute_loss(
-        self,
-        *,
-        actions: Optional[torch.Tensor] = None,
-        lambda_video: float = 1.0,
-        lambda_action: float = 1.0,
-        current_step: int = 0,
-        decoupled_sampler=None,
-        action_timestep_per_token: bool = False,
-        **inputs,
-    ) -> dict:
-        """Compute joint video-action flow matching loss.
-
-        This is the single entry point for training loss computation.
-        Handles timestep sampling, noise injection, forward pass, and
-        loss calculation internally.
-
-        Callers should produce ``inputs`` via ``self.prepare_inputs(batch)``
-        (preferred) or assemble it manually with the same keys: the output of
-        ``self.preprocess()`` plus any of ``actions / proprio_state /
-        action_is_pad / video_is_pad / use_gradient_checkpointing[_offload] /
-        max_timestep_boundary / min_timestep_boundary``.
-
-        Args:
-            actions: (B, T_action, action_dim) ground truth actions. May also
-                be passed via ``inputs["actions"]``.
-            lambda_video: Weight for video loss term.
-            lambda_action: Weight for action loss term.
-            current_step: Current training step.
-            decoupled_sampler: Optional DecoupledFlowMatchLoss.
-            action_timestep_per_token: Per-token action timestep sampling.
-            **inputs: Preprocessed video/text tensors plus forward-time flags.
-
-        Returns:
-            dict with keys: loss, loss_video, loss_action.
-        """
-        vb = self.video_backbone
-        action_scheduler = self.action_backbone.scheduler
-        _dtype = self.dtype
-        _device = self.device
-
-        if actions is None:
-            actions = inputs.pop("actions", None)
-        else:
-            inputs.pop("actions", None)
-
-        max_tb = int(inputs.pop("max_timestep_boundary", 1) * len(vb.scheduler.timesteps))
-        min_tb = int(inputs.pop("min_timestep_boundary", 0) * len(vb.scheduler.timesteps))
-        B = inputs["input_latents"].shape[0]
-        if action_timestep_per_token:
-            raise ValueError(
-                "action_timestep_per_token=True is not supported in the FastWAM-compatible path; "
-                "action timestep must be per-sample [B]."
-            )
-
-        # --- Sample video timesteps ---
-        if decoupled_sampler is not None:
-            video_t, decoupled_action_t = decoupled_sampler.sample_timesteps(B, current_step=current_step, device="cpu")
-            num_ts = len(vb.scheduler.timesteps)
-            video_timestep_ids = (
-                (video_t / decoupled_sampler.num_train_timesteps * num_ts).long().clamp(min_tb, max_tb - 1)
-            )
-        else:
-            decoupled_action_t = None
-            video_timestep_ids = torch.randint(min_tb, max_tb, (B,))
-
-        video_timesteps = vb.scheduler.timesteps[video_timestep_ids].to(dtype=_dtype, device=_device)
-        video_sigmas = vb.scheduler.sigmas[video_timestep_ids].to(dtype=_dtype, device=_device)
-
-        # --- Add video noise ---
-        video_noise = torch.randn_like(inputs["input_latents"])
-        if hasattr(vb, "add_training_noise"):
-            inputs["latents"] = vb.add_training_noise(inputs["input_latents"], video_noise, video_timestep_ids)
-        else:
-            sigma_bc = video_sigmas.view(B, 1, 1, 1, 1)
-            inputs["latents"] = (1 - sigma_bc) * inputs["input_latents"] + sigma_bc * video_noise
-        if hasattr(vb, "training_target"):
-            video_target = vb.training_target(inputs["input_latents"], video_noise, video_timestep_ids)
-        else:
-            video_target = video_noise - inputs["input_latents"]
-
-        if inputs.get("first_frame_latents") is not None:
-            inputs["latents"][:, :, 0:1] = inputs["first_frame_latents"]
-
-        # --- Add special-token noise (v2 VGGT-Omega path) ---
-        # ``input_special_tokens`` is the CLEAN per-frame special tokens emitted
-        # by ``WanVideoBackbone.preprocess_input`` (None on non-special encoders).
-        # We add noise along the same sigma as the patches stream so VGGT's
-        # 17 special slots and the patch grid share one flow-matching schedule,
-        # then clean-replace frame 0 from ``first_frame_special_tokens`` to
-        # mirror the patches-side ``first_frame_latents`` contract. ``prepare()``
-        # reads the noised version through the ``special_tokens`` kwarg.
-        input_special = inputs.get("input_special_tokens")
-        special_target = None
-        if input_special is not None:
-            special_noise = torch.randn_like(input_special)
-            # input_special: (B, T_lat, num_special, z_dim) — sigma broadcast on (B, 1, 1, 1)
-            sigma_special = video_sigmas.view(B, 1, 1, 1).to(dtype=input_special.dtype)
-            inputs["special_tokens"] = (1 - sigma_special) * input_special + sigma_special * special_noise
-            if inputs.get("first_frame_special_tokens") is not None:
-                inputs["special_tokens"][:, 0:1] = inputs["first_frame_special_tokens"]
-            special_target = special_noise - input_special
-
-        # --- Prepare action noise ---
-        noisy_actions, action_target, action_timesteps, action_timestep_ids, action_sigmas = (
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        if lambda_action > 0 and actions is not None:
-            if decoupled_action_t is not None:
-                num_ts_a = len(action_scheduler.timesteps)
-                action_timestep_ids = (
-                    (decoupled_action_t / decoupled_sampler.num_train_timesteps * num_ts_a)
-                    .long()
-                    .clamp(0, num_ts_a - 1)
-                )
-            else:
-                action_timestep_ids = torch.randint(0, len(action_scheduler.timesteps), (B,))
-
-            action_timesteps = action_scheduler.timesteps[action_timestep_ids].to(dtype=_dtype, device=_device)
-            action_sigmas = action_scheduler.sigmas[action_timestep_ids].to(dtype=_dtype, device=_device)
-
-            actions = actions.to(dtype=_dtype, device=_device)
-            if actions.dim() == 2:
-                actions = actions.unsqueeze(0)
-
-            action_noise = torch.randn_like(actions)
-            if action_sigmas.dim() == 1:
-                a_sigma_bc = action_sigmas.view(B, 1, 1)
-            else:
-                a_sigma_bc = action_sigmas.unsqueeze(-1)
-            noisy_actions = action_scheduler.add_noise(actions, action_noise, a_sigma_bc)
-            action_target = action_scheduler.training_target(actions, action_noise)
-
-        # --- Joint forward pass ---
-        forward_inputs = dict(inputs)
-        proprio_state = forward_inputs.pop("proprio_state", None)
-        use_grad_ckpt = forward_inputs.pop("use_gradient_checkpointing", False)
-        use_grad_ckpt_offload = forward_inputs.pop("use_gradient_checkpointing_offload", False)
-        # Padding masks are kept in `inputs` for loss-side masking but dropped
-        # from `forward_inputs` so they don't leak into vb.prepare(). Per FastWAM
-        # MoT design, attention itself does not consume sample-level padding.
-        forward_inputs.pop("action_is_pad", None)
-        forward_inputs.pop("video_is_pad", None)
-
-        # Use ``self(...)`` (not ``self.forward(...)``) so ``nn.Module.__call__``
-        # is invoked and the architecture-level forward-pre-hook fires. Under
-        # DeepSpeed ZeRO-3 that hook gathers the leaves registered by
-        # ``_register_zero3_externals`` (raw-access params read by the MoT
-        # driver). On non-ZeRO-3 paths this is a no-op detour through the empty
-        # hook chain.
-        self._register_zero3_externals()
-        video_noise_pred, action_noise_pred = self(
-            noisy_actions if lambda_action > 0 else None,
-            action_timesteps if lambda_action > 0 else None,
-            proprio_state=proprio_state,
-            use_gradient_checkpointing=use_grad_ckpt,
-            use_gradient_checkpointing_offload=use_grad_ckpt_offload,
-            **forward_inputs,
-            timestep=video_timesteps,
-        )
-
-        # --- Video loss ---
-        # On the v2 special-token path, ``video_noise_pred`` is a tuple
-        # ``(patches_pred, special_pred)`` — ``finalize`` returns both heads.
-        # Non-special encoders keep the single-tensor contract.
-        if isinstance(video_noise_pred, tuple):
-            patches_noise_pred, special_noise_pred = video_noise_pred
-            loss_video = self._compute_video_loss_with_special(
-                patches_noise_pred,
-                video_target,
-                special_noise_pred,
-                special_target,
-                video_timestep_ids,
-                inputs,
-                _device,
-            )
-        else:
-            loss_video = self._compute_video_loss(
-                video_noise_pred,
-                video_target,
-                video_timestep_ids,
-                inputs,
-                _device,
-            )
-
-        if lambda_action == 0 or action_noise_pred is None:
-            return {
-                "loss": lambda_video * loss_video,
-                "loss_video": lambda_video * loss_video.detach(),
-                "loss_action": torch.tensor(0.0, device=loss_video.device),
-            }
-
-        # --- Action loss ---
-        loss_action = self._compute_action_loss(
-            action_noise_pred,
-            action_target,
-            action_timestep_ids,
-            action_scheduler,
-            inputs,
-            _device,
-        )
-
-        if lambda_video == 0:
-            loss = lambda_action * loss_action
-        else:
-            loss = lambda_video * loss_video + lambda_action * loss_action
-
-        return {
-            "loss": loss,
-            "loss_video": lambda_video * loss_video.detach(),
-            "loss_action": lambda_action * loss_action.detach(),
-        }
-
-    def _compute_video_loss(self, noise_pred, target, timestep_ids, inputs, device):
-        """Per-sample weighted video MSE loss."""
-        import torch.nn.functional as F
-
-        num_clean_prefix = int(inputs.get("num_clean_prefix_frames", 0) or 0)
-        video_is_pad = inputs.get("video_is_pad")
-
-        n_skip = 0
-        if inputs.get("first_frame_latents") is not None:
-            # TI2V (Wan + cosmos25): trim the leading clean conditioning
-            # latent(s) from the loss. Wan adapter emits
-            # ``num_clean_prefix_frames=0`` (one implicit conditioning latent
-            # at index 0); cosmos25 wrapper emits ``num_clean_prefix_frames=1``
-            # (explicit count). Both should drop exactly the conditioning
-            # latent(s), so use ``max(prefix, 1)``. VACE never enters this
-            # branch — its conditioning rides on ``vace_context``, the video
-            # latent path is fully noised + fully supervised.
-            n_skip = max(num_clean_prefix, 1)
-        elif num_clean_prefix > 0:
-            # Clean-prefix flagged without first_frame_latents: trim prefix
-            # plus the first VAE-conditioning latent that
-            # ``downsample_video_mask_to_latent`` also excludes from the mask.
-            n_skip = num_clean_prefix + 1
-        elif video_is_pad is not None and video_is_pad.shape[-1] < noise_pred.shape[2]:
-            # Production tail-mask convention (no ref-prefix backbone such as
-            # I2V): ``video_is_pad`` is sized to T_lat minus the leading
-            # conditioning latents. Trim noise_pred / target to match.
-            n_skip = noise_pred.shape[2] - video_is_pad.shape[-1]
-
-        if n_skip > 0:
-            noise_pred = noise_pred[:, :, n_skip:]
-            target = target[:, :, n_skip:]
-
-        vb = self.video_backbone
-        tw = vb.scheduler.linear_timesteps_weights[timestep_ids].to(dtype=torch.float32, device=device)
-
-        per_element = F.mse_loss(noise_pred.float(), target.float(), reduction="none")
-        per_frame = per_element.mean(dim=(1, 3, 4))
-
-        if video_is_pad is not None:
-            if video_is_pad.shape[-1] != noise_pred.shape[2]:
-                raise ValueError(
-                    f"video_is_pad length {video_is_pad.shape[-1]} does not match "
-                    f"trimmed noise_pred T={noise_pred.shape[2]} (n_skip={n_skip}). "
-                    "Expected mask sized to T_lat minus leading conditioning latents."
-                )
-            video_is_pad = video_is_pad.to(device=per_frame.device, dtype=torch.bool)
-            valid_mask = ~video_is_pad
-            per_frame = per_frame * valid_mask.float()
-            valid_count = valid_mask.float().sum(dim=1).clamp(min=1)
-            per_sample = per_frame.sum(dim=1) / valid_count
-        else:
-            per_sample = per_frame.mean(dim=1)
-
-        return (per_sample * tw).mean()
-
-    def _compute_video_loss_with_special(
-        self,
-        patches_pred,
-        patches_target,
-        special_pred,
-        special_target,
-        timestep_ids,
-        inputs,
-        device,
-    ):
-        """v2 video FM loss when the encoder emits special tokens (VGGT-Omega).
-
-        Two layers of weighting compose multiplicatively:
-
-        1. **Within a frame** — patches and special are concatenated along
-           the slot axis into a single ``(B, T_target, 497, z_dim)`` VGGT-
-           output-shape tensor (480 patches + 17 special) and reduced with
-           a single token-axis mean. Token density (480 : 17 ≈ 28 : 1)
-           provides the patches-vs-special weighting naturally; no manual
-           lambda knob. See plan_vggt_omega_v2_two_pass_supervised.md §3.6.
-
-        2. **Across timesteps** — per-sample MSE is multiplied by
-           ``scheduler.linear_timesteps_weights[timestep_ids]`` exactly the
-           same way :meth:`_compute_video_loss` does. The Wan flow-match
-           scheduler's bell-shape weighting concentrates gradient on
-           mid-SNR timesteps where the velocity target carries the most
-           signal — keeping it on the special-token path means training
-           dynamics stay comparable across encoders (Wan VAE / V-JEPA /
-           VGGT-Omega).
-        """
-        from einops import rearrange
-
-        num_clean_prefix = int(inputs.get("num_clean_prefix_frames", 0) or 0)
-        video_is_pad = inputs.get("video_is_pad")
-
-        n_skip = 0
-        if inputs.get("first_frame_latents") is not None:
-            n_skip = max(num_clean_prefix, 1)
-        elif num_clean_prefix > 0:
-            n_skip = num_clean_prefix + 1
-        elif video_is_pad is not None and video_is_pad.shape[-1] < patches_pred.shape[2]:
-            n_skip = patches_pred.shape[2] - video_is_pad.shape[-1]
-
-        if n_skip > 0:
-            patches_pred = patches_pred[:, :, n_skip:]
-            patches_target = patches_target[:, :, n_skip:]
-            special_pred = special_pred[:, n_skip:]
-            special_target = special_target[:, n_skip:]
-
-        # Reshape patches (B, z, T, H, W) → (B, T, H*W, z) and concat with
-        # special (B, T, num_special, z) along the slot axis into a single
-        # (B, T, 497, z) VGGT-output-shape tensor — layer (1) in the
-        # docstring above.
-        patches_pred_flat = rearrange(patches_pred, "b c t h w -> b t (h w) c").float()
-        patches_target_flat = rearrange(patches_target, "b c t h w -> b t (h w) c").float()
-        special_pred_f = special_pred.float()
-        special_target_f = special_target.float()
-        pred_full = torch.cat([special_pred_f, patches_pred_flat], dim=2)
-        target_full = torch.cat([special_target_f, patches_target_flat], dim=2)
-
-        # Per-frame MSE: reduce the (slot, z) axes so patches and special
-        # share one density-weighted scalar per frame; then run the same
-        # padding-mask / timestep-weighting pipeline as the baseline path.
-        per_element = (pred_full - target_full) ** 2
-        per_frame = per_element.mean(dim=(2, 3))  # (B, T)
-
-        if video_is_pad is not None:
-            if video_is_pad.shape[-1] != patches_pred.shape[2]:
-                raise ValueError(
-                    f"video_is_pad length {video_is_pad.shape[-1]} does not match "
-                    f"trimmed patches_pred T={patches_pred.shape[2]} (n_skip={n_skip})."
-                )
-            video_is_pad = video_is_pad.to(device=per_frame.device, dtype=torch.bool)
-            valid_mask = ~video_is_pad
-            per_frame = per_frame * valid_mask.float()
-            valid_count = valid_mask.float().sum(dim=1).clamp(min=1)
-            per_sample = per_frame.sum(dim=1) / valid_count
-        else:
-            per_sample = per_frame.mean(dim=1)
-
-        vb = self.video_backbone
-        tw = vb.scheduler.linear_timesteps_weights[timestep_ids].to(dtype=torch.float32, device=device)
-        return (per_sample * tw).mean()
-
-    def _compute_action_loss(self, noise_pred, target, timestep_ids, scheduler, inputs, device):
-        """Per-sample weighted action MSE loss."""
-        import torch.nn.functional as F
-
-        tw = scheduler.training_weight(timestep_ids).to(dtype=torch.float32, device=device)
-        if tw.ndim != 1:
-            raise ValueError(f"action loss weights must be per-sample [B], got shape {tuple(tw.shape)}")
-        per_element = F.mse_loss(noise_pred.float(), target.float(), reduction="none")
-        per_step = per_element.mean(dim=2)
-
-        action_is_pad = inputs.get("action_is_pad")
-
-        if action_is_pad is not None:
-            action_is_pad = action_is_pad.to(device=per_step.device, dtype=torch.bool)
-            valid_mask = ~action_is_pad
-            per_step = per_step * valid_mask.float()
-            valid_count = valid_mask.float().sum(dim=1).clamp(min=1)
-            per_sample = per_step.sum(dim=1) / valid_count
-            return (per_sample * tw).mean()
-
-        per_sample = per_step.mean(dim=1)
-        return (per_sample * tw).mean()
-
-    # --- Inference: generation ---
-
-    @torch.no_grad()
-    def generate(
-        self,
-        schedule,
-        prompt: str,
-        *,
-        vace_video=None,
-        first_frame_image=None,
-        num_frames: int = 49,
-        action_num_frames: Optional[int] = None,
-        height: int = 480,
-        width: int = 832,
-        seed: int = 42,
-        tiled: bool = True,
-        input_video_latents: Optional[Tensor] = None,
-        num_inference_steps: int = 50,
-        shift: float = 5.0,
-        tile_size: tuple = None,
-        tile_stride: tuple = None,
-        dit_cache=None,
-        decode_video: bool = True,
-        profile: bool = False,
-        vace_cache: Optional[dict] = None,
-        prompt_embed_cache: Optional[dict] = None,
-        proprio_state: Optional[Tensor] = None,
-        cfg_scale: float = 1.0,
-        cfg_merge: bool = False,
-        pre_encoded_text: Optional[Tensor] = None,
-        uncond_pre_encoded_text: Optional[Tensor] = None,
-        **extra_pipeline_inputs: Any,
-    ) -> dict:
-        """Execute joint video-action denoising driven by a schedule.
-
-        This is the single entry point for inference. External code
-        (engine) should call this instead of touching video_backbone directly.
-
-        Args:
-            num_frames: Video frame count passed to the video backbone. For
-                RoboTwin this is the post-``video_stride`` count seen during
-                training, not the raw action window length.
-            action_num_frames: Raw state/action window length. Generated
-                action chunk length is ``action_num_frames - 1``. Defaults to
-                ``num_frames`` for datasets whose video/action rates match.
-
-        Returns:
-            dict with ``video`` (list of PIL images or None) and
-            ``actions`` ((T, action_dim) numpy array).
-        """
-        import time
-
-        from tqdm import tqdm
-
-        # Defensive: deploy/model_loader.py:161 already flips eval at load,
-        # but ad-hoc callers (notebooks, mid-training eval callbacks) might
-        # invoke `generate()` without going through that path. Idempotent
-        # — guards CFG dropout (e.g. Cosmos25 §14.7) and any other
-        # training-only behavior from firing during inference.
-        self.eval()
-
-        vb = self.video_backbone
-        device = self.device
-        dtype = self.dtype
-
-        t0 = time.time()
-
-        # §15 — validate CFG up front. CFG vs dit_cache (§15.D6): cond/uncond
-        # use the same cache key, so re-running uncond off a cond-tagged hit
-        # would silently corrupt the velocity prediction. MVP keeps it simple
-        # — disable the cache whenever CFG is on; future work can add a
-        # (cond, uncond) slot. Everything else flows through ``InferenceInputs``
-        # which has unambiguous defaults; backbones that don't implement CFG
-        # (Wan) simply ignore those fields.
-        cfg_scale_f = float(cfg_scale)
-        if cfg_scale_f < 1.0:
-            raise ValueError(f"cfg_scale must be >= 1.0; got {cfg_scale!r}.")
-        if cfg_scale_f > 1.0:
-            dit_cache = None
-
-        action_num_frames = int(action_num_frames if action_num_frames is not None else num_frames)
-
-        from sana_wam.model.inference_inputs import InferenceInputs
-
-        inference_inputs = InferenceInputs(
-            prompt=prompt,
-            vace_video=vace_video,
-            first_frame_image=first_frame_image,
-            pre_encoded_text=pre_encoded_text,
-            uncond_pre_encoded_text=uncond_pre_encoded_text,
-            num_frames=num_frames,
-            height=height,
-            width=width,
-            seed=seed,
-            num_inference_steps=num_inference_steps,
-            shift=shift,
-            tiled=tiled,
-            tile_size=tile_size,
-            tile_stride=tile_stride,
-            vace_cache=vace_cache,
-            prompt_embed_cache=prompt_embed_cache,
-            cfg_scale=cfg_scale_f,
-            cfg_merge=cfg_merge,
-        )
-        inputs_shared = vb.prepare_inputs_for_inference(inference_inputs)
-
-        if profile:
-            if torch.cuda.is_available():
-                torch.cuda.synchronize()
-            logger.info("[WAM_PROFILE] pipeline_prep: %.3fs", time.time() - t0)
-
-        if input_video_latents is not None:
-            inputs_shared["latents"] = input_video_latents
-        # Architecture-specific pipeline inputs (e.g. tri_system's vlm_inputs /
-        # vlm_hidden / vlm_attention_mask) are forwarded as-is. Subclasses
-        # extract what they recognize in their forward(); unrelated architectures
-        # never see these keys because callers only pass them via super().generate.
-        for key, value in extra_pipeline_inputs.items():
-            if value is not None:
-                inputs_shared[key] = value
-        ref_latents = inputs_shared.get("first_frame_latents")
-        if ref_latents is not None:
-            latents = inputs_shared["latents"].clone()
-            latents[:, :, : ref_latents.shape[2]] = ref_latents
-            inputs_shared["latents"] = latents
-        if self.uses_proprioception:
-            if proprio_state is None:
-                raise ValueError("use_proprioception=True requires `proprio_state` during generation.")
-            inputs_shared["proprio_state"] = proprio_state.to(device=device, dtype=dtype)
-
-        # v2 special-token denoising state. When the active encoder declares
-        # ``spec.has_special_tokens=True`` (currently: VGGT-Omega) we
-        # initialize a noisy ``(B, T_lat, num_special, z_dim)`` tensor and let
-        # the denoising loop step it alongside the patches latents. Frame 0
-        # is clean-replaced every step from ``first_frame_special_tokens``
-        # (matching the patches-side ``first_frame_latents`` contract).
-        encoder = getattr(vb, "_encoder", None)
-        special_aware = encoder is not None and getattr(encoder.spec, "has_special_tokens", False)
-        if special_aware:
-            num_special = int(encoder.spec.num_special_tokens_per_frame)
-            z_dim = int(encoder.spec.z_dim)
-            T_lat = inputs_shared["latents"].shape[2]
-            B_lat = inputs_shared["latents"].shape[0]
-            # Use a separate sub-stream of the seed so special and patches
-            # noise are independent but reproducible.
-            special_noise = torch.randn(
-                B_lat,
-                T_lat,
-                num_special,
-                z_dim,
-                device=device,
-                dtype=dtype,
-                generator=torch.Generator(device=device).manual_seed(seed + _SPECIAL_NOISE_SEED_OFFSET),
-            )
-            ref_special = inputs_shared.get("first_frame_special_tokens")
-            if ref_special is not None:
-                special_noise[:, : ref_special.shape[1]] = ref_special.to(device=device, dtype=dtype)
-            inputs_shared["special_tokens"] = special_noise
-
-        action_latents = torch.randn(
-            1,
-            action_num_frames - 1,
-            self.action_dim,
-            device=device,
-            dtype=dtype,
-            generator=torch.Generator(device=device).manual_seed(seed),
-        )
-
-        num_train_ts_v = float(self.video_scheduler.num_train_timesteps)
-        num_train_ts_a = float(self.action_scheduler.num_train_timesteps)
-
-        t_loop = time.time()
-
-        for i in tqdm(range(len(schedule) - 1), desc="Joint denoising"):
-            t_v, t_a = schedule[i]
-            t_v_next, t_a_next = schedule[i + 1]
-
-            sigma_v = t_v / num_train_ts_v
-            sigma_a = t_a / num_train_ts_a
-            sigma_v_next = t_v_next / num_train_ts_v
-            sigma_a_next = t_a_next / num_train_ts_a
-
-            video_stepping = sigma_v != sigma_v_next
-            action_stepping = sigma_a != sigma_a_next
-
-            if not video_stepping and not action_stepping:
-                continue
-
-            v_timestep = torch.tensor([t_v], dtype=dtype, device=device)
-            a_timestep = torch.tensor([t_a], dtype=dtype, device=device) if action_stepping else None
-
-            if dit_cache is not None and video_stepping and not dit_cache.should_recompute(sigma_v):
-                # Reuse cached video noise prediction; still call forward() with
-                # noisy_actions=None to skip the action stream cleanly. This is
-                # only valid when video_stepping=True (the only path that
-                # populates the cache).
-                noise_pred = dit_cache.get_cached()
-                action_noise_pred = None
-                if action_stepping:
-                    # Re-run action with a fresh forward pass; without cached
-                    # bridges we just rerun video too. Acceptable at this scale.
-                    torch.compiler.cudagraph_mark_step_begin()
-                    noise_pred, action_noise_pred = self.forward(
-                        action_latents,
-                        a_timestep,
-                        **inputs_shared,
-                        timestep=v_timestep,
-                    )
-            else:
-                forward_action_latents = action_latents if action_stepping else None
-                if cfg_scale_f > 1.0:
-                    # _forward_with_cfg runs its own cudagraph_mark_step_begin()
-                    # before each inner forward (1 for cfg_merge, 2 for sequential).
-                    noise_pred, action_noise_pred = self._forward_with_cfg(
-                        action_latents=forward_action_latents,
-                        a_timestep=a_timestep,
-                        inputs_shared=inputs_shared,
-                        v_timestep=v_timestep,
-                        cfg_scale=cfg_scale_f,
-                        cfg_merge=bool(cfg_merge),
-                    )
-                else:
-                    torch.compiler.cudagraph_mark_step_begin()
-                    noise_pred, action_noise_pred = self.forward(
-                        forward_action_latents,
-                        a_timestep,
-                        **inputs_shared,
-                        timestep=v_timestep,
-                    )
-                if dit_cache is not None and video_stepping:
-                    dit_cache.update(noise_pred, sigma_v)
-
-            # v2: the special-token path returns ``noise_pred`` as a tuple
-            # ``(patches_noise_pred, special_noise_pred)`` from ``finalize``;
-            # decompose so the patches stepping below keeps its tensor shape.
-            if isinstance(noise_pred, tuple):
-                patches_noise_pred, special_noise_pred = noise_pred
-            else:
-                patches_noise_pred, special_noise_pred = noise_pred, None
-
-            if video_stepping:
-                new_latents = inputs_shared["latents"] + patches_noise_pred * (sigma_v_next - sigma_v)
-                ref_latents = inputs_shared.get("first_frame_latents")
-                if ref_latents is not None:
-                    new_latents = new_latents.clone()
-                    new_latents[:, :, : ref_latents.shape[2]] = ref_latents
-                inputs_shared["latents"] = new_latents
-
-                if special_noise_pred is not None:
-                    new_special = inputs_shared["special_tokens"] + special_noise_pred * (sigma_v_next - sigma_v)
-                    ref_special = inputs_shared.get("first_frame_special_tokens")
-                    if ref_special is not None:
-                        new_special = new_special.clone()
-                        new_special[:, : ref_special.shape[1]] = ref_special
-                    inputs_shared["special_tokens"] = new_special
-
-            if action_stepping and action_noise_pred is not None:
-                action_latents = self.action_scheduler.flow_step(
-                    action_noise_pred, sigma_a, sigma_a_next, action_latents
-                )
-
-        if profile:
-            if torch.cuda.is_available():
-                torch.cuda.synchronize()
-            logger.info("[WAM_PROFILE] denoising_loop: %.3fs", time.time() - t_loop)
-
-        # VAE decode. Fail-fast when the backbone is wired to an irreversible
-        # external encoder — silently returning None would mask a config
-        # mismatch (caller asked for pixels but the encoder cannot produce them).
-        if decode_video:
-            _assert_decode_video_supported(vb)
-            video_frames = vb.decode_video(inputs_shared["latents"], tiled=tiled)
-        else:
-            video_frames = None
-
-        actions = action_latents.squeeze(0).float().cpu().numpy()
-        normalizer = getattr(self, "action_normalizer", None)
-        if normalizer is not None:
-            actions = normalizer.unnormalize(actions)
-
-        return {"video": video_frames, "actions": actions}
-
-    # --- §15: Classifier-Free Guidance helpers (inference-time) ---
-
-    def _forward_with_cfg(
-        self,
-        *,
-        action_latents: Optional[Tensor],
-        a_timestep: Optional[Tensor],
-        inputs_shared: dict,
-        v_timestep: Tensor,
-        cfg_scale: float,
-        cfg_merge: bool,
-    ) -> tuple:
-        """Run cond + uncond forwards and combine via ``pred = uncond + s·(cond - uncond)``.
-
-        Two paths gated on ``cfg_merge``:
-
-        - ``cfg_merge=False`` (default): two sequential forwards. The cond
-          branch consumes ``inputs_shared['context']`` unchanged; the uncond
-          branch temporarily swaps in ``inputs_shared['uncond_context']`` and
-          swaps back via ``try/finally``.
-        - ``cfg_merge=True``: stack ``[uncond, cond]`` along batch axis 0 for
-          all batch-shaped tensors in ``inputs_shared`` plus ``action_latents``
-          and the timesteps, then chunk the merged output. One forward, ~B=2
-          memory peak.
-
-        Action and video streams share the same text context, so a single
-        ``cfg_scale`` is applied to both ``noise_pred`` and (when present)
-        ``action_noise_pred``.
-        """
-        uncond_context = inputs_shared.get("uncond_context")
-        if not isinstance(uncond_context, Tensor):
-            raise RuntimeError(
-                "CFG combine requested but `inputs_shared['uncond_context']` is missing "
-                "or not a tensor. `prepare_inputs_for_inference` should populate it when "
-                "cfg_scale > 1.0."
-            )
-
-        if cfg_merge:
-            expanded, exp_al, exp_vt, exp_at = _expand_inputs_for_cfg(
-                inputs_shared,
-                action_latents=action_latents,
-                v_timestep=v_timestep,
-                a_timestep=a_timestep,
-            )
-            torch.compiler.cudagraph_mark_step_begin()
-            merged_noise, merged_action = self.forward(exp_al, exp_at, **expanded, timestep=exp_vt)
-            # ``merged_noise`` is a tuple ``(patches, special)`` on the v2
-            # special-token path (``finalize`` returns both heads). Each
-            # component is chunked + combined independently.
-            if isinstance(merged_noise, tuple):
-                merged_patches, merged_special = merged_noise
-                u_p, c_p = merged_patches.chunk(2, dim=0)
-                u_s, c_s = merged_special.chunk(2, dim=0)
-                noise_pred = (
-                    _combine_cfg(u_p, c_p, cfg_scale),
-                    _combine_cfg(u_s, c_s, cfg_scale),
-                )
-            else:
-                uncond_noise, cond_noise = merged_noise.chunk(2, dim=0)
-                noise_pred = _combine_cfg(uncond_noise, cond_noise, cfg_scale)
-            if isinstance(merged_action, Tensor):
-                uncond_action, cond_action = merged_action.chunk(2, dim=0)
-                action_noise_pred = _combine_cfg(uncond_action, cond_action, cfg_scale)
-            else:
-                action_noise_pred = None
-            return noise_pred, action_noise_pred
-
-        # Sequential path: cond → uncond → combine. Mark before each forward
-        # so CUDA Graph tree sees both as distinct dispatch sites.
-        torch.compiler.cudagraph_mark_step_begin()
-        cond_noise, cond_action = self.forward(action_latents, a_timestep, **inputs_shared, timestep=v_timestep)
-        saved_context = inputs_shared["context"]
-        inputs_shared["context"] = uncond_context
-        try:
-            torch.compiler.cudagraph_mark_step_begin()
-            uncond_noise, uncond_action = self.forward(action_latents, a_timestep, **inputs_shared, timestep=v_timestep)
-        finally:
-            inputs_shared["context"] = saved_context
-
-        # Same tuple-aware combine as the cfg_merge path: v2 special-token
-        # encoders return ``(patches, special)`` from ``finalize``.
-        if isinstance(uncond_noise, tuple) and isinstance(cond_noise, tuple):
-            u_p, u_s = uncond_noise
-            c_p, c_s = cond_noise
-            noise_pred = (
-                _combine_cfg(u_p, c_p, cfg_scale),
-                _combine_cfg(u_s, c_s, cfg_scale),
-            )
-        else:
-            noise_pred = _combine_cfg(uncond_noise, cond_noise, cfg_scale)
-        if isinstance(cond_action, Tensor) and isinstance(uncond_action, Tensor):
-            action_noise_pred = _combine_cfg(uncond_action, cond_action, cfg_scale)
-        else:
-            # One side dropped the action stream; keep cond as-is.
-            action_noise_pred = cond_action
-        return noise_pred, action_noise_pred
-
-    # --- Deploy helpers (combine action module + video backbone) ---
-
     def apply_compile_optimizations(self, compile_cfg) -> None:
         """Apply architecture-specific deploy-time compile optimizations."""
         mode = compile_mode(compile_cfg, default="none", strict=True)
@@ -1880,93 +820,3 @@ class BaseWAMArchitecture(ABC, nn.Module):
         """
         ...
 
-
-# ----------------------------------------------------------------------
-# §15 — Classifier-Free Guidance helpers (module-level so they stay
-# stateless / testable without a full architecture instance).
-# ----------------------------------------------------------------------
-
-
-def _combine_cfg(uncond: Tensor, cond: Tensor, scale: float) -> Tensor:
-    """Linear CFG combine: ``uncond + scale·(cond - uncond)``.
-
-    Matches upstream Cosmos formula in
-    ``cosmos_predict2/_src/predict2/models/text2world_model_rectified_flow.py:484-488``.
-    """
-    return uncond + float(scale) * (cond - uncond)
-
-
-# Keys in ``inputs_shared`` that carry a leading batch axis and therefore
-# need duplication when stacking ``[uncond, cond]`` for cfg_merge=True.
-_CFG_BATCH_AXIS_KEYS: tuple = (
-    "latents",
-    "input_latents",
-    "proprio_state",
-    "first_frame_latents",
-    "seq_lens",
-    "context_mask",
-    # cosmos25 TI2V emits ``condition_mask`` of shape (B, 1, T_lat, H_lat, W_lat)
-    # in ``_finalize_ti2v_inputs`` and the wrapper cats it to ``x_in`` along
-    # dim=1; cfg_merge=True must double B here or that cat shape-mismatches.
-    "condition_mask",
-    # VGGT-Omega-style per-frame special tokens: (B, T_lat, num_special, z_dim).
-    # cfg_merge=True must double the leading batch axis for the same reason
-    # as ``input_latents`` / ``first_frame_latents`` — the merged uncond/cond
-    # stack is fed directly into ``prepare()`` and must keep the per-sample
-    # alignment.
-    "special_tokens",
-    # v2: clean / first-frame counterparts on the special axis. ``compute_loss``
-    # reads ``input_special_tokens`` (clean) on the training path; ``generate``
-    # uses ``first_frame_special_tokens`` (shape (B, 1, num_special, z_dim))
-    # to clean-replace special[:, 0:1] every step. Both carry a leading B,
-    # so cfg_merge=True must duplicate them.
-    "input_special_tokens",
-    "first_frame_special_tokens",
-)
-
-
-def _expand_inputs_for_cfg(
-    inputs_shared: dict,
-    *,
-    action_latents: Optional[Tensor],
-    v_timestep: Tensor,
-    a_timestep: Optional[Tensor],
-) -> Tuple[dict, Optional[Tensor], Tensor, Optional[Tensor]]:
-    """Stack ``[uncond, cond]`` along batch axis for the cfg_merge=True path.
-
-    Returns ``(expanded_inputs_shared, action_latents, v_timestep, a_timestep)``
-    where the inputs_shared copy has:
-
-    - ``context`` replaced by ``cat([uncond_context, cond_context], dim=0)``
-    - ``uncond_context`` cleared (downstream forwards don't read it)
-    - every other batch-axis tensor in ``_CFG_BATCH_AXIS_KEYS`` duplicated
-
-    Scalar / None entries are passed through unchanged.
-    """
-    uncond_context = inputs_shared["uncond_context"]
-    cond_context = inputs_shared["context"]
-    expanded = dict(inputs_shared)
-    expanded["context"] = torch.cat([uncond_context, cond_context], dim=0)
-    expanded["uncond_context"] = None
-
-    # proprio_state can come in raw 1D ``(D,)`` shape (the architecture's
-    # ``_compute_proprio_state`` normalises inside forward); cfg_merge
-    # stacks BEFORE forward so we must normalise to ``(B, D)`` first,
-    # otherwise ``cat([(D,), (D,)], dim=0)`` lands on ``(2·D,)`` and the
-    # last-dim check downstream raises. Mirrors the (B, 1, D) → (B, D)
-    # squeeze the architecture itself does.
-    proprio = expanded.get("proprio_state")
-    if isinstance(proprio, Tensor):
-        if proprio.ndim == 1:
-            expanded["proprio_state"] = proprio.unsqueeze(0)
-        elif proprio.ndim == 3 and proprio.shape[1] == 1:
-            expanded["proprio_state"] = proprio[:, 0, :]
-
-    for key in _CFG_BATCH_AXIS_KEYS:
-        v = expanded.get(key)
-        if isinstance(v, Tensor):
-            expanded[key] = torch.cat([v, v], dim=0)
-    al = torch.cat([action_latents, action_latents], dim=0) if isinstance(action_latents, Tensor) else None
-    vt = torch.cat([v_timestep, v_timestep], dim=0) if isinstance(v_timestep, Tensor) else v_timestep
-    at = torch.cat([a_timestep, a_timestep], dim=0) if isinstance(a_timestep, Tensor) else None
-    return expanded, al, vt, at

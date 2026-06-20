@@ -1,7 +1,6 @@
 """Minimal torchrun DDP + bf16 trainer for the SANA block-AR model.
 
-Replaces openwam's 1143-line accelerate/deepspeed ``OpenWAMTrainer``. The real
-train step is two calls — ``architecture.prepare_inputs(batch)`` (VAE-encode +
+The real train step is two calls — ``architecture.prepare_inputs(batch)`` (VAE-encode +
 collate) then ``architecture.compute_loss(**inputs)`` (the AR per-chunk loss);
 everything else here is freeze setup, optimizer groups, the loop, and writing
 the deploy checkpoint contract.

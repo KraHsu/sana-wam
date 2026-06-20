@@ -1,4 +1,4 @@
-"""Phase 5 (core): cache-based AR inference attention ≡ training kernel.
+"""Cache-based AR inference attention ≡ training kernel.
 
 The rollout must produce, for the current noisy chunk, exactly what the training
 kernel computes for that chunk's noisy rows — otherwise train/inference diverge.
