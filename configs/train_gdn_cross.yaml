@@ -29,6 +29,10 @@ model:
     # so NO model_path (random init). Supply a GDN checkpoint later via
     # architecture.load_checkpoint if pretraining a GDN video model separately.
     model_path: null
+    # The Wan VAE is still needed to encode video pixels → latents. It is
+    # independent of the DiT weights, so point at the bundle's VAE explicitly
+    # (model_path=null means no bundle auto-discovery).
+    vae_path: /DATA/share/SANA-Video_2B_480p/vae/Wan2.1_VAE.pth
     text_encoder_name: /DATA/share/gemma-2-2b-it
     freeze: false
     attn_kernel: gdn                 # → SanaMSVideoCamCtrl + ChunkCausalGDNTriton

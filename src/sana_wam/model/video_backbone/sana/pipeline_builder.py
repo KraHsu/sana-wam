@@ -441,6 +441,26 @@ _GDN_ATTN_OVERRIDES: dict = {
     "camctrl_layers_num": 0,
 }
 
+# Full architecture spec for GDN-from-scratch. The CamCtrl factory
+# (SanaMSVideoCamCtrl_1600M_P1_D20) sets depth/hidden/patch/num_heads, but NOT
+# in_channels (default 4) etc. The Wan VAE produces 16-channel video latents, so
+# without in_channels=16 the patch-embed conv3d rejects the input. These mirror
+# the linear_relu 480p preset (minus what the factory fixes) so a random-init GDN
+# DiT matches the data/VAE/text contract. There is no published GDN checkpoint.
+_GDN_ARCH_PRESET: dict = {
+    "in_channels": 16,
+    "ffn_type": "GLUMBConvTemp",
+    "qk_norm": True,
+    "pred_sigma": False,
+    "learn_sigma": False,
+    "caption_channels": 2304,
+    "model_max_length": 300,
+    "mlp_ratio": 3,
+    "cross_norm": True,
+    "use_pe": True,
+    "pos_embed_type": "wan_rope",
+}
+
 # The GDN attn class is only wired in SanaMSVideoCamCtrl; the plain SanaMSVideo
 # model has no GDN branch. So attn_kernel="gdn" also switches the model factory.
 _GDN_MODEL_FACTORY = "SanaMSVideoCamCtrl_1600M_P1_D20"
@@ -450,13 +470,15 @@ def _apply_attn_kernel(model_kwargs: dict, attn_kernel: str) -> dict:
     """Return ``model_kwargs`` adjusted for ``attn_kernel``.
 
     ``"linear_relu"`` leaves the preset's ``attn_type`` (LiteLAReLURope) intact.
-    ``"gdn"`` swaps to ChunkCausalGDNTriton and adds the GDN short-conv knobs,
-    unless the caller already pinned ``attn_type`` explicitly in the yaml.
+    ``"gdn"`` swaps to ChunkCausalGDNTriton, adds the GDN short-conv knobs, and
+    fills in the architecture spec (in_channels=16 etc.) needed for a
+    from-scratch GDN DiT — unless the caller already pinned a value in the yaml.
     """
     if attn_kernel == "gdn":
         merged = dict(model_kwargs)
-        for k, v in _GDN_ATTN_OVERRIDES.items():
-            merged.setdefault(k, v)
+        for preset in (_GDN_ATTN_OVERRIDES, _GDN_ARCH_PRESET):
+            for k, v in preset.items():
+                merged.setdefault(k, v)
         # A linear_relu preset's attn_type must be overridden for GDN.
         if str(merged.get("attn_type", "")).endswith("LiteLAReLURope"):
             merged["attn_type"] = _GDN_ATTN_OVERRIDES["attn_type"]
