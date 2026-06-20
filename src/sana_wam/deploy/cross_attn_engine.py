@@ -88,7 +88,7 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
 
         B = 1
         C, Hl, Wl = first_frame_latent.shape[1], first_frame_latent.shape[3], first_frame_latent.shape[4]
-        T = self._video_num_frames_latent(first_frame_latent)
+        T = self._video_num_frames_latent()
         atok = self._action_tokens or (self._raw_num_frames - 1)
 
         # first_frame_latent must be exactly one latent frame (the observation),
@@ -205,6 +205,6 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         latents = latents.to(device=self._device, dtype=self._dtype)
         return latents[:, :, :1].contiguous()  # (1, C, 1, Hl, Wl)
 
-    def _video_num_frames_latent(self, first_frame_latent: torch.Tensor) -> int:
+    def _video_num_frames_latent(self) -> int:
         """Latent temporal length T for the generated clip (causal Wan VAE)."""
         return 1 + (self._video_num_frames - 1) // 4

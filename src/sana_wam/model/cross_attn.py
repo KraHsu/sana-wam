@@ -189,7 +189,10 @@ class DualSystemCrossAttnArchitecture(BaseWAMArchitecture):
         if use_ffc and T > 1:
             v_sigma_f[:, :, 0] = 0.0
         noisy_video = (1 - v_sigma_f) * clean_video + v_sigma_f * v_noise
-        v_target = v_noise - clean_video
+        # Route the target through the scheduler so a future scheduler with a
+        # different flow-matching parameterization stays consistent (currently
+        # noise - sample). The video scheduler's signature takes a timestep arg.
+        v_target = vb.scheduler.training_target(clean_video, v_noise, v_ts_val)
 
         # ---- action: one timestep per sample ----
         if actions is None or lambda_action <= 0:
@@ -205,7 +208,9 @@ class DualSystemCrossAttnArchitecture(BaseWAMArchitecture):
         a_ts_val = a_scheduler.timesteps[a_ids].to(device=device, dtype=dtype)  # (B,)
         a_noise = torch.randn_like(actions)
         noisy_actions = (1 - a_sigma.view(B, 1, 1)) * actions + a_sigma.view(B, 1, 1) * a_noise
-        a_target = a_noise - actions
+        # Route through the scheduler for the same reason as the video target above
+        # (currently noise - original). The action scheduler takes no timestep arg.
+        a_target = a_scheduler.training_target(actions, a_noise)
 
         fwd_inputs = {k: v for k, v in inputs.items() if k in ("context", "context_mask", "seq_lens")}
         proprio_state = inputs.get("proprio_state")
