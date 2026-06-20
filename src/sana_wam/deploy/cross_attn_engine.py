@@ -116,8 +116,6 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
                 proprio_state=proprio,
                 latents=video,
                 timestep=v_t.reshape(1).expand(B),
-                first_frame_latents=first_frame_latent,
-                num_clean_prefix_frames=1,
                 context=context,
                 seq_lens=seq_lens,
             )

@@ -173,7 +173,10 @@ def build_mini_sana_pipeline(
     # CamCtrl class; linear_relu uses the plain class.
     common = dict(
         input_size=h,
-        patch_size=(1, 2, 2),
+        # GDN production factory (SanaMSVideoCamCtrl_1600M_P1_D20) uses patch (1,1,1);
+        # match it for the GDN mini so test token geometry mirrors production. The
+        # linear_relu mini keeps SANA-Video's (1,2,2).
+        patch_size=(1, 1, 1) if _use_gdn else (1, 2, 2),
         in_channels=16,
         hidden_size=hidden_size,
         depth=depth,

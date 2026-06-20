@@ -177,8 +177,18 @@ class DualSystemCrossAttnArchitecture(BaseWAMArchitecture):
         v_sigma = vb.scheduler.sigmas[v_ids].to(device=device, dtype=dtype)  # (B,)
         v_ts_val = vb.scheduler.timesteps[v_ids].to(device=device, dtype=dtype)  # (B,)
         v_noise = torch.randn_like(clean_video)
-        s = v_sigma.view(B, 1, 1, 1, 1)
-        noisy_video = (1 - s) * clean_video + s * v_noise
+        # TI2V clean-prefix: when the video backbone conditions on the real first
+        # frame (use_first_frame_cond), latent frame 0 IS the observation — it must
+        # stay clean (sigma=0 ⇒ noisy[:, :, 0] == clean[:, :, 0]), be modulated at
+        # t=0, and be excluded from the video loss. Mirrors the AR path
+        # (architecture.py: v_sigma[:, 0] = 0). Without this, training noises and
+        # supervises frame 0 while inference pins it clean — a train/infer mismatch.
+        use_ffc = bool(getattr(vb, "_use_first_frame_cond", False))
+        # (B, 1, T, 1, 1) per-frame sigma so frame 0 can differ from the rest.
+        v_sigma_f = v_sigma.view(B, 1, 1, 1, 1).expand(B, 1, T, 1, 1).clone()
+        if use_ffc and T > 1:
+            v_sigma_f[:, :, 0] = 0.0
+        noisy_video = (1 - v_sigma_f) * clean_video + v_sigma_f * v_noise
         v_target = v_noise - clean_video
 
         # ---- action: one timestep per sample ----
@@ -199,6 +209,13 @@ class DualSystemCrossAttnArchitecture(BaseWAMArchitecture):
 
         fwd_inputs = {k: v for k, v in inputs.items() if k in ("context", "context_mask", "seq_lens")}
         proprio_state = inputs.get("proprio_state")
+        # NB: we deliberately do NOT pass num_clean_prefix_frames / first_frame_latents
+        # to the backbone. Those trigger SANA's per-frame timestep modulation, whose
+        # (B, F, 6*D) t0 contract does not match the CamCtrl/GDN block's
+        # forward_frame_aware reshape. Instead frame-0-clean is enforced purely at
+        # the data level (v_sigma[:,0]=0 above ⇒ noisy frame 0 == clean obs) and
+        # excluded from the loss below. This also matches inference, where the whole
+        # clip is denoised at a single per-step timestep with frame 0 re-pinned clean.
 
         v_pred, a_pred = self.forward(
             noisy_actions,
@@ -208,12 +225,24 @@ class DualSystemCrossAttnArchitecture(BaseWAMArchitecture):
             timestep=v_ts_val,
             **fwd_inputs,
         )
+
+        # TI2V: exclude the clean first frame from the video loss (it's the real
+        # obs, not a denoising target). Build/extend video_is_pad so _dual_mse
+        # skips frame 0 even when the batch carries no pad mask.
+        video_is_pad = inputs.get("video_is_pad")
+        if use_ffc and T > 1:
+            if video_is_pad is None:
+                video_is_pad = torch.zeros(B, T, dtype=torch.bool, device=device)
+            else:
+                video_is_pad = video_is_pad.clone().to(device)
+            video_is_pad[:, 0] = True  # mark frame 0 as "pad" ⇒ dropped from loss
+
         return self._dual_mse(
             v_pred, v_target, a_pred, a_target,
             vb=vb, v_ids=v_ids, T=T, B=B,
             lambda_video=lambda_video, lambda_action=lambda_action,
             action_is_pad=inputs.get("action_is_pad"),
-            video_is_pad=inputs.get("video_is_pad"),
+            video_is_pad=video_is_pad,
             device=device,
         )
 

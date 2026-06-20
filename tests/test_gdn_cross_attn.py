@@ -101,3 +101,56 @@ def test_gdn_cross_attn_video_only_forward():
     )
     assert a_pred is None
     assert v_pred.shape == (B, 16, 3, 8, 8)
+
+
+@requires_gpu
+def test_ti2v_frame0_clean_and_excluded():
+    """TI2V (use_first_frame_cond): compute_loss keeps latent frame 0 == the clean
+    observation (sigma=0) and excludes it from the video loss. Pins the train/infer
+    consistency fix — without it, frame 0 is noised+supervised in training but
+    pinned clean at inference."""
+    import sana_wam.model.video_backbone.sana as _s  # noqa: F401
+    from sana_wam.model.cross_attn import DualSystemCrossAttnArchitecture
+    from sana_wam.model.video_backbone.sana.adapter import SanaVideoBackbone
+
+    dev, dt = torch.device("cuda"), torch.bfloat16
+    vb = SanaVideoBackbone.from_mini_config(
+        depth=2, hidden_size=224, num_heads=2, linear_head_dim=112,
+        f=4, h=8, w=8, device="cuda", dtype=dt, attn_kernel="gdn", chunk_size=3,
+    )
+    vb._use_first_frame_cond = True  # TI2V on
+    arch = DualSystemCrossAttnArchitecture(cfg=None)
+    arch.video_backbone = vb
+    arch._cross_cfg = {"action_dim": 20, "dim": 128, "num_heads": 2, "attn_head_dim": 64,
+                       "bridge_layers": [0, 1], "text_dim": 64, "ffn_dim": 256}
+    arch._device, arch._dtype = dev, dt
+    arch.build_action_backbone()
+    arch.to(dt).cuda()
+    vb.scheduler.set_timesteps(4, training=True)
+    arch.action_backbone.scheduler.set_timesteps(4, training=True)
+
+    # Spy on forward to capture the noisy_video it receives.
+    seen = {}
+    orig_forward = arch.forward
+
+    def _spy(noisy_actions, action_timestep, **kw):
+        seen["noisy_video"] = kw.get("latents")
+        return orig_forward(noisy_actions, action_timestep, **kw)
+
+    arch.forward = _spy
+
+    B = 1
+    clean = torch.randn(B, 16, 2, 8, 8, device=dev, dtype=dt)  # T_latent=2
+    out = arch.compute_loss(
+        lambda_video=1.0, lambda_action=1.0,
+        input_latents=clean,
+        actions=torch.randn(B, 6, 20, device=dev, dtype=dt),
+        context=torch.randn(B, 8, 64, device=dev, dtype=dt),
+        seq_lens=torch.full((B,), 8, dtype=torch.long, device=dev),
+    )
+    # frame 0 of the noisy video must equal the clean observation (sigma=0).
+    nv = seen["noisy_video"]
+    torch.testing.assert_close(nv[:, :, 0], clean[:, :, 0], rtol=1e-3, atol=1e-3)
+    # and frames >0 must generally differ (they were noised).
+    assert not torch.allclose(nv[:, :, 1], clean[:, :, 1], rtol=1e-2, atol=1e-2)
+    assert torch.isfinite(out["loss"]).item()
