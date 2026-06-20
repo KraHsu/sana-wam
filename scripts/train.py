@@ -20,6 +20,14 @@ import os
 
 os.environ.setdefault("NCCL_NVLS_ENABLE", "0")
 
+# GDN scan helpers are wrapped in ``@torch.compile`` (third_party/Sana
+# sana_gdn_blocks.py). torch 2.7.1's inductor calls ``triton.compiler.triton_key``,
+# which triton 3.5.1 (required by the GDN bare-@triton.jit kernels) removed —
+# an ABI break. The kernels themselves don't need inductor, so disable the
+# torch.compile wrapper. No-op for the linear_relu path. Must precede any
+# ``diffusion.*`` import.
+os.environ.setdefault("GDN_DISABLE_COMPILE", "1")
+
 import argparse
 import logging
 import sys

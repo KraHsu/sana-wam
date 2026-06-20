@@ -333,6 +333,7 @@ class RoboTwinDataset(BaseActionDataset):
         max_static_retry: int = 3,
         text_embedding_cache_dir: Optional[str] = None,
         text_embedding_dropout: float = 0.0,
+        vae_cache_dir: Optional[str] = None,
         temporal_compression: int = 4,
         causal_temporal: bool = True,
     ):
@@ -665,6 +666,36 @@ class RoboTwinDataset(BaseActionDataset):
             if split != "train":
                 self._text_embedding_transform.eval()
 
+        # ---- Optional pre-encoded VAE latent cache. When set, a sample whose
+        # clip has a cache entry carries ``pre_encoded_latents`` (C, T, H, W),
+        # which the architecture threads to ``vb.preprocess_input`` as
+        # ``input_latents`` (skipping the live VAE encode). Misses fall back to
+        # live encoding. Keyed on (episode_path, start_frame, geometry) so an
+        # entry can only be reused for a byte-identical clip.
+        self._vae_latent_transform = None
+        if vae_cache_dir:
+            from sana_wam.dataloader.transforms.vae_latent_cache import (
+                VAELatentCacheTransform,
+            )
+
+            self._vae_latent_transform = VAELatentCacheTransform(
+                cache_dir=vae_cache_dir,
+                geometry=self.latent_cache_geometry(),
+            )
+
+    def latent_cache_geometry(self) -> str:
+        """Fingerprint every input that determines the encoded video pixels.
+
+        Used as the VAE latent-cache key salt so an entry can only be reused for
+        a byte-identical clip. Any change to resolution, stride, frame count,
+        multiview layout, or camera set must change this string.
+        """
+        cams = ",".join(self.cameras) if self.multiview else str(self.target_camera)
+        return (
+            f"nf={self.num_frames};vs={self.video_stride};nvf={self.num_video_frames};"
+            f"h={self.height};w={self.width};mv={int(self.multiview)};cams={cams}"
+        )
+
     @property
     def action_dim(self) -> int:
         return self._action_dim_value
@@ -943,6 +974,8 @@ class RoboTwinDataset(BaseActionDataset):
         sample.pop("_is_static", None)
         if self._text_embedding_transform is not None:
             sample = self._text_embedding_transform.apply(sample)
+        if self._vae_latent_transform is not None:
+            sample = self._vae_latent_transform.apply(sample)
         return sample
 
 
@@ -1038,6 +1071,7 @@ class MultiTaskRoboTwinDataset(BaseActionDataset):
             max_static_retry=int(_get("max_static_retry", 3)),
             text_embedding_cache_dir=_get("text_embedding_cache_dir", None),
             text_embedding_dropout=float(_get("text_embedding_dropout", 0.0)),
+            vae_cache_dir=_get("vae_cache_dir", None),
             temporal_compression=int(_get("temporal_compression", 4)),
             causal_temporal=bool(_get("causal_temporal", True)),
         )

@@ -28,6 +28,9 @@ dependencies = [
     "timm",
     "mmcv-lite",
     "mmengine",
+    # GDN (gated delta net) attention — sana_wm video backbone. ShortConvolution
+    # + fused linear-attn kernels. Triton kernels need Ampere+; CPU import works.
+    "flash-linear-attention>=0.4.2",
     "sentencepiece>=0.1.99,<1",
     "protobuf>=4.25,<7",
     # deploy server

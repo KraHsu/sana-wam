@@ -27,6 +27,7 @@ env/
 .vscode/
 .idea/
 .DS_Store
+.claude/
 
 # ML artifacts / logs
 wandb/

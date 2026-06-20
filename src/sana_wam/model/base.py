@@ -587,6 +587,7 @@ class BaseWAMArchitecture(ABC, nn.Module):
         all_prompts: list = []
         all_ref_images: list = []
         all_pre_encoded_text: list = []
+        all_pre_encoded_latents: list = []
         all_actions: list = []
         all_proprios: list = []
         all_proprio_seqs: list = []
@@ -598,6 +599,7 @@ class BaseWAMArchitecture(ABC, nn.Module):
             all_prompts.append(sample["prompt"])
             all_ref_images.append(sample.get("first_frame_image"))
             all_pre_encoded_text.append(sample.get("pre_encoded_text"))
+            all_pre_encoded_latents.append(sample.get("pre_encoded_latents"))
 
             action = sample.get("action")
             if action is not None:
@@ -673,6 +675,39 @@ class BaseWAMArchitecture(ABC, nn.Module):
                 )
             preprocess_extra["pre_encoded_text"] = torch.stack(
                 [t.to(dtype=_dtype, device=_device) for t in tensors], dim=0
+            )
+
+        # Optional per-sample pre-encoded VAE latents (cached offline), mirroring
+        # upstream Sana-wm's ``load_vae_feat`` / ``SanaWMZipLatentDataset``. When
+        # present they skip the live VAE encode in ``preprocess_input`` (which is
+        # the per-step bottleneck). All-or-nothing per batch; uniform latent shape
+        # required for fixed-shape stacking.
+        pre_lat_flags = [t is not None for t in all_pre_encoded_latents]
+        if any(pre_lat_flags):
+            if not all(pre_lat_flags):
+                raise ValueError(
+                    "Mixed pre_encoded_latents in batch: every sample must carry the "
+                    "field, or none. Check the dataloader cache wiring."
+                )
+            lat_tensors: list = []
+            for t in all_pre_encoded_latents:
+                if isinstance(t, np.ndarray):
+                    t = torch.from_numpy(t)
+                if t.dim() == 5 and t.shape[0] == 1:
+                    t = t[0]
+                if t.dim() != 4:
+                    raise ValueError(
+                        f"pre_encoded_latents must be (C, T, H, W) or (1, C, T, H, W); got {tuple(t.shape)}"
+                    )
+                lat_tensors.append(t)
+            shapes = {tuple(t.shape) for t in lat_tensors}
+            if len(shapes) > 1:
+                raise ValueError(
+                    f"Inconsistent pre_encoded_latents shapes across batch: {sorted(shapes)}. "
+                    f"All cached latents in a batch must share (C, T, H, W)."
+                )
+            preprocess_extra["input_latents"] = torch.stack(
+                [t.to(dtype=_dtype, device=_device) for t in lat_tensors], dim=0
             )
 
         preprocessed = self.preprocess(

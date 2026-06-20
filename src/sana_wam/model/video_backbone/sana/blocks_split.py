@@ -221,8 +221,21 @@ class SanaMSVideoSplit:
                 image_pos_embed = _rope_freqs_with_frame_index(
                     dit.rope, rope_frame_index, int(dit.h), int(dit.w), x.device
                 )
-            else:
+            elif hasattr(dit, "_apply_positional_embedding"):
                 x, image_pos_embed = dit._apply_positional_embedding(x, bs)
+            else:
+                # SanaMSVideoCamCtrl (the GDN model class) has no
+                # ``_apply_positional_embedding`` helper — it inlines the rope
+                # call in its own forward. For wan_rope this is a single, pure
+                # call that does not modify x (verified against
+                # SanaMSVideo._apply_positional_embedding). Reproduce it so the
+                # native run_block lifecycle works for the GDN backbone too.
+                if dit.pos_embed_type not in ("wan_rope", "wan_temporal_rope"):
+                    raise NotImplementedError(
+                        f"GDN/CamCtrl prepare supports wan_rope only here; got "
+                        f"pos_embed_type={dit.pos_embed_type!r}."
+                    )
+                image_pos_embed = dit.rope((dit.f, dit.h, dit.w), x.device)
 
         t = dit.t_embedder(timestep.flatten())  # (B, D) — per-sample, for final_layer
         if frame_timesteps is not None:

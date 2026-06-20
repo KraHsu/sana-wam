@@ -25,7 +25,7 @@ from torch.utils.data import DataLoader, DistributedSampler
 
 from sana_wam.config import flatten_model_cfg
 from sana_wam.dataloader.robotwin_dataset import MultiTaskRoboTwinDataset
-from sana_wam.model.architecture import DualSystemARArchitecture
+from sana_wam.model import build_architecture
 from sana_wam.train.checkpointing import manage_checkpoints, save_action_stats, save_config
 
 logger = logging.getLogger(__name__)
@@ -58,8 +58,8 @@ class Trainer:
         # --- dataset ---
         self.dataset = MultiTaskRoboTwinDataset.from_config(cfg.dataloader, split="train")
 
-        # --- architecture ---
-        self.architecture = DualSystemARArchitecture(flatten_model_cfg(cfg.model))
+        # --- architecture (dispatched by architecture.variant) ---
+        self.architecture = build_architecture(flatten_model_cfg(cfg.model))
         self.architecture.set_dtype_device(torch.bfloat16, self.device)
         self.architecture.init_training_schedulers(1000)
         self.architecture.set_training_runtime(

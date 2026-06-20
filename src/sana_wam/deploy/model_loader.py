@@ -23,7 +23,7 @@ import torch
 from omegaconf import DictConfig, OmegaConf
 
 from sana_wam.config import flatten_model_cfg
-from sana_wam.model.architecture import DualSystemARArchitecture
+from sana_wam.model import build_architecture
 from sana_wam.model.base import BaseWAMArchitecture
 
 logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ def load_from_checkpoint_dir(
     ckpt_path = os.path.join(ckpt_dir, ckpt_name) if ckpt_name else _find_latest_checkpoint(ckpt_dir)
     logger.info("Loading checkpoint: %s", ckpt_path)
 
-    architecture = DualSystemARArchitecture(flatten_model_cfg(cfg.model))
+    architecture = build_architecture(flatten_model_cfg(cfg.model))
 
     mp = OmegaConf.select(cfg, "accelerate.mixed_precision", default="bf16")
     model_dtype = _DTYPE_MAP.get(str(mp).strip().lower(), torch.bfloat16)

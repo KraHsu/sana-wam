@@ -33,6 +33,16 @@ model:
     text_encoder_name: /DATA/share/gemma-2-2b-it
     freeze: false
     attn_kernel: linear_relu
+    # Conventions mirrored from upstream Sana-wm (../Sana/configs/sana_wm/*.yaml).
+    # qk_norm is always on in the fork (hardcoded True in pipeline_builder), matching
+    # upstream `qk_norm: true`. flow_shift stays 3.0 here: that is the value for the
+    # SANA-Video 2B *480p* checkpoint (model_wrapper.py:17); upstream sana_wm's 9.95
+    # is for the retrained 720p model and would be wrong for this base.
+    flow_shift: 3.0
+    # fp32_attention: run linear-attn matmuls in fp32 (upstream `fp32_attention: true`).
+    # Off by default (bf16, byte-identical to prior fork behavior); enable for NaN-loss
+    # robustness at the cost of speed.
+    fp32_attention: false
 
   action_backbone:
     dim: 1152
@@ -68,6 +78,10 @@ dataloader:
   val_variant: null
   text_embedding_cache_dir: null
   text_embedding_dropout: 0.0
+  # Opt-in VAE latent cache (upstream Sana-wm load_vae_feat analogue): precompute
+  # with scripts/precompute_vae_latents.py, then point here to skip the per-step
+  # VAE encode. Misses fall back to live encoding. null = always encode live.
+  vae_cache_dir: null
 
 training:
   output_dir: outputs/ar_sana

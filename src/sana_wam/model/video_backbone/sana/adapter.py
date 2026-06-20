@@ -103,6 +103,13 @@ class SanaVideoBackbone(VideoBackbone):
         # to per-frame timestep modulation (frame-0 at t=0).
         self._use_first_frame_cond = bool(pipe.config.get("use_first_frame_cond", False))
 
+        # Self-attention family: "linear_relu" (SANA LiteLAReLURope, MoT joint
+        # path) or "gdn" (Sana-wm ChunkCausalGDNTriton, native run_block +
+        # cross-attn bridge). Drives driver/architecture dispatch via the
+        # ``attn_kernel`` property below.
+        self._attn_kernel = str(pipe.config.get("attn_kernel", "linear_relu"))
+        self._chunk_size = int(pipe.config.get("chunk_size", 3))
+
         # SanaPipe is @dataclass (not nn.Module), so `self._pipe = pipe`
         # doesn't auto-register its DiT/VAE/text_encoder as nn.Module
         # children — they stay invisible to self.parameters() /
@@ -275,15 +282,20 @@ class SanaVideoBackbone(VideoBackbone):
 
     @property
     def attn_kernel(self) -> str:
-        """Driver dispatch hook (read by :class:`DualSystemSelfAttnArchitecture`).
-        ``"linear_relu"`` tells the architecture to construct
-        ``SanaMoTJointDriver`` instead of the SDPA-based ``MoTJointDriver``.
+        """Driver/architecture dispatch hook.
 
-        This property is intentionally NOT abstract on the base ABC — a softmax
-        backbone need not define it; ``getattr(..., "softmax")`` at the dispatch
-        site lets it keep the SDPA path.
+        - ``"linear_relu"`` (SANA LiteLAReLURope): the architecture builds
+          ``SanaMoTJointDriver`` and the action stream joins via concatenated
+          MoT self-attention (factorized linear attn).
+        - ``"gdn"`` (Sana-wm ChunkCausalGDNTriton): GDN is a frame-wise recurrence
+          that cannot do concatenated cross-modal attention, so the architecture
+          runs the video backbone natively (``run_block``) and the action stream
+          attaches via the cross-attention bridge (``joint_cross_attn``).
+
+        Not abstract on the base ABC — a softmax backbone need not define it;
+        ``getattr(..., "softmax")`` at the dispatch site keeps the SDPA path.
         """
-        return "linear_relu"
+        return self._attn_kernel
 
     # ----------------------------------------------------------------
     # ABC: three-step lifecycle

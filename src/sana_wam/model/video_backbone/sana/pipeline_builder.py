@@ -146,20 +146,32 @@ def build_mini_sana_pipeline(
     w: int = 8,
     device: str = "cpu",
     dtype: torch.dtype = torch.float32,
+    attn_kernel: str = "linear_relu",
+    chunk_size: int = 3,
 ) -> SanaPipe:
     """Mini-config factory for unit tests: random-weight ``SanaMSVideo``.
 
     Avoids downloading the 2B checkpoint or initializing Gemma-2-2B. The
     resulting pipe has only ``dit`` populated; VAE / text encoder are ``None``
     and tests must not call ``preprocess_input`` / ``decode_video``.
+
+    ``attn_kernel="gdn"`` builds a ChunkCausalGDNTriton mini DiT (GPU/Triton-only;
+    CPU construction works but forward needs CUDA). Default ``linear_relu`` keeps
+    the CPU-testable LiteLAReLURope path.
     """
+    # GDN attention is only wired in the CamCtrl model class (its block builds
+    # self.attn via ATTENTION_BLOCKS.get(attn_type); the plain SanaMSVideo block
+    # has no GDN branch → self.attn=None). With camctrl_type unset the CamCtrl
+    # block is a plain GDN self-attn block (no camera path) — exactly the WAM
+    # need. linear_relu keeps the plain SanaMSVideo class (CPU-testable).
+    _use_gdn = attn_kernel == "gdn"
+    _attn_type = "ChunkCausalGDNTriton" if _use_gdn else "LiteLAReLURope"
     # Touch the upstream factory to trigger ``MODELS.register_module`` side effects.
     _resolve_upstream_factory("SanaMSVideo_2000M_P2_D20")
     # Direct class construction — bypass the factory wrapper so we can override
-    # hidden_size + depth from defaults of the 2B model.
-    from diffusion.model.nets.sana_multi_scale_video import SanaMSVideo as SanaMSVideoCls  # noqa: E402
-
-    dit = SanaMSVideoCls(
+    # hidden_size + depth from defaults of the 2B model. GDN lives only in the
+    # CamCtrl class; linear_relu uses the plain class.
+    common = dict(
         input_size=h,
         patch_size=(1, 2, 2),
         in_channels=16,
@@ -170,7 +182,7 @@ def build_mini_sana_pipeline(
         class_dropout_prob=0.0,
         learn_sigma=False,
         pred_sigma=False,
-        attn_type="LiteLAReLURope",
+        attn_type=_attn_type,
         ffn_type="GLUMBConvTemp",
         use_pe=True,
         pos_embed_type="wan_rope",
@@ -183,6 +195,28 @@ def build_mini_sana_pipeline(
         model_max_length=8,
         caption_channels=64,
     )
+    if _use_gdn:
+        from diffusion.model.nets.sana_multi_scale_video_camctrl import (  # noqa: E402
+            SanaMSVideoCamCtrl,
+        )
+
+        # camctrl_layers_num=0 → every block routes to the plain GDN self-attn
+        # (ATTENTION_BLOCKS.get(attn_type)), no UCPE camera branch — the WAM
+        # needs GDN dynamics, not camera-pose control.
+        dit = SanaMSVideoCamCtrl(
+            **common,
+            camctrl_layers_num=0,
+            chunk_size=chunk_size,
+            chunk_split_strategy="uniform",
+            conv_kernel_size=4,
+            k_conv_only=True,
+        )
+    else:
+        from diffusion.model.nets.sana_multi_scale_video import (  # noqa: E402
+            SanaMSVideo as SanaMSVideoCls,
+        )
+
+        dit = SanaMSVideoCls(**common)
     dit = dit.to(device=device, dtype=dtype).eval()
 
     from sana_wam.model.video_backbone.sana.scheduler import SanaFlowSchedulerAdapter
@@ -190,7 +224,14 @@ def build_mini_sana_pipeline(
     return SanaPipe(
         dit=dit,
         scheduler=SanaFlowSchedulerAdapter(),
-        config={"hidden_size": hidden_size, "depth": depth, "num_heads": num_heads, "fhw": (f, h, w)},
+        config={
+            "hidden_size": hidden_size,
+            "depth": depth,
+            "num_heads": num_heads,
+            "fhw": (f, h, w),
+            "attn_kernel": attn_kernel,
+            "chunk_size": chunk_size,
+        },
     )
 
 
@@ -212,6 +253,24 @@ class _PipeSpec:
     flow_shift: float = 3.0
     """Rectified-flow shift for the scheduler. Default ``3.0`` matches
     SANA-Video upstream (``model_wrapper.py:17``)."""
+    fp32_attention: bool = False
+    """Run the linear-attention numerator/denominator matmuls in fp32.
+
+    Mirrors upstream Sana-wm's ``fp32_attention: true`` (e.g.
+    ``../Sana/configs/sana_wm/sana_wm_chunk_causal_1600m_720p.yaml``). The
+    blocks-split forward already honors ``getattr(attn, "fp32_attention", False)``
+    (``blocks_split.py``); this flag is what finally *sets* that attribute on
+    every attention module, closing a previously dead config path. Default
+    ``False`` keeps bf16 attention (byte-identical to existing fork behavior)."""
+    attn_kernel: str = "linear_relu"
+    """Video self-attention family. ``"linear_relu"`` = SANA ``LiteLAReLURope``
+    (factorized linear attn, the published 480p checkpoint). ``"gdn"`` = upstream
+    Sana-wm ``ChunkCausalGDNTriton`` (gated delta net, frame-wise recurrence +
+    chunk-causal). GDN swaps the preset's ``attn_type`` + GDN knobs and is
+    GPU/Triton-only; the linear_relu checkpoint cannot be reused under GDN."""
+    chunk_size: int = 3
+    """GDN chunk size (frames per chunk) for chunk-causal attention. Ignored for
+    linear_relu. Mirrors ``configs/sana_wm/*`` ``chunk_size``."""
     use_first_frame_cond: bool = False
     """Opt-in: condition the generated video on a clean frame-0 (the current
     observation). Default ``False`` keeps SANA pure text-to-video
@@ -333,6 +392,9 @@ def _spec_from_dictconfig(vb_cfg, *, ckpt_dir: Optional[str] = None) -> _PipeSpe
         text_encoder_name=vb_cfg.get("text_encoder_name", "gemma-2-2b-it"),
         model_kwargs=model_kwargs,
         flow_shift=float(vb_cfg.get("flow_shift", 3.0)),
+        fp32_attention=bool(vb_cfg.get("fp32_attention", False)),
+        attn_kernel=str(vb_cfg.get("attn_kernel", "linear_relu")),
+        chunk_size=int(vb_cfg.get("chunk_size", 3)),
         use_first_frame_cond=bool(vb_cfg.get("use_first_frame_cond", False)),
     )
 
@@ -360,6 +422,48 @@ _SANA_VIDEO_2B_480P_PRESET: dict = {
     "use_pe": True,
     "pos_embed_type": "wan_rope",
 }
+
+# GDN (gated delta net) overrides applied on top of the base preset when
+# ``attn_kernel="gdn"``. Mirrors ``configs/sana_wm/sana_wm_chunk_causal_*.yaml``:
+# ChunkCausalGDNTriton self-attn + the temporal short-conv knobs the GDN block
+# expects. ``ffn_type`` stays GLUMBConvTemp (same as the 480p preset). There is
+# no published GDN checkpoint for this arch, so GDN always random-inits and
+# trains from scratch (the linear_relu weights are incompatible).
+_GDN_ATTN_OVERRIDES: dict = {
+    "attn_type": "ChunkCausalGDNTriton",
+    "conv_kernel_size": 4,
+    "k_conv_only": True,
+    # Plain GDN self-attn on every layer (no UCPE camera branch). The WAM needs
+    # GDN dynamics, not camera-pose control.
+    "camctrl_layers_num": 0,
+}
+
+# The GDN attn class is only wired in SanaMSVideoCamCtrl; the plain SanaMSVideo
+# model has no GDN branch. So attn_kernel="gdn" also switches the model factory.
+_GDN_MODEL_FACTORY = "SanaMSVideoCamCtrl_1600M_P1_D20"
+
+
+def _apply_attn_kernel(model_kwargs: dict, attn_kernel: str) -> dict:
+    """Return ``model_kwargs`` adjusted for ``attn_kernel``.
+
+    ``"linear_relu"`` leaves the preset's ``attn_type`` (LiteLAReLURope) intact.
+    ``"gdn"`` swaps to ChunkCausalGDNTriton and adds the GDN short-conv knobs,
+    unless the caller already pinned ``attn_type`` explicitly in the yaml.
+    """
+    if attn_kernel == "gdn":
+        merged = dict(model_kwargs)
+        for k, v in _GDN_ATTN_OVERRIDES.items():
+            merged.setdefault(k, v)
+        # A linear_relu preset's attn_type must be overridden for GDN.
+        if str(merged.get("attn_type", "")).endswith("LiteLAReLURope"):
+            merged["attn_type"] = _GDN_ATTN_OVERRIDES["attn_type"]
+        return merged
+    if attn_kernel not in ("linear_relu", "softmax"):
+        raise ValueError(
+            f"Unknown video_backbone.attn_kernel={attn_kernel!r}. "
+            "Choose from: linear_relu, gdn, softmax."
+        )
+    return dict(model_kwargs)
 
 
 def _preset_kwargs_from_config_json(path: str) -> dict:
@@ -428,6 +532,9 @@ def _spec_from_dict(d: dict, *, ckpt_dir: Optional[str] = None) -> _PipeSpec:
         text_encoder_name=d.get("text_encoder_name", "gemma-2-2b-it"),
         model_kwargs=model_kwargs,
         flow_shift=float(d.get("flow_shift", 3.0)),
+        fp32_attention=bool(d.get("fp32_attention", False)),
+        attn_kernel=str(d.get("attn_kernel", "linear_relu")),
+        chunk_size=int(d.get("chunk_size", 3)),
         use_first_frame_cond=bool(d.get("use_first_frame_cond", False)),
     )
 
@@ -439,8 +546,44 @@ def _build_pipe_from_spec(
     dtype: torch.dtype,
     ckpt_dir: Optional[str],
 ) -> SanaPipe:
-    factory = _resolve_upstream_factory(spec.model_factory)
-    dit = factory(**spec.model_kwargs)
+    # GDN lives only in the CamCtrl model class — switch the factory too (a
+    # linear_relu preset would name the plain SanaMSVideo factory, whose block
+    # has no GDN branch). The user's explicit model_factory wins only if it's
+    # already a CamCtrl factory.
+    factory_name = spec.model_factory
+    if spec.attn_kernel == "gdn" and "CamCtrl" not in factory_name:
+        factory_name = _GDN_MODEL_FACTORY
+    factory = _resolve_upstream_factory(factory_name)
+    model_kwargs = _apply_attn_kernel(spec.model_kwargs, spec.attn_kernel)
+    if spec.attn_kernel == "gdn":
+        model_kwargs.setdefault("chunk_size", spec.chunk_size)
+    dit = factory(**model_kwargs)
+
+    # Close the dead config path: blocks_split / GDN honor getattr(attn,
+    # "fp32_attention", ...) but nothing set it. Stamp it onto every attention
+    # submodule. linear_relu (LiteLA*) exposes ``kernel_func``; GDN exposes
+    # ``A_log`` (the state-decay param) instead — both carry ``eps``.
+    if spec.fp32_attention:
+        n_set = 0
+        for module in dit.modules():
+            is_attn = hasattr(module, "eps") and (
+                hasattr(module, "kernel_func") or hasattr(module, "A_log")
+            )
+            if is_attn:
+                module.fp32_attention = True
+                n_set += 1
+        logger.info("fp32_attention enabled on %d SANA attention modules", n_set)
+
+    # GDN is a different operator family — the published linear_relu checkpoint
+    # cannot initialize it. Refuse a weight load so we never silently train a
+    # half-random DiT against the wrong checkpoint.
+    if spec.attn_kernel == "gdn" and spec.model_path is not None:
+        raise ValueError(
+            "video_backbone.attn_kernel='gdn' is incompatible with loading the "
+            f"linear_relu checkpoint at model_path={spec.model_path!r}. GDN must "
+            "train from scratch: unset model_path (random init) or supply a GDN "
+            "checkpoint via architecture.load_checkpoint after construction."
+        )
 
     if spec.model_path is not None:
         # ``find_model`` is the upstream loader for ``.pth`` files; lazy import.
@@ -494,6 +637,8 @@ def _build_pipe_from_spec(
             "model_path": spec.model_path,
             "vae_path": spec.vae_path,
             "flow_shift": spec.flow_shift,
+            "attn_kernel": spec.attn_kernel,
+            "chunk_size": spec.chunk_size,
             "use_first_frame_cond": spec.use_first_frame_cond,
         },
     )

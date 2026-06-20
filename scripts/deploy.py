@@ -14,8 +14,14 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
+
+# GDN scan helpers use ``@torch.compile``; torch 2.7.1 inductor ↔ triton 3.5.1
+# ABI break (triton_key removed). Disable the compile wrapper; bare-triton GDN
+# kernels are unaffected. No-op for the linear_relu path. Before diffusion.*.
+os.environ.setdefault("GDN_DISABLE_COMPILE", "1")
 
 from omegaconf import OmegaConf
 
