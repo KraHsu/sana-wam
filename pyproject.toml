@@ -30,7 +30,11 @@ dependencies = [
     "mmengine",
     # GDN (gated delta net) attention — sana_wm video backbone. ShortConvolution
     # + fused linear-attn kernels. Triton kernels need Ampere+; CPU import works.
-    "flash-linear-attention>=0.4.2",
+    # triton is NOT pinned here (torch 2.7.1 hard-pins triton==3.3.1, which fails
+    # to COMPILE the GDN kernels); it is overridden to 3.5.1 via [tool.uv]
+    # override-dependencies below. The scripts set GDN_DISABLE_COMPILE=1 to skip
+    # torch.compile (torch 2.7.1 inductor <-> triton 3.5.1 ABI break on triton_key).
+    "flash-linear-attention>=0.4.2,<0.6",
     "sentencepiece>=0.1.99,<1",
     "protobuf>=4.25,<7",
     # deploy server
@@ -54,6 +58,13 @@ packages = ["src/sana_wam"]
 [tool.uv]
 # torch is pinned to 2.7.1 (+cu128 on the H200 box); install via the explicit
 # PyTorch CUDA index below to match the SANA weight-load / flash-attn ABI.
+#
+# torch 2.7.1 hard-pins triton==3.3.1, but the GDN (sana_wm) Triton kernels only
+# compile on triton 3.5.1. Override the constraint so the resolver installs
+# 3.5.1 instead of torch's bundled 3.3.1. Safe: torch's eager + GDN's bare
+# @triton.jit kernels work on 3.5.1; the only break (inductor's triton_key) is
+# sidestepped by GDN_DISABLE_COMPILE=1 in scripts/train.py + deploy.py.
+override-dependencies = ["triton==3.5.1"]
 
 [tool.uv.sources]
 torch = { index = "pytorch-cu128" }

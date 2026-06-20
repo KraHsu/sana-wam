@@ -91,6 +91,18 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         T = self._video_num_frames_latent(first_frame_latent)
         atok = self._action_tokens or (self._raw_num_frames - 1)
 
+        # first_frame_latent must be exactly one latent frame (the observation),
+        # and the generated clip must have room for it. Without these guards a
+        # mismatch would silently broadcast/clip ``video[:, :, :1] = ...`` below
+        # and corrupt the TI2V conditioning.
+        if first_frame_latent.shape[2] != 1:
+            raise ValueError(
+                f"first_frame_latent must have 1 latent frame, got {first_frame_latent.shape[2]} "
+                f"(shape {tuple(first_frame_latent.shape)})."
+            )
+        if T < 1:
+            raise ValueError(f"generated latent length T={T} must be >= 1 (video_num_frames too small).")
+
         # Flow-matching schedules.
         vb.scheduler.set_timesteps(self._video_steps)
         ab.scheduler.set_timesteps(self._action_steps)

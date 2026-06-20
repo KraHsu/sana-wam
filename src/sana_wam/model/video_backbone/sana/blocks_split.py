@@ -235,7 +235,16 @@ class SanaMSVideoSplit:
                         f"GDN/CamCtrl prepare supports wan_rope only here; got "
                         f"pos_embed_type={dit.pos_embed_type!r}."
                     )
-                image_pos_embed = dit.rope((dit.f, dit.h, dit.w), x.device)
+                # Prefer ``_compute_rope_with_cp`` (CamCtrl): under context
+                # parallelism it slices the GLOBAL rope to this rank's frame band
+                # (matching CamCtrl.forward). It self-falls-back to ``self.rope``
+                # when CP is disabled, so single-GPU is byte-identical to the
+                # plain ``dit.rope`` call. Without this, multi-GPU CP training
+                # would get wrong (rank-local instead of global) RoPE positions.
+                if dit.pos_embed_type == "wan_rope" and hasattr(dit, "_compute_rope_with_cp"):
+                    image_pos_embed = dit._compute_rope_with_cp(x.device, int(dit.h), int(dit.w))
+                else:
+                    image_pos_embed = dit.rope((dit.f, dit.h, dit.w), x.device)
 
         t = dit.t_embedder(timestep.flatten())  # (B, D) — per-sample, for final_layer
         if frame_timesteps is not None:
