@@ -465,6 +465,162 @@ class SanaVideoBackbone(VideoBackbone):
         )
 
     # ----------------------------------------------------------------
+    # Cached autoregressive streaming (true-AR, arbitrary length)
+    # ----------------------------------------------------------------
+    #
+    # The whole-clip ``prepare/run_block/finalize`` path above runs a GDN
+    # backbone in one bounded shot. For arbitrary-length autoregression we
+    # instead drive the model chunk-by-chunk with a rolling GDN **state cache**,
+    # matching upstream Sana-wm's ``forward_long`` inference paradigm. The swap
+    # below was proven viable in this repo by the Phase-0 spike: three in-place
+    # ``__class__`` rebinds (weight-compatible) + a windowed RoPE + binding
+    # upstream's streaming ``forward_long`` — no large upstream fork, no weight
+    # surgery (a GDN checkpoint trained on the non-cached path serves unchanged).
+
+    def enable_cached_streaming(self, *, max_seq_len: int = 1024) -> None:
+        """Switch the GDN DiT in place to the cached chunk-streaming variant.
+
+        Swaps each block's attention ``ChunkCausalGDNTriton →
+        CachedChunkCausalGDN`` and FFN ``GLUMBConvTemp → CachedGLUMBConvTemp``
+        (weight-compatible ``__class__`` rebind), swaps the positional embedding
+        to ``CausalWanRotaryPosEmbed`` (absolute/windowed frame indices), sets
+        ``pos_embed_type="casual_wan_rope"``, and binds
+        ``SanaMSVideoCamCtrlStreaming.forward_long`` onto the instance.
+
+        Idempotent. Requires ``attn_kernel == "gdn"`` — ``linear_relu`` has its
+        own ``ARLinearStateCache`` streaming path and no cached GDN sibling.
+        After this swap the whole-clip ``prepare/run_block/finalize`` path is no
+        longer valid; drive the model via :meth:`run_chunk` instead.
+        """
+        if getattr(self, "_cached_streaming_enabled", False):
+            return
+        if self._attn_kernel != "gdn":
+            raise RuntimeError(
+                f"enable_cached_streaming requires attn_kernel='gdn', got "
+                f"{self._attn_kernel!r}. linear_relu uses ARLinearStateCache instead."
+            )
+        import types as _types
+
+        from diffusion.model.nets.basic_modules import CachedGLUMBConvTemp
+        from diffusion.model.nets.sana_blocks import CausalWanRotaryPosEmbed
+        from diffusion.model.nets.sana_gdn_blocks import CachedChunkCausalGDN
+        from diffusion.model.nets.sana_multi_scale_video_camctrl import (
+            SanaMSVideoCamCtrlStreaming,
+        )
+
+        dit = self._dit
+        for blk in dit.blocks:
+            blk.attn.__class__ = CachedChunkCausalGDN  # same params, cached forward
+            blk.mlp.__class__ = CachedGLUMBConvTemp  # temporal-conv left-context cache
+        # The base ``self.rope`` is a ``WanRotaryPosEmbed`` (integer ppf); the
+        # windowed ``forward_long`` path needs ``CausalWanRotaryPosEmbed`` which
+        # accepts an absolute ``(start_f, end_f)`` window or explicit frame_index.
+        head_dim = (
+            dit.rope.attention_head_dim
+            if hasattr(dit.rope, "attention_head_dim")
+            else dit.blocks[0].attn.head_dim
+        )
+        dit.rope = CausalWanRotaryPosEmbed(
+            attention_head_dim=head_dim,
+            patch_size=dit.patch_size,
+            max_seq_len=max_seq_len,
+        ).to(device=self._device)
+        dit.pos_embed_type = "casual_wan_rope"
+        # ``forward_long`` lives on the Streaming subclass; bind it onto our base
+        # instance (weights/buffers are shared via ``self``).
+        dit.forward_long = _types.MethodType(SanaMSVideoCamCtrlStreaming.forward_long, dit)
+        if hasattr(SanaMSVideoCamCtrlStreaming, "_is_softmax_option_y_block"):
+            dit._is_softmax_option_y_block = SanaMSVideoCamCtrlStreaming._is_softmax_option_y_block
+        self._cached_streaming_enabled = True
+
+    @property
+    def cached_streaming_enabled(self) -> bool:
+        return bool(getattr(self, "_cached_streaming_enabled", False))
+
+    @staticmethod
+    def empty_kv_cache(num_blocks: int) -> list:
+        """Fresh all-None GDN kv-cache: one 10-slot list per block.
+
+        Slots 0/1 hold the GDN recurrent state ``S_kv (B,H,D,D)`` / ``S_z
+        (B,H,D,1)``; the temporal-conv FFN uses the tail slot for left context.
+        ``forward_long`` populates them on the first chunk and updates in place.
+        """
+        return [[None] * 10 for _ in range(num_blocks)]
+
+    def run_chunk(
+        self,
+        chunk_latents: Tensor,
+        timestep: Tensor,
+        *,
+        context: Tensor,
+        kv_cache: list,
+        start_f: int,
+        end_f: int,
+        save_kv_cache: bool = True,
+        context_mask: Optional[Tensor] = None,
+        seq_lens: Optional[Tensor] = None,
+        frame_index: Optional[Tensor] = None,
+        bridge_layers: Tuple[int, ...] = (),
+    ) -> Tuple[Tensor, dict, list]:
+        """One cached-GDN chunk forward over an absolute latent-frame window.
+
+        Args:
+            chunk_latents: ``(B, C, T_chunk, H, W)`` noisy video for this chunk.
+            timestep: ``(B,)`` video diffusion timestep.
+            context: ``(B, L, D)`` raw caption context (forward_long embeds it).
+            kv_cache: rolling GDN state cache (see :meth:`empty_kv_cache`),
+                advanced in place and returned for the next chunk.
+            start_f / end_f: absolute latent-frame window for this chunk's RoPE.
+            bridge_layers: video block ids whose output hidden states are
+                captured for the cross-attn action stream.
+
+        Returns:
+            ``(video_pred_chunk, bridges, kv_cache)`` where ``bridges`` maps each
+            requested layer id → ``(B, T_chunk_tokens, C)``. Bridge features are
+            captured inside ``forward_long`` (the checkpoint-boundary output for
+            each bridge layer), so they are autograd-connected — gradients from
+            the action stream flow back into the video backbone.
+        """
+        if not self.cached_streaming_enabled:
+            self.enable_cached_streaming()
+        dit = self._dit
+
+        # context → y (B, 1, L, D); forward_long runs y_embedder internally.
+        y = context.unsqueeze(1) if context.dim() == 3 else context
+        B, L = y.shape[0], y.shape[2]
+        # caption mask → (B, L) int16 (the layout forward_long expects).
+        if context_mask is not None:
+            mask = context_mask.to(dtype=torch.int16, device=y.device).view(B, L)
+        elif seq_lens is not None:
+            positions = torch.arange(L, device=y.device).view(1, L)
+            mask = (positions < seq_lens.to(device=y.device).view(B, 1)).to(torch.int16)
+        else:
+            mask = torch.ones(B, L, dtype=torch.int16, device=y.device)
+
+        # forward_long writes the bridge layers' checkpoint-boundary outputs into
+        # this dict (grad-connected — a forward hook would escape an inner
+        # activation and break non-reentrant checkpointing's recompute check).
+        bridges: dict[int, Tensor] = {}
+        video_pred, kv_cache = dit.forward_long(
+            chunk_latents.to(device=self._device, dtype=self._dtype),
+            timestep.to(device=self._device),
+            y.to(device=self._device, dtype=self._dtype),
+            mask=mask,
+            start_f=start_f,
+            end_f=end_f,
+            frame_index=frame_index,
+            kv_cache=kv_cache,
+            save_kv_cache=save_kv_cache,
+            bridge_layers=tuple(bridge_layers),
+            bridge_out=bridges,
+            # Eager block calls: the cached GDN state mutates in place, which is
+            # incompatible with forward_long's internal grad checkpointing under
+            # backprop. Per-chunk activations are small, so this is cheap.
+            use_gradient_checkpointing=False,
+        )
+        return video_pred, bridges, kv_cache
+
+    # ----------------------------------------------------------------
     # ABC: joint self-attention split
     # ----------------------------------------------------------------
 

@@ -1,0 +1,73 @@
+# ---------------------------------------------------------------------------
+# Deploy settings for the TRUE-AR cached-GDN world-action model
+# (dual_system / gdn_autoregressive).
+#
+# build_engine dispatches DualSystemGDNARArchitecture → GDNARInferenceEngine
+# (src/sana_wam/deploy/gdn_ar_engine.py). The engine is STATEFUL: it owns a
+# rolling GDN state cache and runs exactly one AR step per generate, MIRRORING the
+# teacher-forced training loop — each step ingests the realized observation chunk
+# as the clean past (save_kv_cache=True) and denoises the NEXT chunk's video +
+# actions (save_kv_cache=False) conditioned on that cache. reset() clears the
+# cache at each episode boundary.
+#
+# Greedy/closed-loop constraints (same as the block-AR engine): each generate must
+# ingest exactly one new realized observation chunk, so temporal ensembling and
+# async both double-advance / reorder the cache and break AR alignment — keep them
+# off. The GDN state is full-history by construction (no finite window needed for
+# short robot episodes).
+# ---------------------------------------------------------------------------
+checkpoint_path: null          # --ckpt-dir on the CLI overrides this.
+device: cuda:0
+server:
+  host: "0.0.0.0"
+  ws_port: 8850
+  http_port: 8848
+
+# ---------------------------------------------------------------------------
+# Inference parameters (cfg.inference; read by GDNARInferenceEngine).
+# num_frames / video_num_frames / height / width auto-fill from the checkpoint
+# dataloader when omitted. action_tokens_per_chunk=0 ⇒ inferred from the clip
+# (must match training: (num_frames-1) / num_chunks). ar_obs_latent_band=auto
+# picks the leading band at episode start (training chunk-0, incl. causal
+# first-frame token) and the trailing band thereafter.
+# ---------------------------------------------------------------------------
+inference:
+  video_steps: 4               # flow-matching steps for the predicted video chunk
+  action_steps: 4              # flow-matching steps for the predicted action chunk
+  action_tokens_per_chunk: 0   # 0 ⇒ infer (= (num_frames-1)/num_chunks; 40 for the train cfg)
+  ar_obs_latent_band: auto     # leading@step0 / trailing after — matches training
+  seed: 0
+
+# ---------------------------------------------------------------------------
+# Policy execution. The model is autoregressive: each generate emits ONE chunk of
+# actions (action_tokens_per_chunk tokens = the actions to execute over the next
+# chunk's time span), then the engine expects the next realized observation chunk.
+# execute_horizon is the number of raw action steps to execute before re-observing;
+# set it to span ~one chunk = frame_chunk_size * temporal_compression * video_stride
+# raw frames (3 * 4 * 4 = 48 for the train cfg) so each re-observation advances the
+# cache by exactly one contiguous chunk, matching the training chunk cadence. TUNE
+# on RoboTwin: too long → open-loop drift; too short → the obs chunk overlaps the
+# previous one (cache double-counts time). temporal_ensemble/async stay off.
+# ---------------------------------------------------------------------------
+policy:
+  # Each generate returns ONE chunk's actions (≈atc≈22 tokens). The greedy policy
+  # executes them, then the buffer empties and it re-generates — so the effective
+  # cadence is "execute the returned chunk, re-observe". execute_horizon need only be
+  # ≥ atc for that; 24 (= frame_chunk_size*temporal_compression*video_stride = one
+  # chunk's raw span) keeps the obs window advancing ~one contiguous chunk per step.
+  # Step c then ingests the just-observed chunk c-1 and predicts chunk c (no look-ahead).
+  execute_horizon: 24          # raw steps per re-observation (~one chunk); tune on RoboTwin
+  temporal_ensemble: false     # MUST be false: mixes incompatible cache histories
+  # obs_history must reach back far enough to rebuild the training-cadence clip
+  # (>= dataloader.num_frames = growing-history raw_window_len ~119 for lift_pot).
+  history_len: 128
+
+# ---------------------------------------------------------------------------
+# Deploy-time optimizations.
+# ---------------------------------------------------------------------------
+optimization:
+  decode_video: false          # action-only at deploy; do not decode video
+  async_inference:
+    mode: none                 # MUST stay none: one realized obs chunk → one step
+  prompt_embed_cache:
+    maxsize: 32

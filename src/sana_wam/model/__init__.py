@@ -7,7 +7,10 @@ and constructs the matching class:
 - ``autoregressive`` → :class:`DualSystemARArchitecture` (SANA linear_relu, MoT
   block-causal duplicated-sequence path).
 - ``joint_cross_attn`` → :class:`DualSystemCrossAttnArchitecture` (GDN video
-  backbone + cross-attention action bridge).
+  backbone + cross-attention action bridge, one-shot bounded clip).
+- ``gdn_autoregressive`` → :class:`DualSystemGDNARArchitecture` (cached-GDN
+  chunk-streaming video + per-chunk cross-attention action bridge → true AR,
+  arbitrary length).
 - ``joint_self_attn`` → :class:`DualSystemSelfAttnArchitecture` (non-AR MoT joint
   self-attention).
 
@@ -20,6 +23,7 @@ from typing import Any
 
 _VARIANT_AUTOREGRESSIVE = "autoregressive"
 _VARIANT_CROSS_ATTN = "joint_cross_attn"
+_VARIANT_GDN_AR = "gdn_autoregressive"
 _VARIANT_SELF_ATTN = "joint_self_attn"
 
 
@@ -53,13 +57,17 @@ def build_architecture(flat_cfg: Any):
         from sana_wam.model.cross_attn import DualSystemCrossAttnArchitecture
 
         return DualSystemCrossAttnArchitecture(flat_cfg)
+    if variant == _VARIANT_GDN_AR:
+        from sana_wam.model.gdn_ar import DualSystemGDNARArchitecture
+
+        return DualSystemGDNARArchitecture(flat_cfg)
     if variant == _VARIANT_SELF_ATTN:
         from sana_wam.model.joint_self_attn import DualSystemSelfAttnArchitecture
 
         return DualSystemSelfAttnArchitecture(flat_cfg)
     raise ValueError(
         f"Unknown architecture.variant={variant!r}. Choose from: "
-        f"{_VARIANT_AUTOREGRESSIVE}, {_VARIANT_CROSS_ATTN}, {_VARIANT_SELF_ATTN}."
+        f"{_VARIANT_AUTOREGRESSIVE}, {_VARIANT_CROSS_ATTN}, {_VARIANT_GDN_AR}, {_VARIANT_SELF_ATTN}."
     )
 
 

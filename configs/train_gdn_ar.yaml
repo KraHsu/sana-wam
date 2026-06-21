@@ -1,0 +1,139 @@
+# sana-wam training config — TRUE-AR cached-GDN video + cross-attention action.
+#
+# The fourth track: cached-GDN chunk streaming (rolling GDN state cache,
+# arbitrary length) + the proven cross-attn action bridge. Unlike train_gdn_cross
+# (one-shot bounded clip), this trains the genuine autoregressive paradigm — a
+# sequential chunk loop with teacher-forced clean past — so the model rolls past
+# its training horizon at deploy. GPU/Triton-only (cached GDN kernels need CUDA;
+# the trainer sets GDN_DISABLE_COMPILE=1 automatically).
+#
+#   python scripts/train.py --config configs/train_gdn_ar.yaml \
+#       dataloader.dataset_dir=/DATA/share/RoboTwin2.0/dataset \
+#       dataloader.train_tasks=[lift_pot]
+#
+# GROWING-HISTORY rolling AR (v2): the fix for the depth-1 collapse. The teacher-
+# forced rolling loss rolls each sample over its OWN valid chunks, supervising
+# every chunk c at cache DEPTH c. Growing-history gives frame-0-anchored clips of
+# variable logical length k (→ variable rollout depth) padded to the max episode,
+# so training covers the full range of cache depths a deploy rollout hits. The
+# loss reads video_is_pad (valid length) — no hard latent_T % chunk divisibility
+# needed (the partial tail is dropped). At video_stride=2 a full ~112-frame
+# lift_pot episode → ~15 latent → ~5 chunks ⇒ depths 1–4 covered.
+
+model:
+  architecture:
+    framework: dual_system
+    variant: gdn_autoregressive      # → DualSystemGDNARArchitecture
+    action_dim: 20
+    use_proprioception: true
+    state_dim: 20
+    # Cross-attn bridges: one action block per video DiT layer it reads. null +
+    # bridge_interval=1 → every video layer bridges (resolve_bridge_layers).
+    bridge_layers: null
+    bridge_interval: 1
+    # Action-side attention geometry (independent of the GDN video head_dim=112).
+    dim: 1152
+    num_heads: 16
+    # --- AR chunk knobs (consumed by gdn_ar.compute_loss) ---
+    # GDN latent frames per autoregressive chunk. MUST equal video_backbone.chunk_size
+    # and divide latent_T. The cached kernel operates on whole GDN chunks.
+    frame_chunk_size: 3
+    # Leading chunks supplied as the clean OBSERVED prefix: ingested into the cache
+    # (teacher forcing) but NOT supervised — mirrors the deploy loop being handed
+    # the real first observation before predicting forward. 1 ⇒ first chunk observed,
+    # remaining (num_chunks-1) chunks supervised. Keeps every denoised chunk's cache
+    # non-empty (no chunk-0-from-scratch edge).
+    ar_observed_prefix_chunks: 1
+
+  video_backbone:
+    name: sana_video_2b
+    # GDN trains from scratch — the linear_relu 480p checkpoint is incompatible,
+    # so NO model_path (random init). Supply a GDN checkpoint later via
+    # architecture.load_checkpoint if pretraining a GDN video model separately.
+    model_path: null
+    # The Wan VAE is still needed to encode video pixels → latents. It is
+    # independent of the DiT weights, so point at the bundle's VAE explicitly.
+    vae_path: /DATA/share/SANA-Video_2B_480p/vae/Wan2.1_VAE.pth
+    text_encoder_name: /DATA/share/gemma-2-2b-it
+    freeze: false
+    attn_kernel: gdn                 # → SanaMSVideoCamCtrl + cached GDN streaming
+    chunk_size: 3                    # GDN chunk-causal frames/chunk == frame_chunk_size
+    fp32_attention: true             # upstream sana_wm runs GDN in fp32
+    # TI2V: condition on the real first frame (clean-prefix at t=0). In the AR
+    # paradigm the observed-prefix chunk(s) carry this role via the cache.
+    use_first_frame_cond: true
+    flow_shift: 3.0
+
+  action_backbone:
+    dim: 1152
+    ffn_dim: 4608
+    # Cross-attn variant does not use attn_kernel coupling (no MoT driver).
+
+dataloader:
+  type: robotwin
+  dataset_dir: /DATA/share/RoboTwin2.0/dataset
+  task_name: null
+  robot: aloha-agilex
+  variant: clean_50
+  action_mode: eef
+  # num_frames is AUTO-set by growing_history (raw_window_len spans the longest
+  # episode); video_stride controls chunk granularity. stride=2 → ~5 chunks over a
+  # ~112-frame episode (depths 1–4). The rolling loss drops any partial tail chunk.
+  video_stride: 2
+  height: 384
+  width: 320
+  split: train
+  val_ratio: 0.0
+  repeat: 1
+  window_stride: 1
+  multiview: true
+  camera_layout: [head_camera, left_camera, right_camera]
+  target_camera: head_camera
+  normalize_mode: min-max
+  filter_static_segments: true
+  static_segment_threshold: 1.0e-5
+  max_static_retry: 3
+  train_tasks: null
+  holdout_tasks: null
+  val_variant: null
+  text_embedding_cache_dir: null
+  text_embedding_dropout: 0.0
+  vae_cache_dir: null
+  # ---- Growing-history (variable-length, anchored at episode frame 0) ----
+  # Each window starts at frame 0 and sweeps a variable logical length k; the raw
+  # buffer auto-expands to span the longest episode (pad-to-max-T, masked). This
+  # gives the rolling AR loss frame-0-anchored clips of varying length → the model
+  # is supervised at every cache depth a deploy rollout hits, and the episode-start
+  # distribution matches deploy.
+  growing_history: true
+  # Clip-length window. Raised from 45→90 to TIGHTEN length variance (90-121 raw →
+  # 4-5 chunks): under B=1 DDP a wide spread (45-121 = 2-5 chunks) makes short-clip
+  # ranks idle while long-clip ranks finish, stalling all-reduce (a straggler GPU sat
+  # at 0%). Narrow spread = balanced ranks = full GPU util. Frame-0 anchoring +
+  # bootstrap + full-depth coverage unchanged (a 4-5 chunk clip rolls depths 0..3/4,
+  # covering the deploy rollout range).
+  history_min_frames: 90
+  history_stride: 15        # step between logical window lengths
+  # MUST mirror model.frame_chunk_size / video_backbone.chunk_size (GDN latent chunk).
+  gdn_chunk_size: 3
+
+training:
+  output_dir: outputs/gdn_ar
+  max_steps: 1995
+  save_steps: 500
+  keep_last_k: 2
+  batch_size: 1
+  gradient_accumulation_steps: 1
+  num_workers: 4
+  video_lr: 1.0e-4          # GDN trains from scratch → higher than the AR finetune LR
+  action_lr: 1.0e-4
+  weight_decay: 0.0
+  grad_clip: 1.0
+  warmup_steps: 50
+  lambda_video: 1.0
+  lambda_action: 1.0
+  use_gradient_checkpointing: true
+  freeze: [video_backbone._pipe.vae]
+  deepspeed: null
+  seed: 0
+  debug: false

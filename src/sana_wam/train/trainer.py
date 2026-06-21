@@ -58,6 +58,25 @@ class Trainer:
         # --- dataset ---
         self.dataset = MultiTaskRoboTwinDataset.from_config(cfg.dataloader, split="train")
 
+        # Persist the dataset's RESOLVED num_frames back into the config so the saved
+        # checkpoint is self-contained. growing_history auto-sets num_frames =
+        # raw_window_len at dataset-build time (spanning the longest episode); the
+        # deploy engine needs that exact value to reconstruct the chunk geometry
+        # (action_tokens_per_chunk / clip window). Without this write-back the deploy
+        # config has no num_frames → falls back to a default (81) → wrong atc →
+        # action/video misalignment at rollout. Value-agnostic: persists whatever the
+        # dataset resolved, for any task/stride.
+        try:
+            _subs = getattr(self.dataset, "_sub_datasets", None)
+            _resolved_nf = (
+                getattr(_subs[0], "num_frames", None) if _subs
+                else getattr(self.dataset, "num_frames", None)
+            )
+            if _resolved_nf and getattr(cfg, "dataloader", None) is not None:
+                cfg.dataloader.num_frames = int(_resolved_nf)
+        except Exception as _e:  # never block training on a config-sync hiccup
+            logging.getLogger(__name__).warning("num_frames write-back skipped: %s", _e)
+
         # --- architecture (dispatched by architecture.variant) ---
         self.architecture = build_architecture(flatten_model_cfg(cfg.model))
         self.architecture.set_dtype_device(torch.bfloat16, self.device)
