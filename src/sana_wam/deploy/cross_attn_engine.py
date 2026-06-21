@@ -186,6 +186,16 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
             actions = actions + a_pred.to(self._dtype) * a_dsig
             video[:, :, :P] = prefix  # re-pin the clean observed history
 
+        # Streaming: the action trajectory is anchored at episode frame 0, but action
+        # steps [0, boundary) lead up to the current state (the observed past, already
+        # executed). Return only the FUTURE actions so the policy executes from "now"
+        # (actions[0] = next action), matching the training action clean-prefix mask.
+        # boundary = raw step of the latest observed frame = tc*(P-1)*video_stride.
+        if self._streaming:
+            boundary = min(4 * (P - 1) * self._video_stride, actions.shape[1] - 1)
+            if boundary > 0:
+                actions = actions[:, boundary:]
+
         self._step_c += 1
         actions_np = actions.squeeze(0).float().cpu().numpy()
         normalizer = getattr(arch, "action_normalizer", None)

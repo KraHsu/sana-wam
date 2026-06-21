@@ -1086,6 +1086,11 @@ class RoboTwinDataset(BaseActionDataset):
             "proprio_mask": proprio_mask,
             "proprio_seq": proprio_seq_tensor,
             "num_clean_prefix_latent": num_clean_prefix_latent,
+            # Action steps [0, cur_raw) lead up to the current state (the observed
+            # past); exclude them from the action loss so the model is supervised
+            # only on FUTURE actions — symmetric with the video clean-prefix mask and
+            # matching what deploy executes (the engine returns actions from cur_raw).
+            "num_clean_prefix_actions": int(cur_raw),
             "prompt": prompt,
             "episode_index": ep_idx,
             "episode_path": path,

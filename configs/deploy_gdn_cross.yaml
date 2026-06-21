@@ -31,17 +31,23 @@ inference:
   action_steps: 4             # flow-matching steps for the predicted action clip
   action_tokens: 0            # 0 ⇒ infer from clip (num_frames - 1)
   seed: 0
-  streaming: true             # accumulate observed history across steps (stateful)
+  streaming: true             # rebuild+re-encode observed history each step
   predict_horizon_frames: 1   # latent frames to leave for prediction each step
 
 # ---------------------------------------------------------------------------
-# Policy execution — greedy (mandatory for the stateful streaming engine). Each
-# generate() ingests exactly one realized observation into the rolling history;
-# receding-horizon / temporal ensembling would advance the history more than
-# once per realized frame or mix incompatible history lengths.
+# Policy execution. The cross-attn model is ONE-SHOT (each generate predicts the
+# whole remaining trajectory), and the engine returns only the FUTURE actions
+# (anchored at "now"). Under greedy (execute_horizon=null) the policy would drain
+# that whole future before re-observing → effectively open-loop. So streaming needs
+# a FINITE execute_horizon: execute a few actions, then re-observe (which grows the
+# clean prefix by ~one latent frame) and re-generate. Set it to ~tc*video_stride
+# (= raw steps per latent frame; 4*4=16 by default) so re-observation advances the
+# prefix one latent at a time, matching the growing-history training increment.
+# Tune against RoboTwin. temporal_ensemble/async stay off: they mix predictions
+# made under different history lengths, which this model is not trained for.
 # ---------------------------------------------------------------------------
 policy:
-  execute_horizon: null       # null ⇒ greedy: drain the predicted chunk, then re-observe
+  execute_horizon: 16         # raw action steps per re-observation (~one latent frame); tune on RoboTwin
   temporal_ensemble: false    # MUST be false: mixes incompatible history lengths
   # REQUIRED for streaming: obs_history must reach back to episode frame 0 so the
   # engine can rebuild the frame-0-anchored clip at the training pixel cadence.

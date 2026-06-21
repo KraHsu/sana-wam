@@ -132,12 +132,17 @@ def test_cross_attn_engine_streaming_grows_and_caps_prefix():
     def cond(n):  # n per-sim-step frames since episode start (oldest→newest)
         return {"prompt": "x", "obs_history": [{"image": object()} for _ in range(n)]}
 
-    eng.generate(cond(1))
+    # action_tokens=8; streaming returns FUTURE actions only, sliced at the boundary
+    # tc*(P-1)*video_stride (tc=4, video_stride=1).
+    o1 = eng.generate(cond(1))
     assert eng._obs_latents.shape[2] == 1  # one observed latent frame
-    eng.generate(cond(2))
+    assert o1["actions"].shape == (8, 20)  # P=1 ⇒ boundary 0 ⇒ full trajectory
+    o2 = eng.generate(cond(2))
     assert eng._obs_latents.shape[2] == 2  # grows with history
-    eng.generate(cond(3))
+    assert o2["actions"].shape == (4, 20)  # P=2 ⇒ boundary 4 ⇒ actions[4:]
+    o3 = eng.generate(cond(3))
     assert eng._obs_latents.shape[2] == 2  # capped at T_lat - predict_horizon
+    assert o3["actions"].shape == (4, 20)  # P still 2 ⇒ boundary 4
     assert eng._step_c == 3
 
     # reset clears the (debug) prefix + counter

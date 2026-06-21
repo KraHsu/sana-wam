@@ -260,11 +260,27 @@ class DualSystemCrossAttnArchitecture(BaseWAMArchitecture):
             # clean_mask (B, T) was built above from the per-sample prefix lengths.
             video_is_pad = video_is_pad | clean_mask
 
+        # Action clean-prefix: steps [0, k_b) lead up to the current state (the
+        # observed past, already executed) — exclude them from the action loss so the
+        # model is supervised only on FUTURE actions, mirroring the video clean prefix
+        # and matching deploy (which executes actions from the same boundary). k_b is
+        # (B,) raw action-step counts from the dataloader; absent ⇒ supervise all.
+        action_is_pad = inputs.get("action_is_pad")
+        ncpa = inputs.get("num_clean_prefix_actions")
+        if ncpa is not None and Ta > 0:
+            a_clean = torch.arange(Ta, device=device).view(1, Ta) < ncpa.to(
+                device=device, dtype=torch.long
+            ).clamp(min=0, max=Ta).view(B, 1)  # (B, Ta)
+            if action_is_pad is None:
+                action_is_pad = a_clean
+            else:
+                action_is_pad = action_is_pad.bool().to(device) | a_clean
+
         return self._dual_mse(
             v_pred, v_target, a_pred, a_target,
             vb=vb, v_ids=v_ids, T=T, B=B,
             lambda_video=lambda_video, lambda_action=lambda_action,
-            action_is_pad=inputs.get("action_is_pad"),
+            action_is_pad=action_is_pad,
             video_is_pad=video_is_pad,
             device=device,
         )
