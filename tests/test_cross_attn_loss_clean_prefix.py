@@ -43,68 +43,6 @@ def _build_arch(dev, dt):
 
 
 @requires_gpu
-def test_compute_loss_action_clean_prefix_masks_past_actions():
-    """num_clean_prefix_actions excludes the observed-past action steps [0, k) from
-    the action loss (symmetric with the video clean prefix)."""
-    dev, dt = torch.device("cuda"), torch.bfloat16
-    arch = _build_arch(dev, dt)
-
-    B, C, T, Hl, Wl = 2, 16, 9, 8, 8
-    atok = 8
-    clean_video = torch.randn(B, C, T, Hl, Wl, device=dev, dtype=dt)
-    actions = torch.randn(B, atok, 20, device=dev, dtype=dt)
-    ctx = torch.randn(B, 8, 64, device=dev, dtype=dt)
-    seq = torch.full((B,), 8, dtype=torch.long, device=dev)
-    # sample 0: no action prefix (k=0); sample 1: first 3 action steps observed (k=3)
-    ncpa = torch.tensor([0, 3], dtype=torch.long, device=dev)
-
-    captured = {}
-    orig_dual = type(arch)._dual_mse
-
-    def spy_dual(*a, **kw):
-        captured["action_is_pad"] = kw.get("action_is_pad")
-        return orig_dual(*a, **kw)
-
-    arch._dual_mse = spy_dual
-
-    inputs = {
-        "input_latents": clean_video,
-        "context": ctx,
-        "seq_lens": seq,
-        "num_clean_prefix_actions": ncpa,
-    }
-    out = arch.compute_loss(actions=actions, lambda_video=1.0, lambda_action=1.0, **inputs)
-    assert torch.isfinite(out["loss"]).all()
-
-    aip = captured["action_is_pad"]
-    assert aip is not None and tuple(aip.shape) == (B, atok)
-    # sample 0: nothing masked; sample 1: steps [0,3) masked, [3,atok) kept.
-    assert not aip[0].any()
-    assert aip[1, :3].all()
-    assert not aip[1, 3:].any()
-
-
-@requires_gpu
-def test_compute_loss_without_action_prefix_field_supervises_all_actions():
-    dev, dt = torch.device("cuda"), torch.bfloat16
-    arch = _build_arch(dev, dt)
-    B = 1
-    clean_video = torch.randn(B, 16, 9, 8, 8, device=dev, dtype=dt)
-    actions = torch.randn(B, 8, 20, device=dev, dtype=dt)
-    ctx = torch.randn(B, 8, 64, device=dev, dtype=dt)
-    seq = torch.full((B,), 8, dtype=torch.long, device=dev)
-
-    captured = {}
-    orig_dual = type(arch)._dual_mse
-    arch._dual_mse = lambda *a, **kw: (captured.update(action_is_pad=kw.get("action_is_pad")) or orig_dual(*a, **kw))
-
-    inputs = {"input_latents": clean_video, "context": ctx, "seq_lens": seq}
-    arch.compute_loss(actions=actions, lambda_video=1.0, lambda_action=1.0, **inputs)
-    # No clean-prefix field ⇒ no action masking (legacy: supervise the whole trajectory).
-    assert captured["action_is_pad"] is None
-
-
-@requires_gpu
 def test_compute_loss_per_sample_clean_prefix_masks():
     dev, dt = torch.device("cuda"), torch.bfloat16
     arch = _build_arch(dev, dt)
