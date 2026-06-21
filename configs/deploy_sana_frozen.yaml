@@ -1,0 +1,45 @@
+# ---------------------------------------------------------------------------
+# Deploy settings for the FROZEN pretrained SANA-Video 2B (linear-attn) backbone
+# + trainable cross-attn action bridge (Option A; train config:
+# configs/train_sana_frozen.yaml, output dir outputs/sana_frozen_ln).
+#
+# Same dual_system / joint_cross_attn dispatch as deploy_gdn_cross.yaml →
+# CrossAttnInferenceEngine. The backbone differs (linear_relu SANA-Video instead
+# of GDN) but the deploy contract is identical: STREAMING rebuilds the
+# frame-0-anchored observed-history clip each step, VAE-encodes it for the clean
+# prefix, and (Design B) pins the executed action_history as a clean action
+# prefix. num_frames/height/width auto-fill from the checkpoint dataloader.
+# ---------------------------------------------------------------------------
+checkpoint_path: null          # --ckpt-dir on the CLI overrides this.
+device: cuda:0
+server:
+  host: "0.0.0.0"
+  ws_port: 8850
+  http_port: 8848
+
+inference:
+  video_steps: 4
+  action_steps: 4
+  action_tokens: 0            # 0 ⇒ infer from clip (num_frames - 1)
+  seed: 0
+  streaming: true
+  predict_horizon_frames: 1
+
+policy:
+  execute_horizon: 16         # ~tc*video_stride (one latent frame); tune on RoboTwin
+  temporal_ensemble: false    # MUST be false: mixes incompatible history lengths
+  # The checkpoint's resolved dataloader.num_frames = 129 (the growing-history
+  # raw_window_len spanning the LONGEST lift_pot training episode). history_len
+  # MUST be >= that so the frame-0-anchored clip can represent "now" and the
+  # action prefix aligns token-for-token; otherwise the engine warns + clamps
+  # (OOD) and success collapses. 160 leaves margin for deploy episodes that run a
+  # little longer than the longest training one; larger is harmless (just retains
+  # more obs).
+  history_len: 160
+
+optimization:
+  decode_video: false         # action-only at deploy; do not decode video
+  async_inference:
+    mode: none                # MUST stay none: one realized obs must map to one step
+  prompt_embed_cache:
+    maxsize: 32

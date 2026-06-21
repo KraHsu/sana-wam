@@ -168,11 +168,18 @@ class BridgeCrossAttention(nn.Module):
         # K path (post-projection); V is left raw. That is fine when the KV source
         # is O(1) (GDN features, text/proprio context), but the pretrained
         # linear-attn SANA-Video backbone emits pre-final-norm hidden states with
-        # magnitude ~1e9, so the unnormalized V projection blows the action loss up
-        # to ~2.5e7. An input RMSNorm on the KV source fixes both K and V at once
-        # and is a no-op-ish unit-RMS rescale for already-O(1) sources. Off by
-        # default so context/GDN-O(1) bridges keep their exact parameter set.
-        self.norm_kv = RMSNorm(kv_hidden_dim, eps=eps) if norm_kv_input else None
+        # magnitude ~1e9 (its blocks are pre-norm with an unnormalized, additively
+        # growing residual stream; only the final norm_out tames it). The
+        # unnormalized V projection then blows the action loss up to ~2.5e7. An
+        # input norm on the KV source fixes both K and V at once. We use LayerNorm
+        # (not RMSNorm) to match the backbone's own normalization family — every
+        # SANA norm is LayerNorm(affine=False) — so it *recenters* the large DC
+        # component a 1e9-magnitude residual carries (RMSNorm would leave the mean
+        # in). The learnable affine lets each per-layer bridge rescale its tap; the
+        # block-depth and timestep signals are recovered structurally (one bridge
+        # per fixed layer) and via AdaLN, not from the discarded global magnitude.
+        # Off by default so context/GDN-O(1) bridges keep their exact parameter set.
+        self.norm_kv = nn.LayerNorm(kv_hidden_dim, eps=eps) if norm_kv_input else None
 
     def forward(self, x_action: torch.Tensor, x_video: torch.Tensor, ctx_mask: Optional[torch.Tensor] = None):
         if self.norm_kv is not None:
