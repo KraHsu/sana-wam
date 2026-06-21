@@ -195,15 +195,17 @@ class DualSystemCrossAttnArchitecture(BaseWAMArchitecture):
         # Per-sample clean-prefix length: frame 0 is always the TI2V observation;
         # growing-history adds P_lat-1 more real, observed history frames (sigma=0,
         # unsupervised), matching streaming inference where the past is clean and
-        # only the future is denoised. num_clean_prefix_frames is (B,) latent
-        # counts from the dataloader; absent ⇒ frame-0-only (legacy).
+        # only the future is denoised. num_clean_prefix_frames is a (B,) tensor of
+        # latent counts from the growing-history dataloader. NB the video adapter
+        # also emits this key as a scalar int (1) for the plain TI2V flag, so only a
+        # TENSOR is treated as per-sample lengths; int/None ⇒ frame-0-only (legacy).
         ncp = inputs.get("num_clean_prefix_frames")
         prefix_lens = None
         if use_ffc and T > 1:
-            if ncp is None:
-                prefix_lens = torch.ones(B, dtype=torch.long, device=device)
-            else:
+            if isinstance(ncp, Tensor):
                 prefix_lens = ncp.to(device=device, dtype=torch.long).clamp(min=1, max=T)
+            else:
+                prefix_lens = torch.ones(B, dtype=torch.long, device=device)
             frame_ids = torch.arange(T, device=device)  # (T,)
             clean_mask = frame_ids.view(1, T) < prefix_lens.view(B, 1)  # (B, T)
             zero = clean_mask.view(B, 1, T, 1, 1)
@@ -239,7 +241,7 @@ class DualSystemCrossAttnArchitecture(BaseWAMArchitecture):
         # keeping the model robust to missing/imperfect history + the episode-0 bootstrap.
         a_clean_mask = None
         ncpa = inputs.get("num_clean_prefix_actions")
-        if self._action_clean_prefix and ncpa is not None and Ta > 0:
+        if self._action_clean_prefix and isinstance(ncpa, Tensor) and Ta > 0:
             k_a = ncpa.to(device=device, dtype=torch.long).clamp(min=0, max=Ta)  # (B,)
             if self.training and self._action_prefix_dropout > 0.0:
                 drop = torch.rand(B, device=device) < self._action_prefix_dropout
@@ -272,18 +274,25 @@ class DualSystemCrossAttnArchitecture(BaseWAMArchitecture):
             **fwd_inputs,
         )
 
-        # TI2V: exclude the clean first frame from the video loss (it's the real
-        # obs, not a denoising target). Build/extend video_is_pad so _dual_mse
-        # skips frame 0 even when the batch carries no pad mask.
         # TI2V: exclude the clean prefix frames from the video loss (they're the
-        # real observed history, not denoising targets). Mark [0, k_b) per sample
-        # as "pad" so _dual_mse skips them even when the batch carries no pad mask.
+        # real observed history, not denoising targets). Mark [0, k_b) per sample as
+        # "pad" so _dual_mse skips them. NB: _dual_mse scores ALL T latent frames
+        # (no frame-0 trim), so video_is_pad must be full latent-T here. base.py emits
+        # a tail-only mask (skip_first=True ⇒ length T-1, frame 0 = clean obs); align
+        # it to T by prepending a not-pad frame-0 column. (Before this, the length
+        # mismatch made _dual_mse silently drop the pad mask entirely.)
         video_is_pad = inputs.get("video_is_pad")
         if use_ffc and T > 1:
-            if video_is_pad is None:
+            if not isinstance(video_is_pad, Tensor):
                 video_is_pad = torch.zeros(B, T, dtype=torch.bool, device=device)
             else:
-                video_is_pad = video_is_pad.clone().to(device)
+                video_is_pad = video_is_pad.bool().to(device)
+                if video_is_pad.shape[1] == T - 1:  # tail-only (skip_first) ⇒ add frame 0
+                    video_is_pad = torch.cat(
+                        [torch.zeros(B, 1, dtype=torch.bool, device=device), video_is_pad], dim=1
+                    )
+                elif video_is_pad.shape[1] != T:  # unexpected length ⇒ ignore stale mask
+                    video_is_pad = torch.zeros(B, T, dtype=torch.bool, device=device)
             # clean_mask (B, T) was built above from the per-sample prefix lengths.
             video_is_pad = video_is_pad | clean_mask
 
