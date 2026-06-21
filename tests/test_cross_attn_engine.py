@@ -52,7 +52,8 @@ def test_cross_attn_engine_denoise_loop():
     arch = _build_arch(dev, dt)
 
     cfg = OmegaConf.create({
-        "inference": {"denoise_steps": 3, "seed": 0, "num_frames": 9, "action_tokens": 8},
+        "inference": {"denoise_steps": 3, "seed": 0, "num_frames": 9, "action_tokens": 8,
+                      "streaming": False},
         "dataloader": {"num_frames": 9, "video_stride": 4},
     })
     eng = CrossAttnInferenceEngine(cfg=cfg, architecture=arch)
@@ -82,7 +83,7 @@ def test_cross_attn_engine_reset_reseeds():
 
     dev, dt = torch.device("cuda"), torch.bfloat16
     arch = _build_arch(dev, dt)
-    cfg = OmegaConf.create({"inference": {"denoise_steps": 2, "seed": 7}, "dataloader": {"num_frames": 9, "video_stride": 4}})
+    cfg = OmegaConf.create({"inference": {"denoise_steps": 2, "seed": 7, "streaming": False}, "dataloader": {"num_frames": 9, "video_stride": 4}})
     eng = CrossAttnInferenceEngine(cfg=cfg, architecture=arch)
     first = torch.randn(1, 16, 1, 8, 8, device=dev, dtype=dt)
     ctx = torch.randn(1, 8, 64, device=dev, dtype=dt)
@@ -101,40 +102,69 @@ def test_cross_attn_engine_reset_reseeds():
 
 @requires_gpu
 def test_cross_attn_engine_streaming_grows_and_caps_prefix():
+    """Streaming re-encodes the observed-history clip each call (Option A); the pinned
+    clean prefix grows with obs_history and caps at T_lat - predict_horizon."""
     from omegaconf import OmegaConf
 
     from sana_wam.deploy.cross_attn_engine import CrossAttnInferenceEngine
 
     dev, dt = torch.device("cuda"), torch.bfloat16
     arch = _build_arch(dev, dt)
-    # T_lat = 1 + (9-1)//4 = 3 ; predict_horizon=1 ⇒ prefix caps at T-1 = 2.
+    # num_frames=9, video_stride=1 ⇒ vnf=9 ⇒ T_lat = 1 + (9-1)//4 = 3 (matches the
+    # mini backbone's f=3). predict_horizon=1 ⇒ prefix caps at T_lat - 1 = 2.
     cfg = OmegaConf.create({
         "inference": {"denoise_steps": 2, "seed": 0, "num_frames": 9, "action_tokens": 8,
                       "streaming": True, "predict_horizon_frames": 1},
-        "dataloader": {"num_frames": 9, "video_stride": 4},
+        "dataloader": {"num_frames": 9, "video_stride": 1},
     })
     eng = CrossAttnInferenceEngine(cfg=cfg, architecture=arch)
-    first = torch.randn(1, 16, 1, 8, 8, device=dev, dtype=dt)
     ctx = torch.randn(1, 8, 64, device=dev, dtype=dt)
     seq = torch.full((1,), 8, dtype=torch.long, device=dev)
-    eng._encode_first_frame = lambda c: first
     eng._encode_prompt = lambda p: (ctx, seq)
     eng._prep_proprio = lambda ps: None
-    # vnf=9 video frames ⇒ _video_num_frames_latent() = 1 + (9-1)//4 = 3 (matches
-    # the mini backbone's f=3). max_prefix = T_lat - predict_horizon = 3 - 1 = 2.
-    eng._video_num_frames = 9
+    # Stub the VAE seam: a clip of N video frames → N causal latent frames (the test
+    # cares about prefix length, not VAE internals). With video_stride=1 the clip
+    # length equals the obs_history length, so the encoded prefix grows 1→2→3.
+    eng._encode_clip = lambda clip: torch.randn(
+        1, 16, max(1, len(clip)), 8, 8, device=dev, dtype=dt
+    )
 
-    cond = {"prompt": "x", "first_frame_image": [object()]}
-    eng.generate(cond)
-    assert eng._obs_latents.shape[2] == 1  # one observed frame after step 1
-    eng.generate(cond)
-    assert eng._obs_latents.shape[2] == 2  # grows
-    eng.generate(cond)
-    assert eng._obs_latents.shape[2] == 2  # capped at T - predict_horizon
+    def cond(n):  # n per-sim-step frames since episode start (oldest→newest)
+        return {"prompt": "x", "obs_history": [{"image": object()} for _ in range(n)]}
+
+    eng.generate(cond(1))
+    assert eng._obs_latents.shape[2] == 1  # one observed latent frame
+    eng.generate(cond(2))
+    assert eng._obs_latents.shape[2] == 2  # grows with history
+    eng.generate(cond(3))
+    assert eng._obs_latents.shape[2] == 2  # capped at T_lat - predict_horizon
     assert eng._step_c == 3
 
-    # reset clears the rolling history
+    # reset clears the (debug) prefix + counter
     eng.reset()
     assert eng._obs_latents is None
     assert eng._step_c == 0
+
+
+def test_build_obs_clip_anchors_at_frame0_and_caps():
+    """Pure index/cadence logic for the streaming obs clip (no GPU/VAE needed)."""
+    from sana_wam.deploy.cross_attn_engine import CrossAttnInferenceEngine
+
+    eng = CrossAttnInferenceEngine.__new__(CrossAttnInferenceEngine)
+    eng._raw_num_frames = 9
+    eng._video_stride = 2
+    eng._video_num_frames = 5  # (9-1)//2 + 1
+    eng._warned_overlong = False
+
+    def clip_for(n):
+        frames = list(range(n))  # stand-in frame objects, oldest→newest
+        return eng._build_obs_clip({"obs_history": [{"image": f} for f in frames]})
+
+    # Anchored at frame 0, subsampled by stride: leading frames at the training cadence.
+    assert clip_for(1) == [0]
+    assert clip_for(3) == [0, 2]          # range(0,3,2)
+    assert clip_for(9) == [0, 2, 4, 6, 8]  # full window
+    # Beyond the training window: clamp to the leading window (frame-0 anchor), warn once.
+    assert clip_for(20) == [0, 2, 4, 6, 8]
+    assert eng._warned_overlong is True
 

@@ -955,6 +955,20 @@ class RoboTwinDataset(BaseActionDataset):
         c = rng.randint(1, max_clean_chunks)
         return c * chunk
 
+    def _proprio_raw_index(self, num_clean_prefix_latent: int, actual_valid_len: int) -> int:
+        """Raw-frame index of the CURRENT proprio state = the latest observed frame.
+
+        Deploy conditions on the robot's current state; training must match. For a
+        single-observation window (``P_lat <= 1``, incl. the legacy frame-0-only and
+        bootstrap cases) that is raw frame 0. For growing-history the latest observed
+        frame is the last clean-prefix latent ``P_lat-1`` ↔ video frame
+        ``tc*(P_lat-1)`` ↔ raw frame ``tc*(P_lat-1)*video_stride`` (causal Wan VAE,
+        where latent ``j>=1`` aggregates ``tc`` video frames). Clamped into the valid
+        window so a padded tail never selects a fabricated state.
+        """
+        cur = self.temporal_compression * (max(1, int(num_clean_prefix_latent)) - 1) * self.video_stride
+        return min(cur, max(0, int(actual_valid_len) - 1))
+
     def _build_sample(self, ep_idx: int, start: int, logical_len: Optional[int] = None) -> dict:
         """Assemble a single sample at (ep_idx, start).
 
@@ -1015,7 +1029,18 @@ class RoboTwinDataset(BaseActionDataset):
         if not self.multiview:
             sampled_video = [crop_and_resize(frame, self.height, self.width) for frame in sampled_video]
 
-        proprio_np = raw_actions[0:1].astype(np.float32)
+        # Clean-prefix length (latent frames) the model conditions on as real,
+        # unsupervised history — matches the streaming-inference distribution.
+        num_clean_prefix_latent = self._sample_clean_prefix_latent(ep_idx, logical_len, actual_valid_len)
+
+        # Proprio = the CURRENT robot state the policy conditions on (one context
+        # token). Deploy passes the state at the LATEST observation, so training must
+        # match. For the legacy single-observation window (P_lat<=1) that is frame 0;
+        # for growing-history the observation advances to the last clean-prefix frame
+        # (see ``_proprio_raw_index``) so proprio tracks that boundary instead of being
+        # pinned to episode frame 0 (which would feed a stale state at deploy).
+        cur_raw = self._proprio_raw_index(num_clean_prefix_latent, actual_valid_len)
+        proprio_np = raw_actions[cur_raw : cur_raw + 1].astype(np.float32)
         action_np = raw_actions[1 : self.num_frames].astype(np.float32)
 
         video_mask = torch.tensor(
@@ -1026,16 +1051,13 @@ class RoboTwinDataset(BaseActionDataset):
             [(t + 1) < actual_valid_len for t in range(self.num_action_steps)],
             dtype=torch.bool,
         )
-        proprio_mask = torch.tensor([0 < actual_valid_len], dtype=torch.bool)
-
-        # Clean-prefix length (latent frames) the model conditions on as real,
-        # unsupervised history — matches the streaming-inference distribution.
-        num_clean_prefix_latent = self._sample_clean_prefix_latent(ep_idx, logical_len, actual_valid_len)
+        proprio_mask = torch.tensor([cur_raw < actual_valid_len], dtype=torch.bool)
 
         # Step-0-only by design: drop "hasn't-started-yet" windows, not
-        # tail windows where the first action label is padding.
+        # tail windows where the first action label is padding. Measured at the
+        # window start (raw_actions[0]→action[0]), independent of the proprio frame.
         if self.num_action_steps > 0 and bool(action_mask[0]):
-            first_delta_max = float(np.max(np.abs(action_np[0] - proprio_np[0])))
+            first_delta_max = float(np.max(np.abs(action_np[0] - raw_actions[0])))
             is_static = first_delta_max < self._static_segment_threshold
         else:
             is_static = False

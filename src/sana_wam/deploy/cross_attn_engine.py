@@ -7,19 +7,31 @@ on the observed real frames (TI2V clean-prefix). The GDN backbone's own
 chunk-causal masking provides temporal structure inside one forward.
 
 Two modes:
-  - **non-streaming** (``inference.streaming=false``): stateless, conditions on
-    the single newest observation frame; ``reset`` only reseeds the RNG.
-  - **streaming** (default): STATEFUL growing-history. The engine accumulates a
-    rolling clean-prefix of observed latent frames across closed-loop steps (capped
-    at ``T - predict_horizon``) and re-pins that whole prefix each denoise step, so
-    the policy conditions on recent history — matching the growing-history training
-    distribution. ``reset`` clears the prefix at episode boundaries. Because GDN is
-    causal and episodes are short, re-running the forward over the growing prefix is
-    equivalent to a kv_cache at trivial cost.
+  - **non-streaming** (``inference.streaming=false``): conditions on the single
+    newest observation frame (legacy frame-0-only TI2V).
+  - **streaming** (default): growing-history clean-prefix. The engine rebuilds the
+    real observed history clip from ``conditions['obs_history']`` (WAMPolicy appends
+    one frame per sim step), anchored at episode frame 0 and subsampled by
+    ``video_stride`` — *exactly* the dataset's ``range(0, num_frames, video_stride)``
+    — then VAE-encodes it so the clean-prefix latents are genuine causal latents
+    carrying real motion (latent frame i≥1 aggregates ``video_stride*4`` real frames),
+    matching the growing-history training distribution. The leading observed latents
+    are pinned as the clean prefix (capped at ``T - predict_horizon`` so there is
+    always room to predict); the rest of the clip is denoised. This is *stateless*
+    w.r.t. latents — the history lives in ``obs_history`` and is re-encoded each call,
+    so there is no rolling buffer to bleed across episodes (cf. the earlier
+    single-image-stacking prefix, which fed off-distribution frame-0-type latents at
+    every position). ``reset`` only reseeds the RNG + step counter.
+
+NOTE: streaming requires that ``obs_history`` reach back to episode frame 0, i.e.
+``policy.history_len >= dataloader.num_frames`` (= the training ``raw_window_len``,
+which growing-history sets to span the longest episode). If a deploy episode runs
+longer than that window, the frame-0 anchor can no longer represent "now"; the
+engine logs a warning and clamps to the leading window.
 
 Per ``generate``:
-  1. encode prompt → context; encode the current observation frame → one clean
-     latent frame; (streaming) append to the rolling clean-prefix; normalize proprio.
+  1. encode prompt → context; (streaming) rebuild + VAE-encode the observed-history
+     clip → real causal clean-prefix latents; normalize proprio.
   2. initialise noisy video + action at sigma=1 (pure noise), pin the clean prefix
      [0, P) = observed history.
   3. run the action + video flow-matching schedules jointly: at each step call
@@ -77,15 +89,16 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         self._video_stride = max(1, int(OmegaConf.select(cfg, "dataloader.video_stride", default=4) or 4))
         self._video_num_frames = (self._raw_num_frames - 1) // self._video_stride + 1
 
-        # Streaming (growing-history) deploy. When enabled the engine is STATEFUL:
-        # it accumulates a rolling clean-prefix of real observed latent frames
-        # across closed-loop steps, so the policy conditions on the recent history
-        # (not a single frame). Mirrors the growing-history training distribution.
-        # GDN is causal + episodes are short, so re-running the forward over the
-        # growing prefix each step is equivalent to a kv_cache at trivial cost.
+        # Streaming (growing-history) deploy. When enabled, each generate rebuilds
+        # the observed-history clip from conditions['obs_history'] (anchored at
+        # episode frame 0, subsampled by video_stride) and VAE-encodes it, so the
+        # clean-prefix latents are REAL causal latents at the training cadence —
+        # matching the growing-history training distribution. The leading observed
+        # latents are pinned as the clean prefix (capped at T - predict_horizon).
         self._streaming = bool(_inf("streaming", True))
         self._predict_horizon = max(1, int(_inf("predict_horizon_frames", 1) or 1))
-        self._obs_latents: Optional[torch.Tensor] = None  # (1, C, P, Hl, Wl) clean history
+        self._obs_latents: Optional[torch.Tensor] = None  # (1, C, P, Hl, Wl) last pinned prefix (debug)
+        self._warned_overlong = False
         self._step_c = 0
 
         self._prompt_ctx_cache: "OrderedDict[str, tuple[torch.Tensor, torch.Tensor]]" = OrderedDict()
@@ -107,24 +120,36 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         prompt = conditions.get("prompt", "") or ""
         context, seq_lens = self._encode_prompt(prompt)
         proprio = self._prep_proprio(conditions.get("proprio_state"))
-        first_frame_latent = self._encode_first_frame(conditions)  # (1, C, 1, Hl, Wl)
 
         B = 1
-        C, Hl, Wl = first_frame_latent.shape[1], first_frame_latent.shape[3], first_frame_latent.shape[4]
         T = self._video_num_frames_latent()
         atok = self._action_tokens or (self._raw_num_frames - 1)
-
-        # first_frame_latent must be exactly one latent frame (the observation),
-        # and the generated clip must have room for it. Without these guards a
-        # mismatch would silently broadcast/clip ``video[:, :, :1] = ...`` below
-        # and corrupt the TI2V conditioning.
-        if first_frame_latent.shape[2] != 1:
-            raise ValueError(
-                f"first_frame_latent must have 1 latent frame, got {first_frame_latent.shape[2]} "
-                f"(shape {tuple(first_frame_latent.shape)})."
-            )
         if T < 1:
             raise ValueError(f"generated latent length T={T} must be >= 1 (video_num_frames too small).")
+
+        # Clean prefix. Non-streaming: legacy frame-0-only TI2V (single newest obs).
+        # Streaming: rebuild the observed-history clip from obs_history (anchored at
+        # episode frame 0, subsampled at the training video_stride) and VAE-encode it,
+        # so prefix frames are REAL causal latents carrying motion — matching the
+        # growing-history training distribution. Pin the leading observed latents,
+        # capped at ``T - predict_horizon`` so there is always room to predict.
+        if self._streaming:
+            max_prefix = max(1, T - self._predict_horizon)
+            obs_latents = self._encode_clip(self._build_obs_clip(conditions))  # (1, C, P_real, Hl, Wl)
+            P = min(obs_latents.shape[2], max_prefix)
+            prefix = obs_latents[:, :, :P].contiguous()
+        else:
+            prefix = self._encode_first_frame(conditions)  # (1, C, 1, Hl, Wl)
+            # Must be exactly one latent frame; otherwise the pin below would silently
+            # broadcast/clip and corrupt the TI2V conditioning.
+            if prefix.shape[2] != 1:
+                raise ValueError(
+                    f"first_frame_latent must have 1 latent frame, got {prefix.shape[2]} "
+                    f"(shape {tuple(prefix.shape)})."
+                )
+            P = 1
+        self._obs_latents = prefix  # last pinned prefix (observability/debug)
+        C, Hl, Wl = prefix.shape[1], prefix.shape[3], prefix.shape[4]
 
         # Flow-matching schedules.
         vb.scheduler.set_timesteps(self._video_steps)
@@ -133,23 +158,6 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         a_sigmas = [float(s) for s in ab.scheduler.sigmas.tolist()] + [0.0]
         v_ts, a_ts = vb.scheduler.timesteps, ab.scheduler.timesteps
         n_steps = min(len(v_ts), len(a_ts))
-
-        # Clean-prefix bookkeeping. Non-streaming: legacy frame-0-only TI2V. Streaming:
-        # append the newest observation latent to a rolling history capped at
-        # ``T - predict_horizon`` (so there is always room to predict), then re-pin
-        # the whole prefix each denoise step.
-        if self._streaming:
-            max_prefix = max(1, T - self._predict_horizon)
-            if self._obs_latents is None:
-                self._obs_latents = first_frame_latent
-            else:
-                self._obs_latents = torch.cat([self._obs_latents, first_frame_latent], dim=2)
-                if self._obs_latents.shape[2] > max_prefix:
-                    self._obs_latents = self._obs_latents[:, :, -max_prefix:].contiguous()
-            prefix = self._obs_latents
-        else:
-            prefix = first_frame_latent
-        P = prefix.shape[2]
 
         # Init: pure noise (sigma≈1); pin the clean prefix [0, P) = observed history.
         video = torch.randn(B, C, T, Hl, Wl, generator=self._gen, device=self._device, dtype=self._dtype)
@@ -186,14 +194,17 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         return {"actions": actions_np, "video": None}
 
     def reset(self) -> None:
-        """Clear streaming history at episode boundaries and reseed the RNG.
+        """Reseed the RNG + step counter at episode boundaries.
 
-        Streaming engines accumulate a rolling clean-prefix of observed latents
-        across steps; this MUST be cleared between episodes (mirrors
-        ARInferenceEngine.reset) or history bleeds across rollouts. WAMPolicy
-        calls this on episode reset.
+        Streaming sources its clean-prefix history from ``conditions['obs_history']``
+        (owned by WAMPolicy) and re-encodes it each call, so the engine holds no
+        rolling latent buffer that could bleed across episodes — ``_obs_latents`` is
+        only the last pinned prefix kept for observability. We still reset it and the
+        step counter, and reseed the RNG for reproducible rollouts. WAMPolicy calls
+        this on episode reset (which also clears its own obs_history).
         """
         self._obs_latents = None
+        self._warned_overlong = False
         self._step_c = 0
         self._gen = torch.Generator(device=self._device).manual_seed(self._seed)
 
@@ -253,6 +264,52 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         latents = vb._pipe.vae.encode([video[0]], device=self._device, tiled=True)
         latents = latents.to(device=self._device, dtype=self._dtype)
         return latents[:, :, :1].contiguous()  # (1, C, 1, Hl, Wl)
+
+    def _build_obs_clip(self, conditions: dict) -> list:
+        """Rebuild the observed-history video clip for streaming, anchored at episode
+        frame 0 and subsampled at the training ``video_stride``.
+
+        Mirrors the dataset's ``range(0, num_frames, video_stride)`` so the encoded
+        latents carry the same per-frame motion the model trained on. ``obs_history``
+        holds per-sim-step frames oldest→newest; we take the leading window (from
+        episode frame 0) up to the full training window and subsample. The clip grows
+        with the episode, so the encoded clean prefix grows exactly like training's
+        growing logical length. We do NOT pad the clip out to the full clip length —
+        only the genuinely observed frames are encoded; the unobserved future is what
+        the denoise loop predicts.
+        """
+        frames = self._recent_frames(conditions)  # oldest→newest, frame 0 = episode start
+        # Anchor at frame 0; one training window spans raw_num_frames raw frames.
+        if len(frames) > self._raw_num_frames and not self._warned_overlong:
+            logger.warning(
+                "CrossAttnInferenceEngine: obs_history (%d frames) exceeds the training "
+                "window raw_num_frames=%d; the frame-0 anchor can no longer represent "
+                "'now' — clamping to the leading window (out-of-distribution).",
+                len(frames), self._raw_num_frames,
+            )
+            self._warned_overlong = True
+        recent = frames[: self._raw_num_frames]
+        clip = recent[:: self._video_stride]  # training cadence; len grows with the episode
+        if len(clip) > self._video_num_frames:  # never encode beyond the clip length
+            clip = clip[: self._video_num_frames]
+        return clip or [frames[0]]
+
+    def _encode_clip(self, clip: list) -> torch.Tensor:
+        """VAE-encode an observation clip → ``(1, C, P, Hl, Wl)`` causal latents.
+
+        Stubbable seam (the mini test backbone has no VAE). For a clip of N video
+        frames the causal Wan VAE returns ``1 + (N-1)//4`` latent frames; latent
+        frame i≥1 aggregates 4 successive real frames, so these are genuine
+        motion-bearing latents (unlike a stack of single-image frame-0 encodes).
+        """
+        vb = self.architecture.video_backbone
+        if vb._pipe.vae is None:
+            raise RuntimeError("CrossAttnInferenceEngine streaming requires a loaded Wan VAE.")
+        from sana_wam.model.video_backbone.sana.adapter import _pil_video_to_tensor
+
+        video = _pil_video_to_tensor([clip]).to(device=self._device, dtype=self._dtype)
+        latents = vb._pipe.vae.encode([video[0]], device=self._device, tiled=True)
+        return latents.to(device=self._device, dtype=self._dtype)  # (1, C, P, Hl, Wl)
 
     def _video_num_frames_latent(self) -> int:
         """Latent temporal length T for the generated clip (causal Wan VAE)."""

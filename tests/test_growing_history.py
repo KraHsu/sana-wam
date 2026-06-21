@@ -87,6 +87,25 @@ def test_non_growing_clean_prefix_is_zero():
     assert ds._sample_clean_prefix_latent(0, 129, 129) == 0
 
 
+def test_proprio_raw_index_tracks_latest_observed_frame():
+    # tc=4, video_stride=4 ⇒ each extra clean latent advances the current frame by 16.
+    ds = _bare(video_stride=4, temporal_compression=4)
+    # P_lat<=1 (legacy single-observation / bootstrap): current state is frame 0.
+    assert ds._proprio_raw_index(0, actual_valid_len=129) == 0
+    assert ds._proprio_raw_index(1, actual_valid_len=129) == 0
+    # Growing-history: latest observed = last clean latent (P_lat-1) → tc*(P_lat-1)*stride.
+    assert ds._proprio_raw_index(2, actual_valid_len=129) == 16   # 4*1*4
+    assert ds._proprio_raw_index(3, actual_valid_len=129) == 32   # 4*2*4
+    # Clamped into the valid window (never points at a padded/fabricated frame).
+    assert ds._proprio_raw_index(9, actual_valid_len=20) == 19
+
+
+def test_proprio_raw_index_zero_for_non_growing():
+    ds = _bare(growing_history=False)
+    # Non-growing always has P_lat=0 ⇒ current state stays at frame 0 (window start).
+    assert ds._proprio_raw_index(0, actual_valid_len=49) == 0
+
+
 @pytest.mark.skipif(not _HAS_DATA, reason="RoboTwin dataset not present")
 def test_growing_history_integration_lift_pot():
     from omegaconf import OmegaConf

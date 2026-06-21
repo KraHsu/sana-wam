@@ -4,12 +4,14 @@
 #
 # build_engine dispatches DualSystemCrossAttnArchitecture →
 # CrossAttnInferenceEngine (src/sana_wam/deploy/cross_attn_engine.py). In the
-# default STREAMING mode this engine is STATEFUL: it accumulates a rolling
-# clean-prefix of observed latent frames across closed-loop steps so the policy
-# conditions on recent history (matching growing-history training). Because the
-# engine carries per-episode state, the AR-style greedy/no-async constraints DO
-# apply here: receding-horizon re-generation would double-advance the history,
-# and temporal ensembling mixes predictions across different history lengths.
+# default STREAMING mode the engine rebuilds the observed-history clip from
+# WAMPolicy's obs_history each step — anchored at episode frame 0, subsampled at
+# the training video_stride — and VAE-encodes it, so the clean-prefix latents are
+# real causal latents carrying motion (matching growing-history training), not a
+# stack of single-image encodes. The greedy/no-async constraints still apply:
+# each generate must ingest exactly one new realized observation per step, so
+# receding-horizon re-generation would advance the history more than once per
+# realized frame, and temporal ensembling mixes incompatible history lengths.
 # ---------------------------------------------------------------------------
 checkpoint_path: null          # --ckpt-dir on the CLI overrides this.
 device: cuda:0
@@ -40,9 +42,14 @@ inference:
 # ---------------------------------------------------------------------------
 policy:
   execute_horizon: null       # null ⇒ greedy: drain the predicted chunk, then re-observe
-  temporal_ensemble: false    # MUST be false for the stateful engine
-  # obs_history must hold a full raw frame window (>= dataloader.num_frames) so
-  # the engine can rebuild the obs clip at the training pixel cadence.
+  temporal_ensemble: false    # MUST be false: mixes incompatible history lengths
+  # REQUIRED for streaming: obs_history must reach back to episode frame 0 so the
+  # engine can rebuild the frame-0-anchored clip at the training pixel cadence.
+  # Set history_len >= the checkpoint's dataloader.num_frames (= the growing-history
+  # raw_window_len, which spans the LONGEST training episode). If it is smaller, the
+  # frame-0 anchor cannot represent "now": the engine logs a warning and clamps to a
+  # leading window (out-of-distribution). 64 suits short episodes — bump it to match
+  # your data's longest episode.
   history_len: 64
 
 # ---------------------------------------------------------------------------
@@ -51,6 +58,6 @@ policy:
 optimization:
   decode_video: false         # action-only at deploy; do not decode video
   async_inference:
-    mode: none                # MUST stay none for the stateful engine
+    mode: none                # MUST stay none: one realized obs must map to one step
   prompt_embed_cache:
     maxsize: 32
