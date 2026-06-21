@@ -78,6 +78,18 @@ dataloader:
   text_embedding_cache_dir: null
   text_embedding_dropout: 0.0
   vae_cache_dir: null
+  # ---- Growing-history (variable-length, anchored at episode frame 0) ----
+  # Every window starts at frame 0 and sweeps a variable history length k; the
+  # raw buffer auto-expands to span the longest episode (pad-to-max-T) so batches
+  # still stack. Each sample gets a chunk-aligned clean-prefix of real observed
+  # latent frames (sigma=0, unsupervised) — the model learns to predict under any
+  # amount of history, matching the streaming deploy engine.
+  growing_history: true
+  history_min_frames: 5     # shortest logical window (raw frames)
+  history_stride: 4         # step between logical window lengths
+  # MUST mirror model.video_backbone.chunk_size (GDN latent chunk). The clean
+  # prefix is sampled on multiples of this so the predicted region is whole chunks.
+  gdn_chunk_size: 3
 
 training:
   output_dir: outputs/gdn_cross

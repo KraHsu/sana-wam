@@ -3,18 +3,28 @@
 Unlike the block-AR :class:`ARInferenceEngine` (stateful KV cache, one chunk per
 ``generate``), the cross-attn architecture is **not** autoregressive: each
 ``generate`` is a one-shot flow-matching denoise of the whole clip, conditioned
-on the real first frame (TI2V clean-prefix at t=0). The GDN backbone's own
-chunk-causal masking provides temporal structure inside one forward; there is no
-persistent cache to carry across calls, so this engine is stateless (``reset`` is
-a no-op).
+on the observed real frames (TI2V clean-prefix). The GDN backbone's own
+chunk-causal masking provides temporal structure inside one forward.
+
+Two modes:
+  - **non-streaming** (``inference.streaming=false``): stateless, conditions on
+    the single newest observation frame; ``reset`` only reseeds the RNG.
+  - **streaming** (default): STATEFUL growing-history. The engine accumulates a
+    rolling clean-prefix of observed latent frames across closed-loop steps (capped
+    at ``T - predict_horizon``) and re-pins that whole prefix each denoise step, so
+    the policy conditions on recent history — matching the growing-history training
+    distribution. ``reset`` clears the prefix at episode boundaries. Because GDN is
+    causal and episodes are short, re-running the forward over the growing prefix is
+    equivalent to a kv_cache at trivial cost.
 
 Per ``generate``:
-  1. encode prompt → context; encode the current observation frame → first-frame
-     latent (clean prefix); normalize proprio.
-  2. initialise noisy video + action at sigma=1 (pure noise), keep latent frame 0
-     clean (the observation).
+  1. encode prompt → context; encode the current observation frame → one clean
+     latent frame; (streaming) append to the rolling clean-prefix; normalize proprio.
+  2. initialise noisy video + action at sigma=1 (pure noise), pin the clean prefix
+     [0, P) = observed history.
   3. run the action + video flow-matching schedules jointly: at each step call
-     ``architecture.forward`` to get (v_pred, a_pred), step both schedulers.
+     ``architecture.forward`` to get (v_pred, a_pred), step both schedulers, re-pin
+     the clean prefix.
   4. denormalize and return the predicted action trajectory (+ optionally decoded
      video).
 """
@@ -67,12 +77,25 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         self._video_stride = max(1, int(OmegaConf.select(cfg, "dataloader.video_stride", default=4) or 4))
         self._video_num_frames = (self._raw_num_frames - 1) // self._video_stride + 1
 
+        # Streaming (growing-history) deploy. When enabled the engine is STATEFUL:
+        # it accumulates a rolling clean-prefix of real observed latent frames
+        # across closed-loop steps, so the policy conditions on the recent history
+        # (not a single frame). Mirrors the growing-history training distribution.
+        # GDN is causal + episodes are short, so re-running the forward over the
+        # growing prefix each step is equivalent to a kv_cache at trivial cost.
+        self._streaming = bool(_inf("streaming", True))
+        self._predict_horizon = max(1, int(_inf("predict_horizon_frames", 1) or 1))
+        self._obs_latents: Optional[torch.Tensor] = None  # (1, C, P, Hl, Wl) clean history
+        self._step_c = 0
+
         self._prompt_ctx_cache: "OrderedDict[str, tuple[torch.Tensor, torch.Tensor]]" = OrderedDict()
         self._gen = torch.Generator(device=self._device).manual_seed(self._seed)
 
         logger.info(
-            "CrossAttnInferenceEngine ready: video_steps=%d action_steps=%d action_dim=%d vnf=%d",
+            "CrossAttnInferenceEngine ready: video_steps=%d action_steps=%d action_dim=%d vnf=%d "
+            "streaming=%s predict_horizon=%d",
             self._video_steps, self._action_steps, self._action_dim, self._video_num_frames,
+            self._streaming, self._predict_horizon,
         )
 
     # ----------------------------------------------------------------- generate
@@ -111,10 +134,27 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         v_ts, a_ts = vb.scheduler.timesteps, ab.scheduler.timesteps
         n_steps = min(len(v_ts), len(a_ts))
 
-        # Init: pure noise (sigma≈1); keep latent frame 0 = the clean observation.
+        # Clean-prefix bookkeeping. Non-streaming: legacy frame-0-only TI2V. Streaming:
+        # append the newest observation latent to a rolling history capped at
+        # ``T - predict_horizon`` (so there is always room to predict), then re-pin
+        # the whole prefix each denoise step.
+        if self._streaming:
+            max_prefix = max(1, T - self._predict_horizon)
+            if self._obs_latents is None:
+                self._obs_latents = first_frame_latent
+            else:
+                self._obs_latents = torch.cat([self._obs_latents, first_frame_latent], dim=2)
+                if self._obs_latents.shape[2] > max_prefix:
+                    self._obs_latents = self._obs_latents[:, :, -max_prefix:].contiguous()
+            prefix = self._obs_latents
+        else:
+            prefix = first_frame_latent
+        P = prefix.shape[2]
+
+        # Init: pure noise (sigma≈1); pin the clean prefix [0, P) = observed history.
         video = torch.randn(B, C, T, Hl, Wl, generator=self._gen, device=self._device, dtype=self._dtype)
         actions = torch.randn(B, atok, self._action_dim, generator=self._gen, device=self._device, dtype=self._dtype)
-        video[:, :, :1] = first_frame_latent  # TI2V clean prefix
+        video[:, :, :P] = prefix  # TI2V clean prefix (observed history)
 
         for i in range(n_steps):
             # Cast timesteps to the model dtype: TimestepEmbedding's sinusoid
@@ -136,8 +176,9 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
             a_dsig = a_sigmas[i + 1] - a_sigmas[i]
             video = video + v_pred.to(self._dtype) * v_dsig
             actions = actions + a_pred.to(self._dtype) * a_dsig
-            video[:, :, :1] = first_frame_latent  # re-pin the clean observation
+            video[:, :, :P] = prefix  # re-pin the clean observed history
 
+        self._step_c += 1
         actions_np = actions.squeeze(0).float().cpu().numpy()
         normalizer = getattr(arch, "action_normalizer", None)
         if normalizer is not None:
@@ -145,7 +186,15 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         return {"actions": actions_np, "video": None}
 
     def reset(self) -> None:
-        """Stateless engine — only reseed the RNG for reproducibility."""
+        """Clear streaming history at episode boundaries and reseed the RNG.
+
+        Streaming engines accumulate a rolling clean-prefix of observed latents
+        across steps; this MUST be cleared between episodes (mirrors
+        ARInferenceEngine.reset) or history bleeds across rollouts. WAMPolicy
+        calls this on episode reset.
+        """
+        self._obs_latents = None
+        self._step_c = 0
         self._gen = torch.Generator(device=self._device).manual_seed(self._seed)
 
     # --------------------------------------------------------------- conditions

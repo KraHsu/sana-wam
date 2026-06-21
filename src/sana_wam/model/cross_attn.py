@@ -184,10 +184,24 @@ class DualSystemCrossAttnArchitecture(BaseWAMArchitecture):
         # (architecture.py: v_sigma[:, 0] = 0). Without this, training noises and
         # supervises frame 0 while inference pins it clean — a train/infer mismatch.
         use_ffc = bool(getattr(vb, "_use_first_frame_cond", False))
-        # (B, 1, T, 1, 1) per-frame sigma so frame 0 can differ from the rest.
+        # (B, 1, T, 1, 1) per-frame sigma so the clean prefix can differ from the rest.
         v_sigma_f = v_sigma.view(B, 1, 1, 1, 1).expand(B, 1, T, 1, 1).clone()
+        # Per-sample clean-prefix length: frame 0 is always the TI2V observation;
+        # growing-history adds P_lat-1 more real, observed history frames (sigma=0,
+        # unsupervised), matching streaming inference where the past is clean and
+        # only the future is denoised. num_clean_prefix_frames is (B,) latent
+        # counts from the dataloader; absent ⇒ frame-0-only (legacy).
+        ncp = inputs.get("num_clean_prefix_frames")
+        prefix_lens = None
         if use_ffc and T > 1:
-            v_sigma_f[:, :, 0] = 0.0
+            if ncp is None:
+                prefix_lens = torch.ones(B, dtype=torch.long, device=device)
+            else:
+                prefix_lens = ncp.to(device=device, dtype=torch.long).clamp(min=1, max=T)
+            frame_ids = torch.arange(T, device=device)  # (T,)
+            clean_mask = frame_ids.view(1, T) < prefix_lens.view(B, 1)  # (B, T)
+            zero = clean_mask.view(B, 1, T, 1, 1)
+            v_sigma_f = torch.where(zero, torch.zeros_like(v_sigma_f), v_sigma_f)
         noisy_video = (1 - v_sigma_f) * clean_video + v_sigma_f * v_noise
         # Route the target through the scheduler so a future scheduler with a
         # different flow-matching parameterization stays consistent (currently
@@ -234,13 +248,17 @@ class DualSystemCrossAttnArchitecture(BaseWAMArchitecture):
         # TI2V: exclude the clean first frame from the video loss (it's the real
         # obs, not a denoising target). Build/extend video_is_pad so _dual_mse
         # skips frame 0 even when the batch carries no pad mask.
+        # TI2V: exclude the clean prefix frames from the video loss (they're the
+        # real observed history, not denoising targets). Mark [0, k_b) per sample
+        # as "pad" so _dual_mse skips them even when the batch carries no pad mask.
         video_is_pad = inputs.get("video_is_pad")
         if use_ffc and T > 1:
             if video_is_pad is None:
                 video_is_pad = torch.zeros(B, T, dtype=torch.bool, device=device)
             else:
                 video_is_pad = video_is_pad.clone().to(device)
-            video_is_pad[:, 0] = True  # mark frame 0 as "pad" ⇒ dropped from loss
+            # clean_mask (B, T) was built above from the per-sample prefix lengths.
+            video_is_pad = video_is_pad | clean_mask
 
         return self._dual_mse(
             v_pred, v_target, a_pred, a_target,

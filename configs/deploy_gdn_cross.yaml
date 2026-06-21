@@ -1,0 +1,56 @@
+# ---------------------------------------------------------------------------
+# Deploy settings for the GDN cross-attention TI2V world-action model
+# (dual_system / joint_cross_attn).
+#
+# build_engine dispatches DualSystemCrossAttnArchitecture →
+# CrossAttnInferenceEngine (src/sana_wam/deploy/cross_attn_engine.py). In the
+# default STREAMING mode this engine is STATEFUL: it accumulates a rolling
+# clean-prefix of observed latent frames across closed-loop steps so the policy
+# conditions on recent history (matching growing-history training). Because the
+# engine carries per-episode state, the AR-style greedy/no-async constraints DO
+# apply here: receding-horizon re-generation would double-advance the history,
+# and temporal ensembling mixes predictions across different history lengths.
+# ---------------------------------------------------------------------------
+checkpoint_path: null          # --ckpt-dir on the CLI overrides this.
+device: cuda:0
+server:
+  host: "0.0.0.0"
+  ws_port: 8850
+  http_port: 8848
+
+# ---------------------------------------------------------------------------
+# Inference parameters (cfg.inference; read by CrossAttnInferenceEngine).
+# num_frames / video_num_frames / height / width are auto-filled from the
+# checkpoint dataloader when omitted (build_server_from_config). action_tokens=0
+# ⇒ inferred from the clip (raw_num_frames - 1).
+# ---------------------------------------------------------------------------
+inference:
+  video_steps: 4              # flow-matching steps for the predicted video clip
+  action_steps: 4             # flow-matching steps for the predicted action clip
+  action_tokens: 0            # 0 ⇒ infer from clip (num_frames - 1)
+  seed: 0
+  streaming: true             # accumulate observed history across steps (stateful)
+  predict_horizon_frames: 1   # latent frames to leave for prediction each step
+
+# ---------------------------------------------------------------------------
+# Policy execution — greedy (mandatory for the stateful streaming engine). Each
+# generate() ingests exactly one realized observation into the rolling history;
+# receding-horizon / temporal ensembling would advance the history more than
+# once per realized frame or mix incompatible history lengths.
+# ---------------------------------------------------------------------------
+policy:
+  execute_horizon: null       # null ⇒ greedy: drain the predicted chunk, then re-observe
+  temporal_ensemble: false    # MUST be false for the stateful engine
+  # obs_history must hold a full raw frame window (>= dataloader.num_frames) so
+  # the engine can rebuild the obs clip at the training pixel cadence.
+  history_len: 64
+
+# ---------------------------------------------------------------------------
+# Deploy-time optimizations.
+# ---------------------------------------------------------------------------
+optimization:
+  decode_video: false         # action-only at deploy; do not decode video
+  async_inference:
+    mode: none                # MUST stay none for the stateful engine
+  prompt_embed_cache:
+    maxsize: 32

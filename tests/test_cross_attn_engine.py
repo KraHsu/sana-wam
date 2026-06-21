@@ -97,3 +97,44 @@ def test_cross_attn_engine_reset_reseeds():
     eng.reset()
     a2 = eng.generate(cond)["actions"]
     np.testing.assert_allclose(a1, a2, rtol=1e-3, atol=1e-3)
+
+
+@requires_gpu
+def test_cross_attn_engine_streaming_grows_and_caps_prefix():
+    from omegaconf import OmegaConf
+
+    from sana_wam.deploy.cross_attn_engine import CrossAttnInferenceEngine
+
+    dev, dt = torch.device("cuda"), torch.bfloat16
+    arch = _build_arch(dev, dt)
+    # T_lat = 1 + (9-1)//4 = 3 ; predict_horizon=1 ⇒ prefix caps at T-1 = 2.
+    cfg = OmegaConf.create({
+        "inference": {"denoise_steps": 2, "seed": 0, "num_frames": 9, "action_tokens": 8,
+                      "streaming": True, "predict_horizon_frames": 1},
+        "dataloader": {"num_frames": 9, "video_stride": 4},
+    })
+    eng = CrossAttnInferenceEngine(cfg=cfg, architecture=arch)
+    first = torch.randn(1, 16, 1, 8, 8, device=dev, dtype=dt)
+    ctx = torch.randn(1, 8, 64, device=dev, dtype=dt)
+    seq = torch.full((1,), 8, dtype=torch.long, device=dev)
+    eng._encode_first_frame = lambda c: first
+    eng._encode_prompt = lambda p: (ctx, seq)
+    eng._prep_proprio = lambda ps: None
+    # vnf=9 video frames ⇒ _video_num_frames_latent() = 1 + (9-1)//4 = 3 (matches
+    # the mini backbone's f=3). max_prefix = T_lat - predict_horizon = 3 - 1 = 2.
+    eng._video_num_frames = 9
+
+    cond = {"prompt": "x", "first_frame_image": [object()]}
+    eng.generate(cond)
+    assert eng._obs_latents.shape[2] == 1  # one observed frame after step 1
+    eng.generate(cond)
+    assert eng._obs_latents.shape[2] == 2  # grows
+    eng.generate(cond)
+    assert eng._obs_latents.shape[2] == 2  # capped at T - predict_horizon
+    assert eng._step_c == 3
+
+    # reset clears the rolling history
+    eng.reset()
+    assert eng._obs_latents is None
+    assert eng._step_c == 0
+

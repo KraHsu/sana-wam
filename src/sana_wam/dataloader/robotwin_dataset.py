@@ -336,6 +336,10 @@ class RoboTwinDataset(BaseActionDataset):
         vae_cache_dir: Optional[str] = None,
         temporal_compression: int = 4,
         causal_temporal: bool = True,
+        growing_history: bool = False,
+        history_min_frames: int = 1,
+        history_stride: int = 1,
+        gdn_chunk_size: int = 1,
     ):
         super().__init__()
         self.robot = robot
@@ -343,6 +347,18 @@ class RoboTwinDataset(BaseActionDataset):
         self.action_mode = action_mode
         self.temporal_compression = int(temporal_compression)
         self.causal_temporal = bool(causal_temporal)
+        # ---- Growing-history (variable-length, anchored at episode frame 0) ----
+        # When enabled, every window starts at frame 0 and sweeps a variable
+        # logical length k (1, 1+stride, ...) up to the episode length. The raw
+        # buffer is fixed at the episode-spanning max (pad-to-max-T), so batches
+        # still stack; per-sample length is realized via the existing
+        # video_mask / action_mask. Each sample also carries a chunk-aligned
+        # clean-prefix length P_lat (real latent frames the model conditions on,
+        # unsupervised), matching the streaming-inference distribution.
+        self.growing_history = bool(growing_history)
+        self.history_min_frames = max(2, int(history_min_frames))
+        self.history_stride = max(1, int(history_stride))
+        self.gdn_chunk_size = max(1, int(gdn_chunk_size))
         self.normalize_mode = normalize_mode if normalize_mode not in ("", "none", "null") else None
         self._filter_static_segments = bool(filter_static_segments)
         self._static_segment_threshold = float(static_segment_threshold)
@@ -461,6 +477,24 @@ class RoboTwinDataset(BaseActionDataset):
             f"action_dim={self._action_dim_detected}"
         )
 
+        # ---- Growing-history: expand the raw buffer to span the longest episode
+        # on the stride grid (pad-to-max-T). All windows start at frame 0; the
+        # buffer is fixed so batches stack, and per-sample length is masked.
+        if self.growing_history:
+            self._raw_window_len = self._max_raw_window_on_grid(max(self._episode_lengths))
+            self.num_frames = self._raw_window_len
+            self.num_action_steps = self.num_frames - 1
+            self._video_sample_indices = list(range(0, self.num_frames, self.video_stride))
+            self.num_video_frames = len(self._video_sample_indices)
+            _check_temporal_divisibility(self.num_video_frames, self.temporal_compression, self.causal_temporal)
+            print(
+                f"  Growing-history: raw_window_len={self._raw_window_len} "
+                f"(spans max episode {max(self._episode_lengths)}), "
+                f"→ {self.num_video_frames} video frames, gdn_chunk_size={self.gdn_chunk_size}, "
+                f"history_min_frames={self.history_min_frames}, history_stride={self.history_stride}"
+            )
+
+
         # ---- Probe original observation image size (first camera, first episode) ----
         self._obs_image_size = None  # (H, W) of the raw JPEG frames in HDF5
         with h5py.File(self._episode_files[0], "r") as f:
@@ -491,22 +525,36 @@ class RoboTwinDataset(BaseActionDataset):
                         )
             print(f"  Multiview mode: 3-cam L-shape, cameras={self.cameras}, output={self.height}x{self.width}")
 
-        # ---- Exhaustive window enumeration ----
-        self._window_index = []  # List of (episode_idx, start_frame)
-        for ep_idx, ep_len in enumerate(self._episode_lengths):
-            if ep_len < 2:
-                continue
-            if self.split == "val":
-                # Keep validation loss comparable to the historical full-window
-                # distribution.
-                max_start = max(0, ep_len - self._raw_window_len)
-            else:
-                # FastWAM-aligned tail semantics, constrained to starts with at
-                # least one valid future action label under the t+1 action
-                # alignment. Tail windows are padded and masked out in the loss.
-                max_start = max(0, ep_len - 2)
-            for start in range(0, max_start + 1, self.window_stride):
-                self._window_index.append((ep_idx, start))
+        # ---- Window enumeration ----
+        # Each entry is (episode_idx, start_frame, logical_len). For the fixed
+        # path logical_len == raw_window_len (full window). For growing-history
+        # all windows start at frame 0 and logical_len sweeps the variable
+        # history length k.
+        self._window_index = []
+        if self.growing_history:
+            for ep_idx, ep_len in enumerate(self._episode_lengths):
+                if ep_len < self.history_min_frames:
+                    continue
+                ks = list(range(self.history_min_frames, ep_len, self.history_stride))
+                if not ks or ks[-1] != ep_len:
+                    ks.append(ep_len)
+                for k in ks:
+                    self._window_index.append((ep_idx, 0, k))
+        else:
+            for ep_idx, ep_len in enumerate(self._episode_lengths):
+                if ep_len < 2:
+                    continue
+                if self.split == "val":
+                    # Keep validation loss comparable to the historical full-window
+                    # distribution.
+                    max_start = max(0, ep_len - self._raw_window_len)
+                else:
+                    # FastWAM-aligned tail semantics, constrained to starts with at
+                    # least one valid future action label under the t+1 action
+                    # alignment. Tail windows are padded and masked out in the loss.
+                    max_start = max(0, ep_len - 2)
+                for start in range(0, max_start + 1, self.window_stride):
+                    self._window_index.append((ep_idx, start, self._raw_window_len))
         if repeat > 1:
             self._window_index = self._window_index * repeat
         if not self._window_index:
@@ -519,7 +567,8 @@ class RoboTwinDataset(BaseActionDataset):
             f"(window_stride={self.window_stride}, repeat={repeat}, "
             f"raw_window_len={self._raw_window_len}, video_stride={self.video_stride}, "
             f"→ {self.num_video_frames} video frames, "
-            f"{self.num_action_steps} action steps + 1 proprio)"
+            f"{self.num_action_steps} action steps + 1 proprio, "
+            f"growing_history={self.growing_history})"
         )
 
         # ---- Load scene_info for active arm detection ----
@@ -641,9 +690,14 @@ class RoboTwinDataset(BaseActionDataset):
             for _ in range(num_val_samples):
                 ep_idx = eligible_ep_indices[val_rng.randint(0, len(eligible_ep_indices) - 1)]
                 ep_len = self._episode_lengths[ep_idx]
-                max_start = max(0, ep_len - self._raw_window_len)
-                start_idx = val_rng.randint(0, max_start)
-                self._val_samples.append((ep_idx, start_idx))
+                if self.growing_history:
+                    # Anchor at frame 0; sample a variable history length k.
+                    k = val_rng.randint(self.history_min_frames, ep_len)
+                    self._val_samples.append((ep_idx, 0, k))
+                else:
+                    max_start = max(0, ep_len - self._raw_window_len)
+                    start_idx = val_rng.randint(0, max_start)
+                    self._val_samples.append((ep_idx, start_idx, self._raw_window_len))
             print(f"  Val: {len(self._val_samples)} fixed samples")
         elif split == "val":
             print(f"  Val: exhaustive windows ({len(self._window_index)} samples)")
@@ -693,7 +747,8 @@ class RoboTwinDataset(BaseActionDataset):
         cams = ",".join(self.cameras) if self.multiview else str(self.target_camera)
         return (
             f"nf={self.num_frames};vs={self.video_stride};nvf={self.num_video_frames};"
-            f"h={self.height};w={self.width};mv={int(self.multiview)};cams={cams}"
+            f"h={self.height};w={self.width};mv={int(self.multiview)};cams={cams};"
+            f"grow={int(self.growing_history)}"
         )
 
     @property
@@ -844,7 +899,63 @@ class RoboTwinDataset(BaseActionDataset):
             return self._read_eef_actions(f, start, end)
         return f["joint_action/vector"][start:end].astype(np.float32)
 
-    def _build_sample(self, ep_idx: int, start: int) -> dict:
+    def _max_raw_window_on_grid(self, max_ep_len: int) -> int:
+        """Smallest raw window length >= the longest episode that lands on the
+        video-stride grid and satisfies the encoder temporal-divisibility rule.
+
+        Growing-history pads every clip to this single max-T so batches stack;
+        GDN is causal, so the tail pad never corrupts the real leading frames.
+        """
+        L = max(self.history_min_frames, int(max_ep_len))
+        # (L-1) must be divisible by video_stride (clean subsample grid), and the
+        # resulting num_video_frames must pass _check_temporal_divisibility.
+        for cand in range(L, L + self.video_stride * self.temporal_compression + 1):
+            if (cand - 1) % self.video_stride != 0:
+                continue
+            nvf = len(range(0, cand, self.video_stride))
+            try:
+                _check_temporal_divisibility(nvf, self.temporal_compression, self.causal_temporal)
+            except ValueError:
+                continue
+            return cand
+        raise ValueError(
+            f"Could not find a valid growing-history raw_window_len near {L} "
+            f"(video_stride={self.video_stride}, temporal_compression={self.temporal_compression})."
+        )
+
+    def _video_len_to_latent(self, num_video_frames: int) -> int:
+        """Latent temporal length for a given number of (causal-VAE) video frames."""
+        if self.causal_temporal:
+            return 1 + max(0, num_video_frames - 1) // self.temporal_compression
+        return max(1, num_video_frames // self.temporal_compression)
+
+    def _sample_clean_prefix_latent(self, ep_idx: int, logical_len: int, actual_valid_len: int) -> int:
+        """Pick a chunk-aligned clean-prefix length P_lat (in latent frames).
+
+        Frames [0, P_lat) are treated as real, clean observed history (sigma=0,
+        unsupervised) at training time, mirroring streaming inference where the
+        observed past is clean and only the future is denoised. P_lat varies per
+        sample on the GDN chunk grid, with >=1 clean chunk and >=1 supervised
+        chunk. Returns 0 for the bootstrap case (history shorter than one chunk),
+        where only the frame-0 TI2V pin applies and the whole clip is supervised.
+        Non-growing datasets always return 0 (legacy frame-0-only behavior).
+        """
+        if not self.growing_history:
+            return 0
+        # Valid video frames within this sample's logical history.
+        valid_video = len([idx for idx in self._video_sample_indices if idx < actual_valid_len])
+        t_lat_valid = self._video_len_to_latent(valid_video)
+        chunk = self.gdn_chunk_size
+        # Need at least one clean chunk AND one supervised chunk.
+        max_clean_chunks = (t_lat_valid - chunk) // chunk  # leave >=1 chunk to supervise
+        if max_clean_chunks < 1:
+            return 0
+        # Deterministic per-sample RNG: reproducible in train, fixed in val.
+        rng = random.Random(f"{ep_idx}:{int(logical_len)}:{int(self.split == 'val')}")
+        c = rng.randint(1, max_clean_chunks)
+        return c * chunk
+
+    def _build_sample(self, ep_idx: int, start: int, logical_len: Optional[int] = None) -> dict:
         """Assemble a single sample at (ep_idx, start).
 
         - ``num_frames``: raw HDF5 window length (state/action rate).
@@ -852,6 +963,10 @@ class RoboTwinDataset(BaseActionDataset):
         - State/action stay at raw rate.
         - ``proprio = raw_actions[0:1]`` (time dim kept).
         - ``action = raw_actions[1:num_frames]`` (length ``num_frames-1``).
+
+        ``logical_len`` (growing-history) caps the number of frames treated as
+        *valid* (the rest read as padding via the masks), so a fixed max-T
+        buffer realizes a variable history length. Defaults to the full window.
         """
         path = self._episode_files[ep_idx]
         ep_len = self._episode_lengths[ep_idx]
@@ -860,12 +975,19 @@ class RoboTwinDataset(BaseActionDataset):
         actual_raw_end = min(raw_end, ep_len)
         actual_raw_len = max(0, actual_raw_end - start)
 
+        # Growing-history: frames beyond the per-sample logical length are
+        # treated as padding (masked out of the loss), even though the buffer is
+        # read+padded to the full raw_window_len so batches stack uniformly.
+        if logical_len is None:
+            logical_len = self._raw_window_len
+        actual_valid_len = min(actual_raw_len, max(0, int(logical_len)))
+
         if actual_raw_len <= 0:
             raise IndexError(f"Window [{start}, {raw_end}) has no frames (ep_len={ep_len}).")
-        if actual_raw_len < 2:
+        if actual_valid_len < 2:
             raise IndexError(
-                f"Window [{start}, {raw_end}) has no valid action label "
-                f"(actual_raw_len={actual_raw_len}, ep_len={ep_len})."
+                f"Window [{start}, {raw_end}) logical_len={logical_len} has no valid action label "
+                f"(actual_valid_len={actual_valid_len}, ep_len={ep_len})."
             )
 
         with h5py.File(path, "r") as f:
@@ -897,14 +1019,18 @@ class RoboTwinDataset(BaseActionDataset):
         action_np = raw_actions[1 : self.num_frames].astype(np.float32)
 
         video_mask = torch.tensor(
-            [idx < actual_raw_len for idx in self._video_sample_indices],
+            [idx < actual_valid_len for idx in self._video_sample_indices],
             dtype=torch.bool,
         )
         action_mask = torch.tensor(
-            [(t + 1) < actual_raw_len for t in range(self.num_action_steps)],
+            [(t + 1) < actual_valid_len for t in range(self.num_action_steps)],
             dtype=torch.bool,
         )
-        proprio_mask = torch.tensor([0 < actual_raw_len], dtype=torch.bool)
+        proprio_mask = torch.tensor([0 < actual_valid_len], dtype=torch.bool)
+
+        # Clean-prefix length (latent frames) the model conditions on as real,
+        # unsupervised history — matches the streaming-inference distribution.
+        num_clean_prefix_latent = self._sample_clean_prefix_latent(ep_idx, logical_len, actual_valid_len)
 
         # Step-0-only by design: drop "hasn't-started-yet" windows, not
         # tail windows where the first action label is padding.
@@ -937,6 +1063,7 @@ class RoboTwinDataset(BaseActionDataset):
             "proprio": proprio_tensor,
             "proprio_mask": proprio_mask,
             "proprio_seq": proprio_seq_tensor,
+            "num_clean_prefix_latent": num_clean_prefix_latent,
             "prompt": prompt,
             "episode_index": ep_idx,
             "episode_path": path,
@@ -950,11 +1077,11 @@ class RoboTwinDataset(BaseActionDataset):
 
     def __getitem__(self, idx):
         if self._val_samples is not None:
-            ep_idx, start = self._val_samples[idx]
+            ep_idx, start, logical_len = self._val_samples[idx]
         else:
-            ep_idx, start = self._window_index[idx]
+            ep_idx, start, logical_len = self._window_index[idx]
 
-        sample = self._build_sample(ep_idx, start)
+        sample = self._build_sample(ep_idx, start, logical_len)
 
         # Training-only: resample on static segments (keep val deterministic)
         if (
@@ -965,8 +1092,8 @@ class RoboTwinDataset(BaseActionDataset):
         ):
             for _ in range(self._max_static_retry):
                 rand_idx = random.randint(0, len(self._window_index) - 1)
-                ep_idx2, start2 = self._window_index[rand_idx]
-                alt = self._build_sample(ep_idx2, start2)
+                ep_idx2, start2, logical_len2 = self._window_index[rand_idx]
+                alt = self._build_sample(ep_idx2, start2, logical_len2)
                 if not alt["_is_static"]:
                     sample = alt
                     break
@@ -1074,6 +1201,10 @@ class MultiTaskRoboTwinDataset(BaseActionDataset):
             vae_cache_dir=_get("vae_cache_dir", None),
             temporal_compression=int(_get("temporal_compression", 4)),
             causal_temporal=bool(_get("causal_temporal", True)),
+            growing_history=bool(_get("growing_history", False)),
+            history_min_frames=int(_get("history_min_frames", 1)),
+            history_stride=int(_get("history_stride", 1)),
+            gdn_chunk_size=int(_get("gdn_chunk_size", 1)),
         )
 
     def __init__(

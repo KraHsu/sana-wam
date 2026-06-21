@@ -593,6 +593,7 @@ class BaseWAMArchitecture(ABC, nn.Module):
         all_proprio_seqs: list = []
         all_action_masks: list = []
         all_video_masks: list = []
+        all_clean_prefix: list = []
 
         for sample in samples:
             all_frames.append(sample["video"])
@@ -640,6 +641,7 @@ class BaseWAMArchitecture(ABC, nn.Module):
                 vmask = torch.from_numpy(vmask)
             all_action_masks.append(amask)
             all_video_masks.append(vmask)
+            all_clean_prefix.append(int(sample.get("num_clean_prefix_latent", 0) or 0))
 
         ref_flags = [r is not None for r in all_ref_images]
         if any(ref_flags) and not all(ref_flags):
@@ -756,6 +758,16 @@ class BaseWAMArchitecture(ABC, nn.Module):
                 for m in all_video_masks
             ]
             inputs["video_is_pad"] = torch.stack(latent_masks, dim=0).to(device=_device)
+
+        # Per-sample clean-prefix length (in latent frames) for growing-history
+        # training. Consumed ONLY by compute_loss (sigma=0 + unsupervised mask on
+        # the prefix); deliberately NOT routed to the backbone forward, which
+        # would trip SANA's per-frame t-mod reshape path. Always present (0 in
+        # the legacy fixed-window path → frame-0-only clean prefix).
+        if any(p > 0 for p in all_clean_prefix):
+            inputs["num_clean_prefix_frames"] = torch.tensor(
+                all_clean_prefix, dtype=torch.long, device=_device
+            )
 
         return inputs
 
