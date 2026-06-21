@@ -83,6 +83,11 @@ class WAMPolicy:
 
         history_len = getattr(cfg, "history_len", 10)
         self.obs_history: deque = deque(maxlen=history_len)
+        # Executed-action history (Design B clean action prefix): the actions actually
+        # sent to the env, oldest→newest. The cross-attn streaming engine pins these as
+        # a clean prefix so the policy conditions on the real executed past. Like
+        # obs_history, history_len must span the training window to reach episode start.
+        self.action_history: deque = deque(maxlen=history_len)
 
         # Receding-horizon config
         self.execute_horizon: Optional[int] = getattr(cfg, "execute_horizon", None)
@@ -132,6 +137,7 @@ class WAMPolicy:
             self._steps_since_generate = 0
 
         action = self._action_buffer.popleft()
+        self.action_history.append(action)  # executed → clean action prefix next gen
         self._current_step += 1
         self._steps_since_generate += 1
         return action
@@ -204,6 +210,7 @@ class WAMPolicy:
         self._action_buffer.clear()
         self._ensemble_buffer.clear()
         self.obs_history.clear()
+        self.action_history.clear()
         self._current_step = 0
         self._steps_since_generate = 0
         if self._async_executor is not None:
@@ -234,6 +241,7 @@ class WAMPolicy:
         conditions = {
             "observation": obs,
             "obs_history": list(self.obs_history),
+            "action_history": list(self.action_history),  # executed past → clean action prefix
         }
         img = obs.get("image")
         if img is not None:

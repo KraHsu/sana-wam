@@ -22,6 +22,18 @@ model:
     # Action-side attention geometry (independent of the GDN video head_dim=112).
     dim: 1152
     num_heads: 16
+    # Clean ACTION prefix (Design B): condition the action stream on the executed-past
+    # actions. Action tokens [0, k) (the actions up to the current frame) are pinned
+    # clean (sigma=0) and dropped from the loss — mirroring the video TI2V clean prefix
+    # — so the model learns to predict future actions from the real past ones. k is the
+    # same boundary as the proprio/video prefix (num_clean_prefix_actions from the
+    # growing-history dataloader). At deploy the streaming engine pins the robot's
+    # executed actions there. Requires growing_history.
+    action_clean_prefix: true
+    # Teacher-forcing robustness: with this prob drop the action prefix per sample
+    # (train without it) so the model stays robust to missing/imperfect history and
+    # the episode-0 bootstrap, narrowing the train↔deploy (executed-action) gap.
+    action_prefix_dropout: 0.3
 
   video_backbone:
     name: sana_video_2b

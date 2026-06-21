@@ -1086,6 +1086,13 @@ class RoboTwinDataset(BaseActionDataset):
             "proprio_mask": proprio_mask,
             "proprio_seq": proprio_seq_tensor,
             "num_clean_prefix_latent": num_clean_prefix_latent,
+            # Clean ACTION prefix length (in action tokens). Action token t is the
+            # action into raw frame t+1, so the executed past = tokens [0, cur_raw)
+            # (the actions leading up to the current frame). Tied to the same boundary
+            # as the proprio (current state) and video prefix. Consumed by compute_loss
+            # to pin these tokens clean (conditioning) and drop them from the action
+            # loss. 0 in the legacy/non-growing path.
+            "num_clean_prefix_actions": int(cur_raw),
             "prompt": prompt,
             "episode_index": ep_idx,
             "episode_path": path,

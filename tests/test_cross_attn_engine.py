@@ -151,6 +151,57 @@ def test_cross_attn_engine_streaming_grows_and_caps_prefix():
     assert eng._step_c == 0
 
 
+@requires_gpu
+def test_cross_attn_engine_pins_clean_action_prefix():
+    """Design B: the streaming engine pins the executed action_history as a clean
+    action prefix and slices the future after it."""
+    from omegaconf import OmegaConf
+
+    from sana_wam.deploy.cross_attn_engine import CrossAttnInferenceEngine
+
+    dev, dt = torch.device("cuda"), torch.bfloat16
+    arch = _build_arch(dev, dt)
+    arch._action_clean_prefix = True  # engine gates on this (set when trained Design B)
+
+    cfg = OmegaConf.create({
+        "inference": {"denoise_steps": 2, "seed": 0, "num_frames": 9, "action_tokens": 8,
+                      "streaming": True, "predict_horizon_frames": 1},
+        "dataloader": {"num_frames": 9, "video_stride": 1},
+    })
+    eng = CrossAttnInferenceEngine(cfg=cfg, architecture=arch)
+    ctx = torch.randn(1, 8, 64, device=dev, dtype=dt)
+    seq = torch.full((1,), 8, dtype=torch.long, device=dev)
+    eng._encode_prompt = lambda p: (ctx, seq)
+    eng._prep_proprio = lambda ps: None
+    eng._encode_clip = lambda clip: torch.randn(1, 16, max(1, len(clip)), 8, 8, device=dev, dtype=dt)
+
+    captured = {}
+    orig_forward = arch.forward
+
+    def spy_forward(noisy_actions, a_ts, **kw):
+        captured.setdefault("noisy_actions", noisy_actions.detach().clone())
+        return orig_forward(noisy_actions, a_ts, **kw)
+
+    arch.forward = spy_forward
+
+    # 2 obs frames ⇒ P=2 ⇒ video boundary 4*(2-1)*1=4; 5 executed actions ⇒ k_a=5.
+    # boundary = max(5, 4) = 5 ⇒ future = actions[5:] = 3 tokens. No action_normalizer
+    # on the mini arch ⇒ pinned values equal the raw action_history.
+    history = [np.full(20, float(i), dtype=np.float32) for i in range(5)]
+    cond = {
+        "prompt": "x",
+        "obs_history": [{"image": object()} for _ in range(2)],
+        "action_history": history,
+    }
+    out = eng.generate(cond)
+
+    na = captured["noisy_actions"].float()
+    for i in range(5):  # tokens [0,5) pinned to the executed actions, in order
+        assert torch.allclose(na[0, i], torch.full((20,), float(i), device=dev), atol=1e-2)
+    assert not torch.allclose(na[0, 5], torch.full((20,), 5.0, device=dev), atol=1e-2)  # token 5 noised
+    assert out["actions"].shape == (3, 20)  # future sliced at boundary 5
+
+
 def test_build_obs_clip_anchors_at_frame0_and_caps():
     """Pure index/cadence logic for the streaming obs clip (no GPU/VAE needed)."""
     from sana_wam.deploy.cross_attn_engine import CrossAttnInferenceEngine

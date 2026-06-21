@@ -100,6 +100,10 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         self._obs_latents: Optional[torch.Tensor] = None  # (1, C, P, Hl, Wl) last pinned prefix (debug)
         self._warned_overlong = False
         self._step_c = 0
+        # Design B: pin the executed-past actions as a clean prefix so the model
+        # conditions on them. Gated on the architecture flag (set only when the
+        # checkpoint was trained with action_clean_prefix); otherwise legacy behavior.
+        self._action_clean_prefix = bool(getattr(arch, "_action_clean_prefix", False))
 
         self._prompt_ctx_cache: "OrderedDict[str, tuple[torch.Tensor, torch.Tensor]]" = OrderedDict()
         self._gen = torch.Generator(device=self._device).manual_seed(self._seed)
@@ -159,10 +163,23 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         v_ts, a_ts = vb.scheduler.timesteps, ab.scheduler.timesteps
         n_steps = min(len(v_ts), len(a_ts))
 
+        # Clean action prefix (Design B): the executed past actions, re-normalized.
+        # Pin them so the action stream conditions on the real past (mirrors the video
+        # clean prefix). k_a = number of executed actions (capped to leave a future);
+        # 0 at episode start (bootstrap) ⇒ no action prefix.
+        act_prefix = (
+            self._prep_action_prefix(conditions, atok)
+            if (self._streaming and self._action_clean_prefix)
+            else None
+        )
+        k_a = act_prefix.shape[1] if act_prefix is not None else 0
+
         # Init: pure noise (sigma≈1); pin the clean prefix [0, P) = observed history.
         video = torch.randn(B, C, T, Hl, Wl, generator=self._gen, device=self._device, dtype=self._dtype)
         actions = torch.randn(B, atok, self._action_dim, generator=self._gen, device=self._device, dtype=self._dtype)
         video[:, :, :P] = prefix  # TI2V clean prefix (observed history)
+        if k_a > 0:
+            actions[:, :k_a] = act_prefix  # clean action prefix (executed past)
 
         for i in range(n_steps):
             # Cast timesteps to the model dtype: TimestepEmbedding's sinusoid
@@ -185,14 +202,17 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
             video = video + v_pred.to(self._dtype) * v_dsig
             actions = actions + a_pred.to(self._dtype) * a_dsig
             video[:, :, :P] = prefix  # re-pin the clean observed history
+            if k_a > 0:
+                actions[:, :k_a] = act_prefix  # re-pin the clean action prefix
 
-        # Streaming: the action trajectory is anchored at episode frame 0, but action
-        # steps [0, boundary) lead up to the current state (the observed past, already
-        # executed). Return only the FUTURE actions so the policy executes from "now"
-        # (actions[0] = next action), matching the training action clean-prefix mask.
-        # boundary = raw step of the latest observed frame = tc*(P-1)*video_stride.
+        # Streaming: the action trajectory is anchored at episode frame 0, but the
+        # leading steps lead up to the current state (the observed/executed past).
+        # Return only the FUTURE actions so the policy executes from "now"
+        # (actions[0] = next action). The boundary is where the past ends: the pinned
+        # action prefix k_a if present, else the video boundary tc*(P-1)*video_stride.
         if self._streaming:
-            boundary = min(4 * (P - 1) * self._video_stride, actions.shape[1] - 1)
+            boundary = max(k_a, 4 * (P - 1) * self._video_stride)
+            boundary = min(boundary, actions.shape[1] - 1)
             if boundary > 0:
                 actions = actions[:, boundary:]
 
@@ -240,6 +260,32 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         return torch.from_numpy(np.asarray(norm, dtype=np.float32)).to(
             device=self._device, dtype=self._dtype
         ).unsqueeze(0)
+
+    def _prep_action_prefix(self, conditions: dict, atok: int) -> Optional[torch.Tensor]:
+        """Executed-past actions → clean action prefix ``(1, k_a, action_dim)``.
+
+        ``conditions['action_history']`` is the actions the policy sent to the env
+        (oldest→newest, raw/unnormalized scale). Re-normalize into the model's
+        training space (the inverse of the ``action_normalizer.unnormalize`` applied
+        to the engine's output) and align token i ↔ the i-th executed action (token i
+        is the action into frame i+1, anchored at episode frame 0 — which requires
+        ``history_len`` to span the episode). Cap ``k_a`` to leave >=1 future token;
+        returns None when no history (episode-start bootstrap)."""
+        hist = conditions.get("action_history") or []
+        if not hist:
+            return None
+        arr = np.asarray(hist, dtype=np.float32)
+        if arr.ndim == 1:
+            arr = arr.reshape(1, -1)
+        k_a = min(arr.shape[0], max(0, int(atok) - 1))  # keep at least one future token
+        if k_a <= 0:
+            return None
+        arr = arr[:k_a]
+        normalizer = getattr(self.architecture, "action_normalizer", None)
+        if normalizer is not None:
+            arr = np.asarray(normalizer.normalize(arr), dtype=np.float32)
+        t = torch.from_numpy(np.ascontiguousarray(arr)).to(device=self._device, dtype=self._dtype)
+        return t.unsqueeze(0)  # (1, k_a, action_dim)
 
     def _recent_frames(self, conditions: dict) -> list:
         frames = [

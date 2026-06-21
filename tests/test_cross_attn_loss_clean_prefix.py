@@ -114,3 +114,88 @@ def test_compute_loss_without_prefix_field_is_frame0_only():
     # frame 0 clean, rest noised (legacy behavior preserved)
     assert torch.allclose(noisy[0, :, :1], cv[0, :, :1], atol=1e-2)
     assert not torch.allclose(noisy[0, :, 1:], cv[0, :, 1:], atol=1e-2)
+
+
+def _spy(arch, captured):
+    """Spy arch.forward (capture noisy_actions/video) + _dual_mse (capture action_is_pad)."""
+    orig_forward = arch.forward
+
+    def spy_forward(noisy_actions, a_ts, *, latents=None, **kw):
+        captured["noisy_actions"] = noisy_actions.detach().clone()
+        return orig_forward(noisy_actions, a_ts, latents=latents, **kw)
+
+    arch.forward = spy_forward
+    orig_dual = type(arch)._dual_mse
+    arch._dual_mse = lambda *a, **kw: (
+        captured.update(action_is_pad=kw.get("action_is_pad")) or orig_dual(*a, **kw)
+    )
+
+
+@requires_gpu
+def test_action_clean_prefix_pins_past_actions_and_drops_from_loss():
+    """Design B: action tokens [0, k_a) are pinned clean (conditioning) and excluded
+    from the action loss; the rest are noised + supervised."""
+    dev, dt = torch.device("cuda"), torch.bfloat16
+    arch = _build_arch(dev, dt)
+    arch._action_clean_prefix = True
+    arch._action_prefix_dropout = 0.0
+    arch.eval()  # no dropout regardless
+
+    B, atok = 2, 8
+    clean_video = torch.randn(B, 16, 9, 8, 8, device=dev, dtype=dt)
+    actions = torch.randn(B, atok, 20, device=dev, dtype=dt)
+    ctx = torch.randn(B, 8, 64, device=dev, dtype=dt)
+    seq = torch.full((B,), 8, dtype=torch.long, device=dev)
+    # sample 0: no action prefix (k_a=0); sample 1: first 3 actions observed (k_a=3)
+    ncpa = torch.tensor([0, 3], dtype=torch.long, device=dev)
+
+    captured = {}
+    _spy(arch, captured)
+    inputs = {"input_latents": clean_video, "context": ctx, "seq_lens": seq,
+              "num_clean_prefix_actions": ncpa}
+    out = arch.compute_loss(actions=actions, lambda_video=1.0, lambda_action=1.0, **inputs)
+    assert torch.isfinite(out["loss"]).all()
+
+    na = captured["noisy_actions"].float()
+    a = actions.float()
+    # sample 1: tokens [0,3) pinned == clean; [3,atok) noised
+    assert torch.allclose(na[1, :3], a[1, :3], atol=1e-2)
+    assert not torch.allclose(na[1, 3:], a[1, 3:], atol=1e-2)
+    # sample 0: nothing pinned (all noised)
+    assert not torch.allclose(na[0], a[0], atol=1e-2)
+
+    aip = captured["action_is_pad"]
+    assert aip is not None and tuple(aip.shape) == (B, atok)
+    assert not aip[0].any()           # sample 0: nothing masked
+    assert aip[1, :3].all()           # sample 1: prefix excluded from loss
+    assert not aip[1, 3:].any()
+
+
+@requires_gpu
+def test_action_prefix_dropout_disables_pin_and_mask():
+    """With dropout=1.0 every sample trains without the action prefix (Design A)."""
+    dev, dt = torch.device("cuda"), torch.bfloat16
+    arch = _build_arch(dev, dt)
+    arch._action_clean_prefix = True
+    arch._action_prefix_dropout = 1.0
+    arch.train()  # dropout active
+
+    B, atok = 2, 8
+    clean_video = torch.randn(B, 16, 9, 8, 8, device=dev, dtype=dt)
+    actions = torch.randn(B, atok, 20, device=dev, dtype=dt)
+    ctx = torch.randn(B, 8, 64, device=dev, dtype=dt)
+    seq = torch.full((B,), 8, dtype=torch.long, device=dev)
+    ncpa = torch.tensor([3, 5], dtype=torch.long, device=dev)
+
+    captured = {}
+    _spy(arch, captured)
+    inputs = {"input_latents": clean_video, "context": ctx, "seq_lens": seq,
+              "num_clean_prefix_actions": ncpa}
+    arch.compute_loss(actions=actions, lambda_video=1.0, lambda_action=1.0, **inputs)
+
+    na = captured["noisy_actions"].float()
+    a = actions.float()
+    assert not torch.allclose(na[0, :3], a[0, :3], atol=1e-2)  # not pinned (dropped)
+    assert not torch.allclose(na[1, :5], a[1, :5], atol=1e-2)
+    aip = captured["action_is_pad"]
+    assert aip is None or not aip.any()  # nothing excluded from loss

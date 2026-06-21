@@ -38,6 +38,10 @@ class DualSystemCrossAttnArchitecture(BaseWAMArchitecture):
     def __init__(self, cfg=None):
         super().__init__(cfg)
         self._cross_cfg: dict = {}
+        # Design B: condition the action stream on the executed-past clean action
+        # prefix (mirrors the video TI2V clean prefix). Off ⇒ legacy behavior.
+        self._action_clean_prefix: bool = False
+        self._action_prefix_dropout: float = 0.0
         if cfg is None:
             return
         cfg = dict(cfg) if isinstance(cfg, dict) else {k: v for k, v in cfg.items()}
@@ -62,6 +66,8 @@ class DualSystemCrossAttnArchitecture(BaseWAMArchitecture):
         video_dim = self._resolve_video_dim(cfg)
         text_dim = self._resolve_text_dim(cfg)
         self._init_proprio_context(cfg, text_dim=text_dim)
+        self._action_clean_prefix = bool(cfg.get("action_clean_prefix", False))
+        self._action_prefix_dropout = float(cfg.get("action_prefix_dropout", 0.0) or 0.0)
 
         action_dim_hidden = int(cfg.get("dim", 1024))
         num_heads = int(cfg.get("num_heads", 16))
@@ -221,7 +227,28 @@ class DualSystemCrossAttnArchitecture(BaseWAMArchitecture):
         a_sigma = a_scheduler.sigmas[a_ids].to(device=device, dtype=dtype)  # (B,)
         a_ts_val = a_scheduler.timesteps[a_ids].to(device=device, dtype=dtype)  # (B,)
         a_noise = torch.randn_like(actions)
-        noisy_actions = (1 - a_sigma.view(B, 1, 1)) * actions + a_sigma.view(B, 1, 1) * a_noise
+        # (B, Ta, 1) per-token sigma so the clean action prefix can differ from the rest.
+        a_sigma_t = a_sigma.view(B, 1, 1).expand(B, Ta, 1).clone()
+        # Design B clean action prefix: action tokens [0, k_a) are the executed past;
+        # pin them clean (sigma=0 ⇒ noisy == clean) so the action stream CONDITIONS on
+        # the real past actions (full self-attention lets future tokens read them),
+        # then exclude them from the loss below — mirroring the video TI2V clean prefix
+        # and matching streaming inference where the engine pins the executed actions.
+        # Prefix dropout (teacher-forcing robustness): with prob ``action_prefix_dropout``
+        # zero k_a for a sample so it trains without a pinned prefix (Design A fallback),
+        # keeping the model robust to missing/imperfect history + the episode-0 bootstrap.
+        a_clean_mask = None
+        ncpa = inputs.get("num_clean_prefix_actions")
+        if self._action_clean_prefix and ncpa is not None and Ta > 0:
+            k_a = ncpa.to(device=device, dtype=torch.long).clamp(min=0, max=Ta)  # (B,)
+            if self.training and self._action_prefix_dropout > 0.0:
+                drop = torch.rand(B, device=device) < self._action_prefix_dropout
+                k_a = torch.where(drop, torch.zeros_like(k_a), k_a)
+            a_clean_mask = torch.arange(Ta, device=device).view(1, Ta) < k_a.view(B, 1)  # (B, Ta)
+            a_sigma_t = torch.where(
+                a_clean_mask.unsqueeze(-1), torch.zeros_like(a_sigma_t), a_sigma_t
+            )
+        noisy_actions = (1 - a_sigma_t) * actions + a_sigma_t * a_noise
         # Route through the scheduler for the same reason as the video target above
         # (currently noise - original). The action scheduler takes no timestep arg.
         a_target = a_scheduler.training_target(actions, a_noise)
@@ -260,11 +287,21 @@ class DualSystemCrossAttnArchitecture(BaseWAMArchitecture):
             # clean_mask (B, T) was built above from the per-sample prefix lengths.
             video_is_pad = video_is_pad | clean_mask
 
+        # Exclude the clean action prefix from the action loss (it's given clean
+        # conditioning, not a denoising target) — mirrors video_is_pad. a_clean_mask
+        # (B, Ta) was built above (post-dropout), or None when the feature is off.
+        action_is_pad = inputs.get("action_is_pad")
+        if a_clean_mask is not None:
+            if action_is_pad is None:
+                action_is_pad = a_clean_mask
+            else:
+                action_is_pad = action_is_pad.bool().to(device) | a_clean_mask
+
         return self._dual_mse(
             v_pred, v_target, a_pred, a_target,
             vb=vb, v_ids=v_ids, T=T, B=B,
             lambda_video=lambda_video, lambda_action=lambda_action,
-            action_is_pad=inputs.get("action_is_pad"),
+            action_is_pad=action_is_pad,
             video_is_pad=video_is_pad,
             device=device,
         )

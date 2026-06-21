@@ -594,6 +594,7 @@ class BaseWAMArchitecture(ABC, nn.Module):
         all_action_masks: list = []
         all_video_masks: list = []
         all_clean_prefix: list = []
+        all_clean_prefix_actions: list = []
 
         for sample in samples:
             all_frames.append(sample["video"])
@@ -642,6 +643,7 @@ class BaseWAMArchitecture(ABC, nn.Module):
             all_action_masks.append(amask)
             all_video_masks.append(vmask)
             all_clean_prefix.append(int(sample.get("num_clean_prefix_latent", 0) or 0))
+            all_clean_prefix_actions.append(int(sample.get("num_clean_prefix_actions", 0) or 0))
 
         ref_flags = [r is not None for r in all_ref_images]
         if any(ref_flags) and not all(ref_flags):
@@ -767,6 +769,14 @@ class BaseWAMArchitecture(ABC, nn.Module):
         if any(p > 0 for p in all_clean_prefix):
             inputs["num_clean_prefix_frames"] = torch.tensor(
                 all_clean_prefix, dtype=torch.long, device=_device
+            )
+
+        # Per-sample clean-prefix length in ACTION tokens (growing-history, Design B):
+        # tokens [0, k) are the observed/executed past actions; compute_loss pins them
+        # clean (conditioning) and excludes them from the action loss. Absent ⇒ 0.
+        if any(p > 0 for p in all_clean_prefix_actions):
+            inputs["num_clean_prefix_actions"] = torch.tensor(
+                all_clean_prefix_actions, dtype=torch.long, device=_device
             )
 
         return inputs
