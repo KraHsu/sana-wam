@@ -148,6 +148,7 @@ class BridgeCrossAttention(nn.Module):
         attn_head_dim: int,
         eps: float = 1e-6,
         kv_hidden_dim: Optional[int] = None,
+        norm_kv_input: bool = False,
     ):
         super().__init__()
         kv_hidden_dim = kv_hidden_dim if kv_hidden_dim is not None else hidden_dim
@@ -163,8 +164,19 @@ class BridgeCrossAttention(nn.Module):
         self.o = nn.Linear(self.attn_hidden_dim, hidden_dim)
         self.norm_q = RMSNorm(self.attn_hidden_dim, eps=eps)
         self.norm_k = RMSNorm(self.attn_hidden_dim, eps=eps)
+        # Normalize the KV *source* before q/k/v projection. norm_k only tames the
+        # K path (post-projection); V is left raw. That is fine when the KV source
+        # is O(1) (GDN features, text/proprio context), but the pretrained
+        # linear-attn SANA-Video backbone emits pre-final-norm hidden states with
+        # magnitude ~1e9, so the unnormalized V projection blows the action loss up
+        # to ~2.5e7. An input RMSNorm on the KV source fixes both K and V at once
+        # and is a no-op-ish unit-RMS rescale for already-O(1) sources. Off by
+        # default so context/GDN-O(1) bridges keep their exact parameter set.
+        self.norm_kv = RMSNorm(kv_hidden_dim, eps=eps) if norm_kv_input else None
 
     def forward(self, x_action: torch.Tensor, x_video: torch.Tensor, ctx_mask: Optional[torch.Tensor] = None):
+        if self.norm_kv is not None:
+            x_video = self.norm_kv(x_video)
         q = self.norm_q(self.q(x_action))
         k = self.norm_k(self.k(x_video))
         v = self.v(x_video)
@@ -209,7 +221,13 @@ class CrossAttnActionDiTBlock(nn.Module):
         self.self_attn = ActionSelfAttention(hidden_dim, num_heads, attn_head_dim, eps)
         self.self_attn_norm = nn.LayerNorm(hidden_dim, eps=eps, elementwise_affine=False)
 
-        self.cross_attn = BridgeCrossAttention(hidden_dim, num_heads, attn_head_dim, eps, kv_hidden_dim=kv_hidden_dim)
+        # Video bridge: KV source is the backbone's per-block hidden states, whose
+        # magnitude is backbone-dependent (~O(1) for GDN, ~1e9 for the pretrained
+        # linear-attn SANA-Video DiT). Normalize the KV source so the bridge is
+        # robust to either — see BridgeCrossAttention.norm_kv.
+        self.cross_attn = BridgeCrossAttention(
+            hidden_dim, num_heads, attn_head_dim, eps, kv_hidden_dim=kv_hidden_dim, norm_kv_input=True
+        )
         self.bridge_attn_norm = nn.LayerNorm(hidden_dim, eps=eps, elementwise_affine=False)
 
         self.context_attn = BridgeCrossAttention(

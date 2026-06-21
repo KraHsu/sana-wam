@@ -1,0 +1,117 @@
+# Option A: FROZEN pretrained SANA-Video 2B (linear-attn) backbone + trainable
+# cross-attn action bridge. The fastest, lowest-risk bet to break 0% on lift_pot:
+# the from-scratch 2B GDN video model was scale-mismatched for ~50 demos, so its
+# bridge features were weak. Here the backbone is the published SANA-Video 480p
+# checkpoint (real pretrained FEATURES incl. attention), loaded ~fully in its
+# native linear-attn form, FROZEN; only the action bridge + proprio train.
+#
+# Architecture: variant=joint_cross_attn → DualSystemCrossAttnArchitecture. The
+# cross-attn bridge is backbone-agnostic — it cross-attends to per-block hidden
+# states at hidden_size=2240 (VAE/operator-independent), so a linear-attn backbone
+# works exactly as a GDN one. Dispatch is by `variant`, not attn_kernel, so we can
+# pair joint_cross_attn with a linear_relu backbone. The GDN-load guard
+# (pipeline_builder.py:605) only fires for attn_kernel=gdn, so loading the 480p
+# checkpoint here is allowed and clean (0 missing/unexpected against the preset).
+#
+#   python scripts/train.py --config configs/train_sana_frozen.yaml \
+#       dataloader.dataset_dir=/DATA/share/RoboTwin2.0/dataset \
+#       dataloader.train_tasks=[lift_pot]
+
+model:
+  architecture:
+    framework: dual_system
+    variant: joint_cross_attn        # → DualSystemCrossAttnArchitecture (cross-attn bridge)
+    action_dim: 20
+    use_proprioception: true
+    state_dim: 20
+    bridge_layers: null              # null + bridge_interval=1 → every video layer bridges
+    bridge_interval: 1
+    dim: 1152
+    num_heads: 16
+    # Clean ACTION prefix (Design B): condition the action stream on the executed-past
+    # actions (the actions up to the current frame), pinned clean + dropped from the
+    # loss. With a FROZEN backbone the action stream is the only thing learning, so the
+    # proprio + executed-action conditioning carries most of the signal.
+    action_clean_prefix: true
+    action_prefix_dropout: 0.3
+
+  video_backbone:
+    name: sana_video_2b
+    # FROZEN pretrained backbone — the whole point of Option A. linear_relu loads the
+    # published 480p checkpoint ~fully (FFN/cross-attn/embedders/attention all real).
+    model_path: /DATA/share/SANA-Video_2B_480p
+    vae_path: /DATA/share/SANA-Video_2B_480p/vae/Wan2.1_VAE.pth
+    text_encoder_name: /DATA/share/gemma-2-2b-it
+    freeze: true                     # belt: backbone built frozen (also frozen via training.freeze)
+    attn_kernel: linear_relu         # native form ⇒ checkpoint attention loads pretrained
+    # TI2V: condition on the real first frame (clean-prefix at t=0) — the world-action
+    # contract. Matches the published checkpoint's text-to-video + first-frame setup.
+    use_first_frame_cond: true
+    flow_shift: 3.0
+
+  action_backbone:
+    dim: 1152
+    ffn_dim: 4608
+
+dataloader:
+  type: robotwin
+  dataset_dir: /DATA/share/RoboTwin2.0/dataset
+  task_name: null
+  robot: aloha-agilex
+  variant: clean_50
+  action_mode: eef
+  num_frames: 81
+  video_stride: 4
+  height: 384
+  width: 320
+  split: train
+  val_ratio: 0.0
+  repeat: 1
+  window_stride: 1
+  multiview: true
+  camera_layout: [head_camera, left_camera, right_camera]
+  target_camera: head_camera
+  normalize_mode: min-max
+  filter_static_segments: true
+  static_segment_threshold: 1.0e-5
+  max_static_retry: 3
+  train_tasks: null
+  holdout_tasks: null
+  val_variant: null
+  text_embedding_cache_dir: null
+  text_embedding_dropout: 0.0
+  vae_cache_dir: null
+  # Growing-history clean-prefix so the action stream learns under any amount of
+  # observed history (matches the streaming deploy engine). gdn_chunk_size kept for
+  # the clean-prefix grid even though the linear backbone is whole-clip here.
+  growing_history: true
+  history_min_frames: 21
+  history_stride: 8
+  gdn_chunk_size: 3
+
+training:
+  output_dir: outputs/sana_frozen
+  max_steps: 8000              # action-bridge-only on a frozen 2B → converges fast
+  save_steps: 1000
+  keep_last_k: 20
+  batch_size: 1
+  gradient_accumulation_steps: 1
+  num_workers: 6
+  # Backbone is frozen, so only the action bridge + proprio train. video_lr is moot
+  # (no video grad) but kept for the optimizer-group plumbing.
+  video_lr: 1.0e-4
+  action_lr: 1.0e-4
+  weight_decay: 0.0
+  grad_clip: 1.0
+  warmup_steps: 50
+  # Backbone frozen ⇒ no video objective to balance; action is the only loss that
+  # updates weights. Keep a small video term for monitoring only.
+  lambda_video: 0.0
+  lambda_action: 1.0
+  use_gradient_checkpointing: true
+  # FREEZE the pretrained video DiT (the Option-A core). Note the registered child
+  # path is video_backbone.dit (NOT _pipe.vae). The VAE is already frozen at build.
+  freeze: [video_backbone.dit, video_backbone._pipe.vae]
+  deepspeed: null
+  seed: 0
+  debug: false
