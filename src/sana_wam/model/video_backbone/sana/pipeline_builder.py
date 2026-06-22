@@ -664,6 +664,17 @@ def _build_pipe_from_spec(
     )
     if spec.attn_kernel == "gdn":
         model_kwargs.setdefault("chunk_size", spec.chunk_size)
+    # VAE-driven in_channels: the LTX2 latent is 128ch, so the DiT patch-embedder
+    # must accept 128. The pretrained SANA-WM preset already sets this; force it
+    # for any ltx2 build so a misconfig (ltx2 VAE + from-scratch 16ch DiT) fails
+    # at construction with a clear cause instead of a downstream shape error.
+    if spec.vae_type == "ltx2" and int(model_kwargs.get("in_channels", 16)) != 128:
+        logger.info(
+            "vae_type=ltx2: forcing DiT in_channels=128 (was %s) to match the "
+            "128-channel LTX2 latent.",
+            model_kwargs.get("in_channels"),
+        )
+        model_kwargs["in_channels"] = 128
     dit = factory(**model_kwargs)
 
     # Close the dead config path: blocks_split / GDN honor getattr(attn,

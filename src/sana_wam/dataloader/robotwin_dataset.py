@@ -336,6 +336,7 @@ class RoboTwinDataset(BaseActionDataset):
         vae_cache_dir: Optional[str] = None,
         temporal_compression: int = 4,
         causal_temporal: bool = True,
+        vae_type: str = "wan",
         growing_history: bool = False,
         history_min_frames: int = 1,
         history_stride: int = 1,
@@ -347,6 +348,11 @@ class RoboTwinDataset(BaseActionDataset):
         self.action_mode = action_mode
         self.temporal_compression = int(temporal_compression)
         self.causal_temporal = bool(causal_temporal)
+        # VAE family — decides spatial downsample (wan=8, ltx2=32) and latent
+        # channels (wan=16, ltx2=128). Used for the resolution divisibility
+        # rule and the latent-cache key (so a wan cache is never reused for ltx2).
+        self.vae_type = str(vae_type)
+        self._vae_spatial = 32 if self.vae_type == "ltx2" else 8
         # ---- Growing-history (variable-length, anchored at episode frame 0) ----
         # When enabled, every window starts at frame 0 and sweeps a variable
         # logical length k (1, 1+stride, ...) up to the episode length. The raw
@@ -367,10 +373,15 @@ class RoboTwinDataset(BaseActionDataset):
         if action_mode not in ("joint", "eef"):
             raise ValueError(f"action_mode must be 'joint' or 'eef', got '{action_mode}'")
 
-        # Validate resolution: VAE downsamples by 16, patch size 2 → must be /32.
-        if height % 32 != 0 or width % 32 != 0:
+        # Validate resolution: pixels must survive VAE spatial downsample AND the
+        # DiT patch (2) with integer, EVEN latent dims. Wan (8x) keeps the historical
+        # /32 rule; LTX2 (32x) needs /64 so the 32x-smaller latent is still even for
+        # the patch-2 embedder (e.g. 224%32==0 but 224/32=7 is odd → bad).
+        _res_mult = 64 if self.vae_type == "ltx2" else 32
+        if height % _res_mult != 0 or width % _res_mult != 0:
             raise ValueError(
-                f"Resolution {height}x{width} must be divisible by 32 (VAE downsamples by 16, patch size 2)."
+                f"Resolution {height}x{width} must be divisible by {_res_mult} "
+                f"(vae_type={self.vae_type}: {self._vae_spatial}x VAE downsample x 2 DiT patch)."
             )
 
         self.data_root = data_root
@@ -745,11 +756,19 @@ class RoboTwinDataset(BaseActionDataset):
         multiview layout, or camera set must change this string.
         """
         cams = ",".join(self.cameras) if self.multiview else str(self.target_camera)
-        return (
+        geo = (
             f"nf={self.num_frames};vs={self.video_stride};nvf={self.num_video_frames};"
             f"h={self.height};w={self.width};mv={int(self.multiview)};cams={cams};"
             f"grow={int(self.growing_history)}"
         )
+        # VAE identity — the encoded latents differ in channels (wan=16, ltx2=128)
+        # and shape (temporal/spatial stride) by VAE family. Append ONLY for
+        # non-wan VAEs so the historical wan key is preserved byte-for-byte
+        # (existing wan latent caches keep hitting); a wan cache can then never be
+        # silently reused for ltx2 (tc=8), which gets its own distinct key.
+        if self.vae_type != "wan":
+            geo += f";vae={self.vae_type};tc={self.temporal_compression}"
+        return geo
 
     @property
     def action_dim(self) -> int:
@@ -1230,6 +1249,7 @@ class MultiTaskRoboTwinDataset(BaseActionDataset):
             vae_cache_dir=_get("vae_cache_dir", None),
             temporal_compression=int(_get("temporal_compression", 4)),
             causal_temporal=bool(_get("causal_temporal", True)),
+            vae_type=str(_get("vae_type", "wan")),
             growing_history=bool(_get("growing_history", False)),
             history_min_frames=int(_get("history_min_frames", 1)),
             history_stride=int(_get("history_stride", 1)),
