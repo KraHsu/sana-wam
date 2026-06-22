@@ -526,6 +526,14 @@ _GDN_PRETRAINED_PRESET: dict = {
     "conv_kernel_size": 4,
     "k_conv_only": True,
     "t_kernel_size": 3,
+    # Disable CFG caption-dropout. The frozen backbone is set to eval at freeze,
+    # but the trainer's architecture.train() (trainer.py) recursively flips
+    # training=True back on the frozen DiT, which would reactivate the default
+    # 0.1 caption-dropout (sana_blocks.py token_drop fires on `train and
+    # uncond_prob>0`) — injecting stochastic null-caption noise into the very
+    # features the action bridge taps. Weight-neutral (forward-time behavior, no
+    # params) so the 872/872 load is unaffected.
+    "class_dropout_prob": 0.0,
     "camctrl_layers_num": 20,
     "softmax_every_n": 4,
     "cam_attn_compress": 1,
@@ -828,10 +836,16 @@ class _LTX2VAEShim(nn.Module):
 
     Geometry (from the LTX2 causal VAE config + SANA-WM bidirectional config):
     128-channel latent, 8x causal temporal (``Tl=(T-1)/8+1``), 32x spatial.
-    ``scaling_factor=1.0`` and there are NO ``latents_mean/std`` → latents are
-    used raw, exactly as the SANA-WM DiT was trained (and matching the Wan path,
-    which also applies no extra scaling at the adapter). We take the latent
-    distribution's ``mode()`` (deterministic) so cached latents are stable.
+
+    LATENT NORMALIZATION (load-bearing): SANA-WM trains the DiT on NORMALIZED
+    latents ``z = (mode - latents_mean) * scaling_factor / latents_std`` — see
+    upstream ``diffusion/model/builder.py`` ``LTX2VAE_diffusers`` encode (the
+    ``latents_mean/std`` are VAE state-dict BUFFERS, absmean 0.035 / 0.150; they
+    are NOT in ``config.json``, only ``scaling_factor=1.0`` is). Feeding the
+    frozen DiT raw ``mode()`` latents is ~6.6x too small + off-center → off the
+    pretraining manifold. ``encode`` applies this normalization and ``decode``
+    applies the exact inverse before the diffusers decode, mirroring upstream.
+    We use ``mode()`` (deterministic) so cached latents are stable.
 
     Held as an ``nn.Module`` submodule so ``.to()`` / ``.requires_grad_()`` and
     the adapter's ``add_module("vae", ...)`` propagate to the diffusers VAE.
@@ -848,10 +862,24 @@ class _LTX2VAEShim(nn.Module):
         # that falls back to ``upsampling_factor`` reads 32 (not Wan's 8).
         self.upsampling_factor = self.spatial_compression
         self.causal = True
+        # Latent normalization stats (VAE buffers). scaling_factor lives in config.
+        self.scaling_factor = float(getattr(cfg, "scaling_factor", 1.0))
+        self._has_norm = hasattr(vae, "latents_mean") and hasattr(vae, "latents_std")
+        if not self._has_norm:
+            logger.warning(
+                "LTX2 VAE lacks latents_mean/std buffers — feeding RAW latents to "
+                "the DiT. If this is the SANA-WM VAE the DiT will be off-distribution."
+            )
 
     @property
     def _param(self):
         return next(self.vae.parameters())
+
+    def _norm_stats(self, ref):
+        """latents_mean/std broadcast to (1,C,1,1,1) on ref's device/dtype."""
+        m = self.vae.latents_mean.view(1, -1, 1, 1, 1).to(ref.device, ref.dtype)
+        s = self.vae.latents_std.view(1, -1, 1, 1, 1).to(ref.device, ref.dtype)
+        return m, s
 
     def encode(self, videos, device, tiled=False, **_ignored):
         if tiled:
@@ -863,6 +891,9 @@ class _LTX2VAEShim(nn.Module):
         for video in videos:  # (3, T, H, W)
             x = video.unsqueeze(0).to(device=p.device, dtype=p.dtype)
             z = self.vae.encode(x).latent_dist.mode()  # deterministic for caching
+            if self._has_norm:  # match SANA-WM training: (z - mean) * sf / std
+                m, s = self._norm_stats(z)
+                z = (z - m) * self.scaling_factor / s
             out.append(z.squeeze(0))
         return torch.stack(out)
 
@@ -873,8 +904,11 @@ class _LTX2VAEShim(nn.Module):
             self.vae.disable_tiling()
         p = self._param
         out = []
-        for z in hidden_states:  # (z_dim, Tl, Hl, Wl)
+        for z in hidden_states:  # (z_dim, Tl, Hl, Wl) — normalized latent space
             zz = z.unsqueeze(0).to(device=p.device, dtype=p.dtype)
+            if self._has_norm:  # exact inverse of encode: z * std / sf + mean
+                m, s = self._norm_stats(zz)
+                zz = zz * s / self.scaling_factor + m
             video = self.vae.decode(zz).sample.clamp_(-1, 1)
             out.append(video.squeeze(0))
         return torch.stack(out)
