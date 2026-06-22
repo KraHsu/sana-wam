@@ -280,6 +280,15 @@ class _PipeSpec:
     (byte-identical to existing checkpoints). When ``True`` the adapter sets
     ``first_frame_latents`` + ``num_clean_prefix_frames=1`` and the split-forward
     switches to per-frame timestep modulation (frame-0 at t=0)."""
+    init_dit_from: Optional[str] = None
+    """Opt-in (GDN only): path to a pretrained GDN DiT checkpoint to load AFTER
+    construction. This is the seam for the SANA-WM streaming world model
+    (``/DATA/share/SANA-WM_streaming/sana_dit/model.pt``) — a ``.pt`` GAN training
+    state whose DiT weights live under ``['generator']`` with a ``model.`` prefix.
+    Unlike ``model_path`` (which loads the linear_relu published ckpt and is
+    rejected for GDN), ``init_dit_from`` builds the FULL CamCtrl streaming arch
+    (so state_dict keys match) and loads it. Default ``None`` keeps GDN
+    from-scratch (byte-identical to the existing GDN-AR track)."""
 
 
 def _resolve_model_path_and_kwargs(
@@ -399,6 +408,7 @@ def _spec_from_dictconfig(vb_cfg, *, ckpt_dir: Optional[str] = None) -> _PipeSpe
         attn_kernel=str(vb_cfg.get("attn_kernel", "linear_relu")),
         chunk_size=int(vb_cfg.get("chunk_size", 3)),
         use_first_frame_cond=bool(vb_cfg.get("use_first_frame_cond", False)),
+        init_dit_from=vb_cfg.get("init_dit_from", None),
     )
 
 
@@ -465,18 +475,74 @@ _GDN_ARCH_PRESET: dict = {
 # model has no GDN branch. So attn_kernel="gdn" also switches the model factory.
 _GDN_MODEL_FACTORY = "SanaMSVideoCamCtrl_1600M_P1_D20"
 
+# Streaming (cached chunk-causal AR) factory — same params as the non-streaming
+# CamCtrl, but the cached-KV attention classes needed for forward_long rollout.
+# Used when loading the SANA-WM streaming world model (init_dit_from).
+_GDN_MODEL_FACTORY_STREAMING = "SanaMSVideoCamCtrlStreaming_1600M_P1_D20"
 
-def _apply_attn_kernel(model_kwargs: dict, attn_kernel: str) -> dict:
+# Architecture kwargs that make a freshly-built GDN DiT's state_dict match the
+# pretrained SANA-WM streaming checkpoint EXACTLY (872/872 keys, 0 missing/0
+# unexpected; verified /tmp/m0_load_smoke.py 2026-06-22). Applied ONLY when
+# init_dit_from is set, so the from-scratch GDN-AR track is unchanged. Every value
+# here differs from a factory default and is required:
+#   - in_channels=128: LTX2 latent (x_embedder (2240,128,1,1,1))
+#   - linear_head_dim=112: 2240/112=20 GDN heads (default 32 → 70, WRONG)
+#   - camctrl_layers_num=20 + softmax_every_n=4: cam branch on all 20 blocks,
+#     softmax at {3,7,11,15,19}, GDN on the other 15
+#   - y_norm=True: ckpt has attention_y_norm.weight
+#   - chunk_plucker_* / cam_attn_compress / init_cam_from_base / chunk_split_strategy:
+#     the trained camera-control sub-network the ckpt carries
+_GDN_PRETRAINED_PRESET: dict = {
+    "in_channels": 128,
+    "pred_sigma": False,
+    "learn_sigma": False,
+    "caption_channels": 2304,
+    "model_max_length": 300,
+    "attn_type": "ChunkCausalGDNTriton",
+    "ffn_type": "GLUMBConvTemp",
+    "qk_norm": True,
+    "cross_norm": True,
+    "use_pe": True,
+    "pos_embed_type": "wan_rope",
+    "y_norm": True,
+    "linear_head_dim": 112,
+    "mlp_ratio": 3,
+    "conv_kernel_size": 4,
+    "k_conv_only": True,
+    "t_kernel_size": 3,
+    "camctrl_layers_num": 20,
+    "softmax_every_n": 4,
+    "cam_attn_compress": 1,
+    "chunk_split_strategy": "first_chunk_plus_one",
+    "init_cam_from_base": True,
+    "use_chunk_plucker_post_attn": True,
+    "chunk_plucker_channels": 48,
+    "chunk_plucker_post_attn_blocks": 20,
+}
+
+
+def _apply_attn_kernel(model_kwargs: dict, attn_kernel: str, *, pretrained_gdn: bool = False) -> dict:
     """Return ``model_kwargs`` adjusted for ``attn_kernel``.
 
     ``"linear_relu"`` leaves the preset's ``attn_type`` (LiteLAReLURope) intact.
-    ``"gdn"`` swaps to ChunkCausalGDNTriton, adds the GDN short-conv knobs, and
-    fills in the architecture spec (in_channels=16 etc.) needed for a
-    from-scratch GDN DiT — unless the caller already pinned a value in the yaml.
+    ``"gdn"`` swaps to ChunkCausalGDNTriton and adds the GDN short-conv knobs.
+    For the arch spec it fills EITHER the from-scratch preset (``in_channels=16``,
+    no camera branch — the default GDN-AR track) OR, when ``pretrained_gdn`` is
+    set, the SANA-WM preset (``in_channels=128``, full camctrl, 20 GDN heads,
+    softmax-every-4) so a freshly-built DiT matches the pretrained checkpoint
+    exactly. Caller-pinned yaml values always win (``setdefault``).
     """
     if attn_kernel == "gdn":
         merged = dict(model_kwargs)
-        for preset in (_GDN_ATTN_OVERRIDES, _GDN_ARCH_PRESET):
+        if pretrained_gdn:
+            # SANA-WM pretrained: the preset is self-complete (carries attn_type +
+            # the full camctrl spec). Do NOT layer _GDN_ATTN_OVERRIDES on top — its
+            # camctrl_layers_num=0 would (via setdefault) suppress the camera branch
+            # the checkpoint needs.
+            presets = (_GDN_PRETRAINED_PRESET,)
+        else:
+            presets = (_GDN_ATTN_OVERRIDES, _GDN_ARCH_PRESET)
+        for preset in presets:
             for k, v in preset.items():
                 merged.setdefault(k, v)
         # A linear_relu preset's attn_type must be overridden for GDN.
@@ -561,6 +627,7 @@ def _spec_from_dict(d: dict, *, ckpt_dir: Optional[str] = None) -> _PipeSpec:
         attn_kernel=str(d.get("attn_kernel", "linear_relu")),
         chunk_size=int(d.get("chunk_size", 3)),
         use_first_frame_cond=bool(d.get("use_first_frame_cond", False)),
+        init_dit_from=d.get("init_dit_from", None),
     )
 
 
@@ -578,8 +645,14 @@ def _build_pipe_from_spec(
     factory_name = spec.model_factory
     if spec.attn_kernel == "gdn" and "CamCtrl" not in factory_name:
         factory_name = _GDN_MODEL_FACTORY
+        # Loading the pretrained SANA-WM world model needs the cached chunk-causal
+        # streaming arch (its keys + the forward_long rollout path).
+        if spec.init_dit_from is not None:
+            factory_name = _GDN_MODEL_FACTORY_STREAMING
     factory = _resolve_upstream_factory(factory_name)
-    model_kwargs = _apply_attn_kernel(spec.model_kwargs, spec.attn_kernel)
+    model_kwargs = _apply_attn_kernel(
+        spec.model_kwargs, spec.attn_kernel, pretrained_gdn=(spec.init_dit_from is not None)
+    )
     if spec.attn_kernel == "gdn":
         model_kwargs.setdefault("chunk_size", spec.chunk_size)
     dit = factory(**model_kwargs)
@@ -600,15 +673,58 @@ def _build_pipe_from_spec(
         logger.info("fp32_attention enabled on %d SANA attention modules", n_set)
 
     # GDN is a different operator family — the published linear_relu checkpoint
-    # cannot initialize it. Refuse a weight load so we never silently train a
-    # half-random DiT against the wrong checkpoint.
+    # cannot initialize it. Refuse a model_path (linear_relu) weight load so we
+    # never silently train a half-random DiT against the wrong checkpoint. The
+    # supported way to start GDN from real weights is ``init_dit_from`` (a GDN
+    # checkpoint), handled below.
     if spec.attn_kernel == "gdn" and spec.model_path is not None:
         raise ValueError(
             "video_backbone.attn_kernel='gdn' is incompatible with loading the "
             f"linear_relu checkpoint at model_path={spec.model_path!r}. GDN must "
-            "train from scratch: unset model_path (random init) or supply a GDN "
-            "checkpoint via architecture.load_checkpoint after construction."
+            "start from scratch (unset model_path) or load a GDN checkpoint via "
+            "video_backbone.init_dit_from (e.g. the SANA-WM streaming model.pt)."
         )
+
+    # GDN pretrained-weight seam: load the SANA-WM streaming world model. Its .pt
+    # is a GAN training state — DiT weights live under ['generator'] with a
+    # 'model.' prefix. The built streaming CamCtrl arch matches 872/872 keys
+    # (verified M0); only the resolution-dependent ``pos_embed`` buffer differs
+    # (vestigial under wan_rope — RoPE supplies position at runtime), so we drop
+    # it and let the model keep its own.
+    if spec.attn_kernel == "gdn" and spec.init_dit_from is not None:
+        ckpt = torch.load(spec.init_dit_from, map_location="cpu", weights_only=False, mmap=True)
+        gen = ckpt.get("generator", ckpt) if isinstance(ckpt, dict) else ckpt
+        if isinstance(gen, dict) and "state_dict" in gen:
+            gen = gen["state_dict"]
+        state = {
+            (k[len("model."):] if k.startswith("model.") else k): v
+            for k, v in gen.items()
+        }
+        model_sd = dit.state_dict()
+        dropped = []
+        for k in list(state.keys()):
+            if k in model_sd and tuple(state[k].shape) != tuple(model_sd[k].shape):
+                # Resolution-dependent buffers (pos_embed) — keep the model's own.
+                dropped.append((k, tuple(state[k].shape), tuple(model_sd[k].shape)))
+                state.pop(k)
+        result = dit.load_state_dict(state, strict=False)
+        if dropped:
+            logger.warning(
+                "init_dit_from: kept model init for %d shape-mismatched buffer(s) "
+                "(resolution-dependent, e.g. pos_embed): %s",
+                len(dropped),
+                dropped[:4],
+            )
+        if result.missing_keys or result.unexpected_keys:
+            logger.warning(
+                "init_dit_from partial load: %d missing, %d unexpected. "
+                "missing=%s unexpected=%s",
+                len(result.missing_keys),
+                len(result.unexpected_keys),
+                result.missing_keys[:6],
+                result.unexpected_keys[:6],
+            )
+        logger.info("Loaded SANA-WM GDN DiT from init_dit_from=%s", spec.init_dit_from)
 
     if spec.model_path is not None:
         # ``find_model`` is the upstream loader for ``.pth`` files; lazy import.
