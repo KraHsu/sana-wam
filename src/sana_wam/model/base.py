@@ -370,7 +370,12 @@ class BaseWAMArchitecture(ABC, nn.Module):
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         save_file(state_dict, path)
 
-    def load_checkpoint(self, path: str, strict: bool = True) -> None:
+    def load_checkpoint(
+        self,
+        path: str,
+        strict: bool = True,
+        allow_missing_patterns: tuple[str, ...] = (),
+    ) -> None:
         """Load architecture state from a safetensors checkpoint.
 
         Meta-device sub-modules (self-contained deploy: empty shells built via
@@ -380,12 +385,38 @@ class BaseWAMArchitecture(ABC, nn.Module):
         the parameter slot to the safetensors tensor instead. We only flip the
         flag when meta params actually exist so the training-resume path
         (real-device params, in-place copy preserves identity) is unchanged.
+
+        ``allow_missing_patterns`` lists substrings of parameter names that are
+        permitted to be absent from the checkpoint and kept at their freshly
+        built (default-init) values instead of failing a strict load. This is
+        the forward-compat hatch for params added to a *shared* module after a
+        checkpoint was written — e.g. ``cross_attn.norm_kv.*`` was added to
+        ``BridgeCrossAttention`` for the frozen linear-attn SANA backbone, but
+        the same block is reused by older GDN cross-attn / GDN-AR checkpoints
+        that predate it. Those keys default to a LayerNorm(weight=1, bias=0); on
+        the O(1) GDN features this is a behavior change vs the original raw-KV
+        training, so it is logged loudly. Unexpected keys are never tolerated,
+        and any *other* missing key still fails — strictness is preserved
+        everywhere except the named, safe-to-default params.
         """
         from safetensors.torch import load_file
 
         state_dict = load_file(path)
         has_meta = any(p.device.type == "meta" for p in self.parameters())
         missing, unexpected = self.load_state_dict(state_dict, strict=False, assign=has_meta)
+        if allow_missing_patterns:
+            tolerated = [k for k in missing if any(pat in k for pat in allow_missing_patterns)]
+            if tolerated:
+                logger.warning(
+                    "load_checkpoint: %d param(s) absent from checkpoint kept at default init "
+                    "(matched allow_missing_patterns=%s): %s%s. For an older checkpoint this "
+                    "alters that module's behavior vs its original training.",
+                    len(tolerated),
+                    allow_missing_patterns,
+                    tolerated[:8],
+                    " ..." if len(tolerated) > 8 else "",
+                )
+            missing = [k for k in missing if k not in tolerated]
         if strict and (missing or unexpected):
             raise RuntimeError(f"Strict load failed: missing={missing}, unexpected={unexpected}")
 

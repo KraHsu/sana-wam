@@ -63,7 +63,12 @@ def load_from_checkpoint_dir(
     mp = OmegaConf.select(cfg, "accelerate.mixed_precision", default="bf16")
     model_dtype = _DTYPE_MAP.get(str(mp).strip().lower(), torch.bfloat16)
     architecture.set_dtype_device(model_dtype, torch.device(device))
-    architecture.load_checkpoint(ckpt_path, strict=True)
+    # ``cross_attn.norm_kv.*`` was added to the shared BridgeCrossAttention for the
+    # frozen linear-attn SANA backbone; older GDN cross-attn / GDN-AR checkpoints
+    # predate it. Tolerate ONLY those keys being absent (kept at default LayerNorm
+    # init, logged) so deploying a pre-norm_kv checkpoint no longer dies on strict
+    # load; every other missing/unexpected key still fails loudly.
+    architecture.load_checkpoint(ckpt_path, strict=True, allow_missing_patterns=("norm_kv",))
     architecture.eval()
 
     architecture.attach_action_normalizer(_build_action_normalizer(cfg, ckpt_dir))
