@@ -251,6 +251,13 @@ class _PipeSpec:
     model_path: Optional[str] = None
     """Path to ``SANA_Video_2B_480p.pth`` (or HF URL); ``None`` ⇒ random init."""
     vae_path: Optional[str] = None
+    vae_type: str = "wan"
+    """VAE family. ``"wan"`` (default) = Wan2.1 causal VAE (16ch, 4x temporal,
+    8x spatial) loaded from a ``.pth`` — the SANA-Video 2B 480p contract.
+    ``"ltx2"`` = LTX2 causal VAE (128ch, 8x temporal, 32x spatial) loaded from a
+    diffusers directory via ``AutoencoderKLLTX2Video.from_pretrained``; this is
+    the VAE the SANA-WM streaming world model (``init_dit_from``) was trained
+    with, so its 128-channel latent matches that DiT's ``in_channels``."""
     text_encoder_name: Optional[str] = None
     model_kwargs: dict = field(default_factory=dict)
     flow_shift: float = 3.0
@@ -401,6 +408,7 @@ def _spec_from_dictconfig(vb_cfg, *, ckpt_dir: Optional[str] = None) -> _PipeSpe
         model_factory=str(vb_cfg.get("model_factory", "SanaMSVideo_2000M_P2_D20")),
         model_path=model_path,
         vae_path=vae_path,
+        vae_type=str(vb_cfg.get("vae_type", "wan")),
         text_encoder_name=vb_cfg.get("text_encoder_name", "gemma-2-2b-it"),
         model_kwargs=model_kwargs,
         flow_shift=float(vb_cfg.get("flow_shift", 3.0)),
@@ -620,6 +628,7 @@ def _spec_from_dict(d: dict, *, ckpt_dir: Optional[str] = None) -> _PipeSpec:
         model_factory=d.get("model_factory", "SanaMSVideo_2000M_P2_D20"),
         model_path=model_path,
         vae_path=vae_path,
+        vae_type=str(d.get("vae_type", "wan")),
         text_encoder_name=d.get("text_encoder_name", "gemma-2-2b-it"),
         model_kwargs=model_kwargs,
         flow_shift=float(d.get("flow_shift", 3.0)),
@@ -756,7 +765,11 @@ def _build_pipe_from_spec(
 
     dit = dit.to(device=device or "cuda", dtype=dtype).eval()
 
-    vae = _load_vae(spec.vae_path, device=device, dtype=dtype) if spec.vae_path else None
+    vae = (
+        _load_vae(spec.vae_path, device=device, dtype=dtype, vae_type=spec.vae_type)
+        if spec.vae_path
+        else None
+    )
     text_encoder, tokenizer = (
         _load_text_encoder(spec.text_encoder_name, device=device, dtype=dtype, ckpt_dir=ckpt_dir)
         if spec.text_encoder_name
@@ -777,6 +790,7 @@ def _build_pipe_from_spec(
             "factory": spec.model_factory,
             "model_path": spec.model_path,
             "vae_path": spec.vae_path,
+            "vae_type": spec.vae_type,
             "flow_shift": spec.flow_shift,
             "attn_kernel": spec.attn_kernel,
             "chunk_size": spec.chunk_size,
@@ -785,17 +799,113 @@ def _build_pipe_from_spec(
     )
 
 
-def _load_vae(path: Optional[str], *, device, dtype):
-    """Load Wan2.1 VAE from a local ``.pth`` file.
+class _LTX2VAEShim(nn.Module):
+    """Adapt the diffusers ``AutoencoderKLLTX2Video`` to the Wan VAE contract.
 
-    SANA-Video 2B 480p reuses the Wan2.1 VAE; the ckpt is bundled in the HF
-    asset (``<bundle>/vae/Wan2.1_VAE.pth``). We deliberately avoid
-    ``model_pool`` / HuggingFace Hub here — CI / offline machines can't
-    reach the Hub and the asset already has the file on disk.
+    The adapter calls ``vae.encode(list[(3,T,H,W)], device, tiled) -> (B,z,Tl,Hl,Wl)``
+    and ``vae.decode(iterable[(z,Tl,Hl,Wl)], device, tiled) -> (B,3,T,H,W)``
+    (see ``WanVideoVAE.encode``/``decode``). This wrapper exposes the same two
+    methods on top of the diffusers per-batch tensor API.
+
+    Geometry (from the LTX2 causal VAE config + SANA-WM bidirectional config):
+    128-channel latent, 8x causal temporal (``Tl=(T-1)/8+1``), 32x spatial.
+    ``scaling_factor=1.0`` and there are NO ``latents_mean/std`` → latents are
+    used raw, exactly as the SANA-WM DiT was trained (and matching the Wan path,
+    which also applies no extra scaling at the adapter). We take the latent
+    distribution's ``mode()`` (deterministic) so cached latents are stable.
+
+    Held as an ``nn.Module`` submodule so ``.to()`` / ``.requires_grad_()`` and
+    the adapter's ``add_module("vae", ...)`` propagate to the diffusers VAE.
+    """
+
+    def __init__(self, vae):
+        super().__init__()
+        self.vae = vae
+        cfg = vae.config
+        self.z_dim = int(getattr(cfg, "latent_channels", 128))
+        self.temporal_compression = int(getattr(cfg, "temporal_compression_ratio", 8))
+        self.spatial_compression = int(getattr(cfg, "spatial_compression_ratio", 32))
+        # Expose under the Wan attribute name too, so any spatial-factor probe
+        # that falls back to ``upsampling_factor`` reads 32 (not Wan's 8).
+        self.upsampling_factor = self.spatial_compression
+        self.causal = True
+
+    @property
+    def _param(self):
+        return next(self.vae.parameters())
+
+    def encode(self, videos, device, tiled=False, **_ignored):
+        if tiled:
+            self.vae.enable_tiling()
+        else:
+            self.vae.disable_tiling()
+        p = self._param
+        out = []
+        for video in videos:  # (3, T, H, W)
+            x = video.unsqueeze(0).to(device=p.device, dtype=p.dtype)
+            z = self.vae.encode(x).latent_dist.mode()  # deterministic for caching
+            out.append(z.squeeze(0))
+        return torch.stack(out)
+
+    def decode(self, hidden_states, device, tiled=False, **_ignored):
+        if tiled:
+            self.vae.enable_tiling()
+        else:
+            self.vae.disable_tiling()
+        p = self._param
+        out = []
+        for z in hidden_states:  # (z_dim, Tl, Hl, Wl)
+            zz = z.unsqueeze(0).to(device=p.device, dtype=p.dtype)
+            video = self.vae.decode(zz).sample.clamp_(-1, 1)
+            out.append(video.squeeze(0))
+        return torch.stack(out)
+
+
+def _load_vae(path: Optional[str], *, device, dtype, vae_type: str = "wan"):
+    """Load the video VAE.
+
+    ``vae_type="wan"`` (default): Wan2.1 causal VAE from a local ``.pth`` file.
+    SANA-Video 2B 480p reuses it; the ckpt is bundled in the HF asset
+    (``<bundle>/vae/Wan2.1_VAE.pth``). We deliberately avoid ``model_pool`` /
+    HuggingFace Hub here — CI / offline machines can't reach the Hub and the
+    asset already has the file on disk.
+
+    ``vae_type="ltx2"``: LTX2 causal VAE (128ch, 8x temporal, 32x spatial) from a
+    diffusers *directory* via ``AutoencoderKLLTX2Video.from_pretrained``, wrapped
+    in ``_LTX2VAEShim`` to expose the Wan encode/decode contract. This is the VAE
+    the SANA-WM streaming world model (``init_dit_from``) was trained with.
 
     Returns ``None`` if path is missing/unset, so smoke tests that don't
     need pixel-space encode/decode can still construct the pipeline.
     """
+    if vae_type == "ltx2":
+        if not path or not os.path.isdir(path):
+            logger.warning(
+                "build_sana_pipeline: LTX2 VAE not loaded (path=%s is not a "
+                "directory). decode_video and preprocess_input(frames=...) will "
+                "be unavailable until a diffusers VAE directory is provided.",
+                path,
+            )
+            return None
+        from diffusers import AutoencoderKLLTX2Video
+
+        # fp32 for numerical stability: the VAE is frozen and used to (re)compute
+        # cached latents the frozen DiT consumes, so encode precision matters and
+        # it is not in the training compute graph. The adapter casts the returned
+        # latents to the pipe dtype.
+        vae = AutoencoderKLLTX2Video.from_pretrained(path, torch_dtype=torch.float32)
+        vae = vae.to(device=device or "cuda").eval()
+        vae.requires_grad_(False)
+        shim = _LTX2VAEShim(vae)
+        logger.info(
+            "Loaded LTX2 causal VAE from %s (z=%d, temporal=%dx, spatial=%dx)",
+            path,
+            shim.z_dim,
+            shim.temporal_compression,
+            shim.spatial_compression,
+        )
+        return shim
+
     if not path or not os.path.isfile(path):
         logger.warning(
             "build_sana_pipeline: VAE not loaded (path=%s missing). decode_video "

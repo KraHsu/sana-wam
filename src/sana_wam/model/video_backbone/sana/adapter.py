@@ -82,14 +82,31 @@ class SanaVideoBackbone(VideoBackbone):
 
     @classmethod
     def get_native_temporal_contract(cls, pipe) -> Tuple[int, bool]:
-        """SANA-Video native VAE temporal contract.
+        """Native VAE temporal contract ``(temporal_compression, causal)``.
 
-        SANA-Video 2B 480p reuses the Wan2.1 causal VAE
-        (``pipeline_builder._load_wan_vae`` loads ``Wan2.1_VAE.pth``), so the
-        contract matches the Wan family: ``(4, True)`` — causal first-frame
-        token plus 4-frame tail grouping.
+        VAE-aware: the LTX2 shim (``vae_type="ltx2"``, the SANA-WM world-model
+        VAE) carries ``temporal_compression`` / ``causal`` attributes → ``(8,
+        True)``. Everything else is the Wan2.1 family that SANA-Video 2B 480p
+        reuses: ``(4, True)`` — causal first-frame token plus 4-frame tail
+        grouping.
         """
+        vae = getattr(pipe, "vae", None)
+        if vae is not None and hasattr(vae, "temporal_compression"):
+            return (int(vae.temporal_compression), bool(getattr(vae, "causal", True)))
         return (4, True)
+
+    @classmethod
+    def get_native_spatial_compression(cls, pipe) -> int:
+        """Native VAE spatial downsample factor (pixels per latent cell, one side).
+
+        Wan2.1 = 8; LTX2 = 32. Read from the VAE so latent↔pixel geometry stays
+        consistent across VAE families. The shim exposes ``spatial_compression``;
+        the Wan VAE exposes ``upsampling_factor`` (=8); default to 8.
+        """
+        vae = getattr(pipe, "vae", None)
+        if vae is not None:
+            return int(getattr(vae, "spatial_compression", getattr(vae, "upsampling_factor", 8)))
+        return 8
 
     def __init__(self, pipe: SanaPipe):
         super().__init__()
@@ -133,6 +150,7 @@ class SanaVideoBackbone(VideoBackbone):
         # values are the only values this backbone ever exposes.
         self._dit_patch_size = self.get_native_dit_patch_size(pipe)
         self._temporal_compression, self._causal_temporal = self.get_native_temporal_contract(pipe)
+        self._spatial_compression = self.get_native_spatial_compression(pipe)
 
         first_param = next(pipe.dit.parameters(), None)
         self._dtype = first_param.dtype if first_param is not None else torch.bfloat16
@@ -722,8 +740,9 @@ class SanaVideoBackbone(VideoBackbone):
             input_latents = input_latents.to(device=device, dtype=dtype)
             B = input_latents.shape[0]
             vid_T = num_frames if num_frames is not None else input_latents.shape[2]
-            vid_H = height if height is not None else input_latents.shape[3] * 8
-            vid_W = width if width is not None else input_latents.shape[4] * 8
+            sc = self._spatial_compression  # Wan=8, LTX2=32
+            vid_H = height if height is not None else input_latents.shape[3] * sc
+            vid_W = width if width is not None else input_latents.shape[4] * sc
 
         # --- text → context (pre-encoded > live Gemma) ---
         if pre_encoded_text is not None:
