@@ -87,6 +87,8 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
             or OmegaConf.select(cfg, "dataloader.num_frames", default=49)
         )
         self._video_stride = max(1, int(OmegaConf.select(cfg, "dataloader.video_stride", default=4) or 4))
+        # VAE temporal compression (Wan=4 default, LTX2/SANA-WM=8) — see GDNAR engine.
+        self._temporal_compression = max(1, int(OmegaConf.select(cfg, "dataloader.temporal_compression", default=4) or 4))
         self._video_num_frames = (self._raw_num_frames - 1) // self._video_stride + 1
 
         # Streaming (growing-history) deploy. When enabled, each generate rebuilds
@@ -211,7 +213,7 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         # (actions[0] = next action). The boundary is where the past ends: the pinned
         # action prefix k_a if present, else the video boundary tc*(P-1)*video_stride.
         if self._streaming:
-            boundary = max(k_a, 4 * (P - 1) * self._video_stride)
+            boundary = max(k_a, self._temporal_compression * (P - 1) * self._video_stride)
             boundary = min(boundary, actions.shape[1] - 1)
             if boundary > 0:
                 actions = actions[:, boundary:]
@@ -368,5 +370,5 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         return latents.to(device=self._device, dtype=self._dtype)  # (1, C, P, Hl, Wl)
 
     def _video_num_frames_latent(self) -> int:
-        """Latent temporal length T for the generated clip (causal Wan VAE)."""
-        return 1 + (self._video_num_frames - 1) // 4
+        """Latent temporal length T for the generated clip (causal VAE)."""
+        return 1 + (self._video_num_frames - 1) // self._temporal_compression

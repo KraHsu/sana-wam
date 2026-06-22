@@ -77,6 +77,12 @@ class GDNARInferenceEngine(BaseInferenceEngine):
             or OmegaConf.select(cfg, "dataloader.num_frames", default=81)
         )
         self._video_stride = max(1, int(OmegaConf.select(cfg, "dataloader.video_stride", default=4) or 4))
+        # VAE temporal compression: Wan=4 (default, preserves existing configs),
+        # LTX2/SANA-WM=8. Drives the latent-frame count used to derive num_chunks
+        # and action_tokens_per_chunk — a stale 4 here under tc=8 halves the latent
+        # length estimate, doubling num_chunks and misaligning actions-to-chunks
+        # (the prior-0% horizon-failure class).
+        self._temporal_compression = max(1, int(OmegaConf.select(cfg, "dataloader.temporal_compression", default=4) or 4))
 
         self._action_dim = int(arch.action_dim)
         self._action_tokens_per_chunk = self._resolve_action_tokens_per_chunk(cfg)
@@ -107,7 +113,7 @@ class GDNARInferenceEngine(BaseInferenceEngine):
             OmegaConf.select(cfg, "inference.action_tokens_per_chunk", default=None)
             or getattr(self.architecture, "_action_tokens_per_chunk", 0)
         )
-        t_lat = 1 + (self._video_num_frames - 1) // 4
+        t_lat = 1 + (self._video_num_frames - 1) // self._temporal_compression
         num_chunks = max(1, t_lat // self._fcs)
         if override:
             tokens = int(override)

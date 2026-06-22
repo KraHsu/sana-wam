@@ -120,6 +120,8 @@ class ARInferenceEngine(BaseInferenceEngine):
             or OmegaConf.select(cfg, "dataloader.num_frames", default=33)
         )
         self._video_stride = max(1, int(OmegaConf.select(cfg, "dataloader.video_stride", default=1) or 1))
+        # VAE temporal compression (Wan=4 default, LTX2/SANA-WM=8) — see GDNAR engine.
+        self._temporal_compression = max(1, int(OmegaConf.select(cfg, "dataloader.temporal_compression", default=4) or 4))
 
         # --- action geometry (from the trained backbone, never the YAML literal) ---
         self._action_dim = int(arch.action_dim)
@@ -152,7 +154,7 @@ class ARInferenceEngine(BaseInferenceEngine):
     def _resolve_action_tokens_per_chunk(self, cfg) -> int:
         override = OmegaConf.select(cfg, "inference.ar_action_tokens_per_chunk", default=None)
         # Latent frame count after the causal Wan VAE, then chunked.
-        t_lat = 1 + (self._video_num_frames - 1) // 4
+        t_lat = 1 + (self._video_num_frames - 1) // self._temporal_compression
         num_chunks = max(1, t_lat // self._fcs)
         if override is not None:
             tokens = int(override)
