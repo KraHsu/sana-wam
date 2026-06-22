@@ -527,8 +527,23 @@ class SanaVideoBackbone(VideoBackbone):
         )
 
         dit = self._dit
+        # Two build flavors reach this point:
+        #  - from-scratch GDN-AR: the NON-streaming factory builds plain
+        #    ``ChunkCausalGDNTriton`` attention on every (all-GDN, no-camctrl)
+        #    block → rebind each to the cached sibling here.
+        #  - pretrained SANA-WM (init_dit_from): the STREAMING factory already
+        #    builds the correct cached, HYBRID per-block attention
+        #    (``Cached*GDN*`` on GDN blocks, ``CachedSoftmax*`` on softmax blocks).
+        #    Blindly rebinding those to ``CachedChunkCausalGDN`` would CLOBBER the
+        #    softmax blocks into GDN and corrupt the rollout — so skip the attn
+        #    rebind when the blocks are already cached, and only fix the FFN.
+        attn_already_cached = type(dit.blocks[0].attn).__name__.startswith("Cached")
         for blk in dit.blocks:
-            blk.attn.__class__ = CachedChunkCausalGDN  # same params, cached forward
+            if not attn_already_cached:
+                blk.attn.__class__ = CachedChunkCausalGDN  # same params, cached forward
+            # The streaming factory leaves the FFN as plain GLUMBConvTemp (single-
+            # tensor return); forward_long needs the cached variant (returns the
+            # temporal-conv left-context cache). Always rebind.
             blk.mlp.__class__ = CachedGLUMBConvTemp  # temporal-conv left-context cache
         # The base ``self.rope`` is a ``WanRotaryPosEmbed`` (integer ppf); the
         # windowed ``forward_long`` path needs ``CausalWanRotaryPosEmbed`` which

@@ -507,7 +507,15 @@ _GDN_PRETRAINED_PRESET: dict = {
     "caption_channels": 2304,
     "model_max_length": 300,
     "attn_type": "ChunkCausalGDNTriton",
-    "ffn_type": "GLUMBConvTemp",
+    # CachedGLUMBConvTemp (not plain GLUMBConvTemp): a weight-identical subclass
+    # (adds no params → checkpoint still loads 872/872) whose forward returns the
+    # temporal-conv left-context cache tuple that forward_long requires. Building
+    # it directly — rather than relying on enable_cached_streaming's post-hoc
+    # ``mlp.__class__`` swap — is REQUIRED when the backbone is frozen: freeze
+    # wraps each submodule's ``forward`` in no_grad, capturing the bound method by
+    # value at freeze time, so a later __class__ swap is defeated (the wrapped
+    # forward still calls the old GLUMBConvTemp.forward → single tensor → crash).
+    "ffn_type": "CachedGLUMBConvTemp",
     "qk_norm": True,
     "cross_norm": True,
     "use_pe": True,

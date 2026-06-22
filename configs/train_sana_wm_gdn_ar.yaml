@@ -1,0 +1,141 @@
+# SANA-WM GDN-AR: pretrained GDN world-model backbone (FROZEN) + cached-GDN
+# autoregressive action bridge. The synthesis of the two prior fixes — it attacks
+# BOTH lift_pot 0% root causes at once:
+#   1. UNDERTRAINING — the GDN-AR track was always trained from scratch
+#      (model_path:null → a 2B GDN DiT random-init on ~50 demos). Here the DiT is
+#      initialized from the SANA-WM streaming world model (init_dit_from) — real
+#      pretrained GDN + camera-control + cross-attn features — and FROZEN.
+#   2. OPEN-LOOP COVARIATE SHIFT — frozen-SANA (linear-attn, Option A) had good
+#      offline MAE but 0% closed-loop. GDN-AR's chunk-causal teacher-forced
+#      rollout trains the genuine autoregressive paradigm so the model rolls past
+#      its training horizon at deploy.
+#
+# Backbone is FROZEN (Option A, proven capacity-sufficient on the linear-attn
+# track): only the action bridge + proprio train. The DiT is the SANA-WM streaming
+# CamCtrl arch (128ch LTX2 latent, 15 GDN + 5 softmax blocks, full camera branch);
+# the camera/plucker inputs are fed zero at runtime (RoboTwin cameras are handled
+# by the 3-view stitch, not CamCtrl — see camera-from-action idea for v2).
+#
+#   python scripts/train.py --config configs/train_sana_wm_gdn_ar.yaml \
+#       dataloader.dataset_dir=/DATA/share/RoboTwin2.0/dataset \
+#       dataloader.train_tasks=[lift_pot]
+
+model:
+  architecture:
+    framework: dual_system
+    variant: gdn_autoregressive      # → DualSystemGDNARArchitecture (cached-AR rollout)
+    action_dim: 20
+    use_proprioception: true
+    state_dim: 20
+    bridge_layers: null              # null + bridge_interval=1 → every video layer bridges
+    bridge_interval: 1
+    dim: 1152
+    num_heads: 16
+    # --- AR chunk knobs (consumed by gdn_ar.compute_loss) ---
+    # GDN latent frames per AR chunk. MUST equal video_backbone.chunk_size and
+    # divide latent_T. The cached kernel operates on whole GDN chunks.
+    frame_chunk_size: 3
+    # Leading chunk(s) supplied as the clean OBSERVED prefix (teacher-forced into
+    # the cache, NOT supervised) — mirrors deploy being handed the first real obs.
+    ar_observed_prefix_chunks: 1
+
+  video_backbone:
+    name: sana_video_2b
+    # GDN cannot load the linear_relu published checkpoint, so model_path stays
+    # null. The pretrained GDN weights come via init_dit_from (the M0 seam): the
+    # SANA-WM streaming world model — a .pt GAN state whose DiT lives under
+    # ['generator'] with a 'model.' prefix. The builder constructs the full
+    # streaming CamCtrl arch (872/872 keys) and loads it.
+    model_path: null
+    init_dit_from: /DATA/share/SANA-WM_streaming/sana_dit/model.pt
+    # LTX2 causal VAE (128ch, 8x temporal, 32x spatial) — the VAE SANA-WM was
+    # trained with. vae_type=ltx2 → diffusers AutoencoderKLLTX2Video + the Wan-
+    # contract shim; forces DiT in_channels=128.
+    vae_type: ltx2
+    vae_path: /DATA/share/SANA-WM_streaming/ltx2_causal_vae
+    text_encoder_name: /DATA/share/gemma-2-2b-it
+    freeze: true                     # belt: backbone built frozen (also via training.freeze)
+    attn_kernel: gdn                 # → SanaMSVideoCamCtrlStreaming + cached GDN
+    chunk_size: 3                    # GDN chunk-causal frames/chunk == frame_chunk_size
+    fp32_attention: true             # upstream sana_wm runs GDN in fp32
+    # TI2V: the observed-prefix chunk carries the first-real-frame role via the cache.
+    use_first_frame_cond: true
+    # SANA-WM rectified-flow shift (training 9.95; deploy uses inference_flow_shift 9.8).
+    flow_shift: 9.95
+
+  action_backbone:
+    dim: 1152
+    ffn_dim: 4608
+
+dataloader:
+  type: robotwin
+  dataset_dir: /DATA/share/RoboTwin2.0/dataset
+  task_name: null
+  robot: aloha-agilex
+  variant: clean_50
+  action_mode: eef
+  # LTX2 causal VAE: 8x temporal compression (was Wan 4x). The dataloader machinery
+  # auto-snaps num_video_frames to satisfy (N-1) % 8 == 0.
+  vae_type: ltx2
+  temporal_compression: 8
+  causal_temporal: true
+  # video_stride HALVED 2→1 vs train_gdn_ar to compensate for tc doubling 4→8, so
+  # the per-clip chunk count (rollout depth coverage) is preserved: a 90-121 raw
+  # episode → num_video_frames 90-121 → latent 1+(N-1)//8 = 12-16 → 4-5 GDN chunks
+  # (depths 0..3/4), matching the gdn_ar target.
+  video_stride: 1
+  # 384x320 → LTX2 latent 12x10 (both EVEN → clean DiT patch-2). Must be /64 for ltx2.
+  height: 384
+  width: 320
+  split: train
+  val_ratio: 0.0
+  repeat: 1
+  window_stride: 1
+  multiview: true
+  camera_layout: [head_camera, left_camera, right_camera]
+  target_camera: head_camera
+  normalize_mode: min-max
+  filter_static_segments: true
+  static_segment_threshold: 1.0e-5
+  max_static_retry: 3
+  train_tasks: null
+  holdout_tasks: null
+  val_variant: null
+  text_embedding_cache_dir: null
+  text_embedding_dropout: 0.0
+  vae_cache_dir: null
+  # Growing-history clean-prefix: frame-0-anchored clips of variable logical length
+  # → the rolling AR loss is supervised at every cache depth a deploy rollout hits.
+  growing_history: true
+  history_min_frames: 90
+  history_stride: 15
+  # MUST mirror model.frame_chunk_size / video_backbone.chunk_size.
+  gdn_chunk_size: 3
+
+training:
+  output_dir: outputs/sana_wm_gdn_ar
+  max_steps: 8000              # action-bridge-only on a frozen backbone → converges fast
+  save_steps: 1000
+  keep_last_k: 20
+  batch_size: 1
+  gradient_accumulation_steps: 1
+  num_workers: 6
+  # Backbone frozen ⇒ only the action bridge + proprio train. video_lr is moot
+  # (no video grad) but kept for the optimizer-group plumbing.
+  video_lr: 1.0e-4
+  action_lr: 1.0e-4
+  weight_decay: 0.0
+  grad_clip: 1.0
+  warmup_steps: 50
+  # Backbone frozen ⇒ no video objective to balance; action is the only loss that
+  # updates weights. Keep the video term off (monitor-only would still run the
+  # frozen DiT forward each step — lambda_video 0 means it contributes no grad).
+  lambda_video: 0.0
+  lambda_action: 1.0
+  use_gradient_checkpointing: true
+  # FREEZE the pretrained GDN DiT (the Option-A core) + the VAE. The registered
+  # child path is video_backbone.dit; the VAE (_pipe.vae) is already frozen at build.
+  freeze: [video_backbone.dit, video_backbone._pipe.vae]
+  deepspeed: null
+  seed: 0
+  debug: false
