@@ -1,0 +1,50 @@
+# ---------------------------------------------------------------------------
+# NON-STREAMING A/B variant of deploy_sana_frozen.yaml.
+#
+# Same DualSystemCrossAttnArchitecture -> CrossAttnInferenceEngine dispatch, but
+# inference.streaming=false. In this mode each generate() conditions on a SINGLE
+# clean latent frame (the newest observation, tiled + VAE-encoded, latent frame 0
+# only -- see CrossAttnInferenceEngine._encode_first_frame); it does NOT rebuild /
+# re-encode the frame-0-anchored growing-history clip, does NOT pin an action
+# prefix (act_prefix is gated on `streaming AND _action_clean_prefix`), and does
+# NOT slice off a "future" boundary -- it returns the full predicted action chunk.
+#
+# This isolates whether the streaming per-step re-encode / re-anchor / boundary
+# slice is the cause of the 0% closed-loop result while offline MAE is good.
+#
+# Purpose: A/B against deploy_sana_frozen.yaml on checkpoint_step_8000.
+# num_frames/height/width auto-fill from the checkpoint dataloader (num_frames=129
+# -> 128 action tokens; video_num_frames=33 -> latent T=9).
+# ---------------------------------------------------------------------------
+checkpoint_path: null          # --ckpt-dir on the CLI overrides this.
+device: cuda:0
+server:
+  host: "0.0.0.0"
+  ws_port: 8850
+  http_port: 8848
+
+inference:
+  video_steps: 4
+  action_steps: 4
+  action_tokens: 0            # 0 => infer from clip (num_frames - 1 = 128)
+  seed: 0
+  streaming: false            # <-- THE FLIP: single-frame TI2V, full-chunk output, no re-anchor
+  predict_horizon_frames: 1   # unused when streaming=false (no prefix cap), kept for parity
+
+policy:
+  # Non-streaming returns the FULL predicted action chunk (no "future" boundary
+  # slice). Use receding-horizon so the policy still re-observes periodically
+  # instead of draining the whole 128-token chunk open-loop. 16 matches the
+  # streaming baseline so the two runs differ ONLY in engine re-generation
+  # semantics. (Set execute_horizon: null for a pure open-loop / one-shot test.)
+  execute_horizon: null        # pure one-shot open-loop from episode-start frame
+  temporal_ensemble: false    # MUST be false: mixes incompatible history lengths
+  history_len: 160            # harmless when streaming=false (engine ignores obs_history
+                              # beyond the newest frame); kept = streaming baseline.
+
+optimization:
+  decode_video: false         # action-only at deploy; do not decode video
+  async_inference:
+    mode: none                # MUST stay none: one realized obs must map to one step
+  prompt_embed_cache:
+    maxsize: 32
