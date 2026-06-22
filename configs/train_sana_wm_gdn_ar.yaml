@@ -114,7 +114,13 @@ dataloader:
 
 training:
   output_dir: outputs/sana_wm_gdn_ar
-  max_steps: 8000              # action-bridge-only on a frozen backbone → converges fast
+  # Lowered LR + longer warmup + tighter clip after the first full run DIVERGED:
+  # loss was clean ~0.2-0.38 for ~550 steps then blew up at peak lr (600:5.3,
+  # 900:19.9), and the step-1000 offline action-MAE was 1.78 (vs hold-last 0.013,
+  # pred_std 1.67 >> gt_std 0.49 = diverged noise). The GDN-AR chunked rolling loss
+  # produces spikier per-chunk gradients than frozen-SANA's whole-clip path (which
+  # was stable at 1e-4). max_steps raised to compensate for the lower LR.
+  max_steps: 12000
   save_steps: 1000
   keep_last_k: 20
   batch_size: 1
@@ -122,11 +128,11 @@ training:
   num_workers: 6
   # Backbone frozen ⇒ only the action bridge + proprio train. video_lr is moot
   # (no video grad) but kept for the optimizer-group plumbing.
-  video_lr: 1.0e-4
-  action_lr: 1.0e-4
+  video_lr: 1.0e-4            # moot (frozen DiT, no video grad)
+  action_lr: 3.0e-5          # 1e-4 -> 3e-5: the prior run diverged at 1e-4 (see above)
   weight_decay: 0.0
-  grad_clip: 1.0
-  warmup_steps: 50
+  grad_clip: 0.5             # 1.0 -> 0.5: tighter clip against the per-chunk grad spikes
+  warmup_steps: 200          # 50 -> 200: ramp slower into the stable regime
   # Backbone frozen ⇒ no video objective to balance; action is the only loss that
   # updates weights. Keep the video term off (monitor-only would still run the
   # frozen DiT forward each step — lambda_video 0 means it contributes no grad).
