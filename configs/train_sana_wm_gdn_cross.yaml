@@ -1,0 +1,113 @@
+# ISOLATION EXPERIMENT: cross-attn bridge on the SANA-WM GDN backbone.
+#
+# Question: is GDN-AR's ~3x worse action fit (offline MAE 0.20 vs frozen-SANA's
+# 0.068) due to the GDN-AR chunked-AR BRIDGE/paradigm, or the GDN BACKBONE
+# features? This run keeps the SANA-WM GDN backbone (frozen, init_dit_from, LTX2)
+# but swaps the bridge to the WHOLE-CLIP cross-attn one (variant=joint_cross_attn,
+# DualSystemCrossAttnArchitecture) — the exact bridge that got 0.068 on the
+# linear-attn backbone (train_sana_frozen.yaml).
+#   - MAE -> ~0.07  => the GDN-AR chunked bridge was the weak link (fixable).
+#   - MAE ~  0.20  => the GDN backbone features are a weaker action read.
+#
+# Cross-attn drives the backbone whole-clip (prepare -> run_block xN -> finalize),
+# NOT the cached-streaming forward_long — so none of the AR streaming machinery is
+# used. cross_attn.py is explicitly the architecture that pairs with attn_kernel=gdn.
+
+model:
+  architecture:
+    framework: dual_system
+    variant: joint_cross_attn        # → DualSystemCrossAttnArchitecture (whole-clip cross-attn)
+    action_dim: 20
+    use_proprioception: true
+    state_dim: 20
+    bridge_layers: null              # null + bridge_interval=1 → every video layer bridges
+    bridge_interval: 1
+    dim: 1152
+    num_heads: 16
+    # Clean ACTION prefix (Design B), same as the 0.068 frozen-SANA run.
+    action_clean_prefix: true
+    action_prefix_dropout: 0.3
+
+  video_backbone:
+    name: sana_video_2b
+    # SAME backbone as the GDN-AR run: frozen pretrained SANA-WM GDN + LTX2.
+    model_path: null
+    init_dit_from: /DATA/share/SANA-WM_streaming/sana_dit/model.pt
+    vae_type: ltx2
+    vae_path: /DATA/share/SANA-WM_streaming/ltx2_causal_vae
+    text_encoder_name: /DATA/share/gemma-2-2b-it
+    freeze: true
+    attn_kernel: gdn
+    # Whole-clip cross-attn: build the NON-streaming GDN factory (Bidirectional
+    # whole-clip attention) — the cached streaming attention raises under run_block.
+    gdn_streaming: false
+    chunk_size: 3
+    fp32_attention: true
+    use_first_frame_cond: true
+    flow_shift: 9.95
+
+  action_backbone:
+    dim: 1152
+    ffn_dim: 4608
+
+dataloader:
+  type: robotwin
+  dataset_dir: /DATA/share/RoboTwin2.0/dataset
+  task_name: null
+  robot: aloha-agilex
+  variant: clean_50
+  action_mode: eef
+  # IDENTICAL dataloader to train_sana_wm_gdn_ar.yaml (proven valid for lift_pot
+  # tc=8) so this is a clean BRIDGE-only isolation — same data + same backbone.
+  vae_type: ltx2
+  temporal_compression: 8
+  causal_temporal: true
+  video_stride: 1
+  height: 384
+  width: 320
+  split: train
+  val_ratio: 0.0
+  repeat: 1
+  window_stride: 1
+  multiview: true
+  camera_layout: [head_camera, left_camera, right_camera]
+  target_camera: head_camera
+  normalize_mode: min-max
+  filter_static_segments: true
+  static_segment_threshold: 1.0e-5
+  max_static_retry: 3
+  train_tasks: null
+  holdout_tasks: null
+  val_variant: null
+  text_embedding_cache_dir: null
+  text_embedding_dropout: 0.0
+  vae_cache_dir: null
+  # Growing-history clean-prefix (same as frozen-SANA): action stream learns under
+  # any amount of observed history.
+  growing_history: true
+  history_min_frames: 90
+  history_stride: 15
+  gdn_chunk_size: 3
+
+training:
+  output_dir: outputs/sana_wm_gdn_cross
+  # Mirror the stable frozen-SANA-style schedule; this is a diagnostic run so a
+  # few thousand steps to read the MAE trend is enough.
+  max_steps: 8000
+  save_steps: 1000
+  keep_last_k: 20
+  batch_size: 1
+  gradient_accumulation_steps: 1
+  num_workers: 6
+  video_lr: 1.0e-4            # moot (frozen DiT)
+  action_lr: 5.0e-5          # cross-attn whole-clip is steadier than GDN-AR; mid value
+  weight_decay: 0.01
+  grad_clip: 0.5
+  warmup_steps: 200
+  lambda_video: 0.0
+  lambda_action: 1.0
+  use_gradient_checkpointing: true
+  freeze: [video_backbone.dit, video_backbone._pipe.vae]
+  deepspeed: null
+  seed: 0
+  debug: false

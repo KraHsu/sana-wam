@@ -296,6 +296,14 @@ class _PipeSpec:
     rejected for GDN), ``init_dit_from`` builds the FULL CamCtrl streaming arch
     (so state_dict keys match) and loads it. Default ``None`` keeps GDN
     from-scratch (byte-identical to the existing GDN-AR track)."""
+    gdn_streaming: bool = True
+    """When loading a pretrained GDN backbone (``init_dit_from``), build the cached
+    STREAMING CamCtrl factory (``CachedChunkCausalGDN`` attention + ``forward_long``)
+    — required by the GDN-AR (``gdn_autoregressive``) architecture. Set ``False`` for
+    the whole-clip cross-attn architecture (``joint_cross_attn``), which drives the
+    backbone via ``prepare/run_block/finalize`` and needs the NON-streaming factory
+    (``Bidirectional`` whole-clip GDN attention); the cached attention raises without
+    a kv_cache. Same checkpoint keys load either way. Ignored without ``init_dit_from``."""
 
 
 def _resolve_model_path_and_kwargs(
@@ -417,6 +425,7 @@ def _spec_from_dictconfig(vb_cfg, *, ckpt_dir: Optional[str] = None) -> _PipeSpe
         chunk_size=int(vb_cfg.get("chunk_size", 3)),
         use_first_frame_cond=bool(vb_cfg.get("use_first_frame_cond", False)),
         init_dit_from=vb_cfg.get("init_dit_from", None),
+        gdn_streaming=bool(vb_cfg.get("gdn_streaming", True)),
     )
 
 
@@ -653,6 +662,7 @@ def _spec_from_dict(d: dict, *, ckpt_dir: Optional[str] = None) -> _PipeSpec:
         chunk_size=int(d.get("chunk_size", 3)),
         use_first_frame_cond=bool(d.get("use_first_frame_cond", False)),
         init_dit_from=d.get("init_dit_from", None),
+        gdn_streaming=bool(d.get("gdn_streaming", True)),
     )
 
 
@@ -670,9 +680,12 @@ def _build_pipe_from_spec(
     factory_name = spec.model_factory
     if spec.attn_kernel == "gdn" and "CamCtrl" not in factory_name:
         factory_name = _GDN_MODEL_FACTORY
-        # Loading the pretrained SANA-WM world model needs the cached chunk-causal
-        # streaming arch (its keys + the forward_long rollout path).
-        if spec.init_dit_from is not None:
+        # The pretrained SANA-WM world model uses the cached chunk-causal STREAMING
+        # arch (forward_long rollout) for the GDN-AR architecture. The whole-clip
+        # cross-attn architecture (gdn_streaming=False) instead needs the
+        # NON-streaming factory (Bidirectional whole-clip GDN attention) — the cached
+        # attention raises without a kv_cache under run_block. Keys load either way.
+        if spec.init_dit_from is not None and spec.gdn_streaming:
             factory_name = _GDN_MODEL_FACTORY_STREAMING
     factory = _resolve_upstream_factory(factory_name)
     model_kwargs = _apply_attn_kernel(
