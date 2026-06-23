@@ -350,6 +350,19 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         clip = recent[:: self._video_stride]  # training cadence; len grows with the episode
         if len(clip) > self._video_num_frames:  # never encode beyond the clip length
             clip = clip[: self._video_num_frames]
+        # Snap to a VAE-valid temporal length. The causal VAE requires (N-1) % tc == 0
+        # — the LTX2 VAE (tc=8) ENFORCES this (N=64 raises an unflatten error mid-VAE),
+        # whereas the Wan VAE (tc=4) tolerated arbitrary lengths. The obs clip grows one
+        # frame per step, so without this it eventually hits an invalid length and
+        # crashes the episode. Truncate to the largest valid 1+tc*k <= len (drops at
+        # most tc-1 trailing frames; the window includes them at the next valid length;
+        # proprio still carries 'now'). No-op when already valid (e.g. capped windows).
+        tc = self._temporal_compression
+        n = len(clip)
+        if tc > 1 and n > 1:
+            valid = 1 + ((n - 1) // tc) * tc
+            if valid != n:
+                clip = clip[:valid]
         return clip or [frames[0]]
 
     def _encode_clip(self, clip: list) -> torch.Tensor:
