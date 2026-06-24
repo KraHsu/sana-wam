@@ -97,6 +97,14 @@ class ARInferenceEngine(BaseInferenceEngine):
         self._video_steps = int(_inf("video_steps", denoise_steps) or denoise_steps)
         self._action_steps = int(_inf("action_steps", denoise_steps) or denoise_steps)
         self._seed = int(_inf("seed", 0) or 0)
+        # Delta actions are only wired through the cross-attn deploy engine. Fail
+        # loudly rather than silently emitting raw deltas as absolute commands.
+        if bool(OmegaConf.select(cfg, "dataloader.delta_action", default=False)):
+            raise NotImplementedError(
+                "dataloader.delta_action=true is not supported by the AR engine; "
+                "use the cross-attn engine, which reconstructs absolute = "
+                "unnormalize(delta + normalize(current_state))."
+            )
         self._obs_chunk_mode = str(_inf("ar_obs_chunk_mode", "rolling_buffer"))
         self._proprio_mode = str(_inf("ar_proprio_mode", "per_step"))
         # Which latent band of the freshly-encoded clip is the current obs chunk.

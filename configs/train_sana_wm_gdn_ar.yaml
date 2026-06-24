@@ -27,6 +27,14 @@ model:
     action_dim: 20
     use_proprioception: true
     state_dim: 20
+    # Delta (relative) actions, GDN-AR per-chunk: each chunk's action target is the
+    # displacement from THAT chunk's proprio anchor (the advancing per-chunk state the
+    # model already conditions on + deploy advances every step). Reuses the absolute
+    # min-max normalizer (delta taken in normalized space); the AR deploy engine
+    # reconstructs absolute = unnormalize(delta + normalize(current_state)). Distinct
+    # from the cross-attn dataloader-side `dataloader.delta_action` (single window
+    # anchor) — keep dataloader.delta_action=false here. 0/false ⇒ absolute (default).
+    delta_action: false
     bridge_layers: null              # null + bridge_interval=1 → every video layer bridges
     bridge_interval: 1
     dim: 1152

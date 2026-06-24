@@ -319,6 +319,20 @@ class DualSystemGDNARArchitecture(DualSystemCrossAttnArchitecture):
                 clean_c = vid_b[:, :, c * K : (c + 1) * K]  # (1, C, K, H, W)
                 proprio_c = _chunk_proprio(b, c, prop_b)
                 clean_a_c = act_b[:, c * atc : (c + 1) * atc]  # (1, atc, Ad)
+                # Delta actions (per-chunk): predict the displacement from THIS chunk's
+                # proprio anchor (the state the chunk is conditioned on) instead of the
+                # absolute target. Anchoring to proprio_c — the SAME state fed as the
+                # per-chunk context and the one deploy advances every step — keeps train
+                # and AR rollout consistent (deploy adds the current proprio back). A
+                # single window anchor (cross-attn style) would NOT match GDN-AR's
+                # advancing per-chunk proprio. proprio_c is (1, D); broadcast over atok.
+                if self._delta_action:
+                    if not isinstance(proprio_c, Tensor):
+                        raise RuntimeError(
+                            "model.architecture.delta_action requires per-chunk proprio "
+                            "(set proprio_per_chunk + provide proprio_seq)."
+                        )
+                    clean_a_c = clean_a_c - proprio_c.unsqueeze(1)
 
                 # ---- video noising at a sampled per-chunk timestep ----
                 v_ids = torch.randint(0, num_ts_v, (1,))

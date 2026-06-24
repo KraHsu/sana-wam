@@ -341,6 +341,7 @@ class RoboTwinDataset(BaseActionDataset):
         history_min_frames: int = 1,
         history_stride: int = 1,
         gdn_chunk_size: int = 1,
+        delta_action: bool = False,
     ):
         super().__init__()
         self.robot = robot
@@ -372,6 +373,20 @@ class RoboTwinDataset(BaseActionDataset):
 
         if action_mode not in ("joint", "eef"):
             raise ValueError(f"action_mode must be 'joint' or 'eef', got '{action_mode}'")
+
+        # ---- Delta (relative) actions ----
+        # When enabled, each action token is the DISPLACEMENT from the current
+        # state (the proprio anchor) rather than the absolute target, computed in
+        # the (already-normalized) action space so the existing absolute normalizer
+        # /stats are reused unchanged. Deploy reconstructs the absolute command as
+        # ``unnormalize(delta + normalize(current_state))``. This directly attacks
+        # closed-loop compounding error by re-anchoring every inference to the
+        # actually-observed state. ``proprio``/``proprio_seq`` stay ABSOLUTE — they
+        # describe the state, not a displacement. Only meaningful for the 20D eef
+        # space (xyz/rot6d/grip), where the anchor and target share the same layout.
+        self.delta_action = bool(delta_action)
+        if self.delta_action and action_mode != "eef":
+            raise ValueError("delta_action=True requires action_mode='eef'.")
 
         # Validate resolution: pixels must survive VAE spatial downsample AND the
         # DiT patch (2) with integer, EVEN latent dims. Wan (8x) keeps the historical
@@ -1060,7 +1075,17 @@ class RoboTwinDataset(BaseActionDataset):
         # pinned to episode frame 0 (which would feed a stale state at deploy).
         cur_raw = self._proprio_raw_index(num_clean_prefix_latent, actual_valid_len)
         proprio_np = raw_actions[cur_raw : cur_raw + 1].astype(np.float32)
-        action_np = raw_actions[1 : self.num_frames].astype(np.float32)
+        action_abs = raw_actions[1 : self.num_frames].astype(np.float32)
+        # Delta actions: token t is the displacement from the CURRENT state (the
+        # proprio anchor = raw_actions[cur_raw]), computed in the already-normalized
+        # action space. Deploy reconstructs absolute = unnormalize(delta + anchor),
+        # re-anchoring every inference to the observed state (see __init__ note).
+        # ``proprio``/``proprio_seq`` stay absolute. cur_raw is 0 in the legacy
+        # frame-0-only path, so the anchor is the window's first state there.
+        if self.delta_action:
+            action_np = (action_abs - proprio_np).astype(np.float32)
+        else:
+            action_np = action_abs
 
         video_mask = torch.tensor(
             [idx < actual_valid_len for idx in self._video_sample_indices],
@@ -1076,7 +1101,9 @@ class RoboTwinDataset(BaseActionDataset):
         # tail windows where the first action label is padding. Measured at the
         # window start (raw_actions[0]→action[0]), independent of the proprio frame.
         if self.num_action_steps > 0 and bool(action_mask[0]):
-            first_delta_max = float(np.max(np.abs(action_np[0] - raw_actions[0])))
+            # Measured on absolute states so the static heuristic is unaffected by
+            # the delta-action representation (action_np may already be a delta).
+            first_delta_max = float(np.max(np.abs(action_abs[0] - raw_actions[0])))
             is_static = first_delta_max < self._static_segment_threshold
         else:
             is_static = False
@@ -1254,6 +1281,7 @@ class MultiTaskRoboTwinDataset(BaseActionDataset):
             history_min_frames=int(_get("history_min_frames", 1)),
             history_stride=int(_get("history_stride", 1)),
             gdn_chunk_size=int(_get("gdn_chunk_size", 1)),
+            delta_action=bool(_get("delta_action", False)),
         )
 
     def __init__(

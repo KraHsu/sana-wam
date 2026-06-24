@@ -106,6 +106,11 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         # conditions on them. Gated on the architecture flag (set only when the
         # checkpoint was trained with action_clean_prefix); otherwise legacy behavior.
         self._action_clean_prefix = bool(getattr(arch, "_action_clean_prefix", False))
+        # Delta (relative) actions: the model predicts displacements from the current
+        # state in the (normalized) training space. Reconstruct the absolute command
+        # as unnormalize(delta + normalize(current_state)). Read from the checkpoint's
+        # dataloader config so it tracks how the policy was trained.
+        self._delta_action = bool(OmegaConf.select(cfg, "dataloader.delta_action", default=False))
 
         self._prompt_ctx_cache: "OrderedDict[str, tuple[torch.Tensor, torch.Tensor]]" = OrderedDict()
         self._gen = torch.Generator(device=self._device).manual_seed(self._seed)
@@ -126,6 +131,22 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         prompt = conditions.get("prompt", "") or ""
         context, seq_lens = self._encode_prompt(prompt)
         proprio = self._prep_proprio(conditions.get("proprio_state"))
+
+        # Delta-action anchor: the current state normalized exactly like training
+        # (the same normalizer ``generate`` later inverts). Both the future tokens
+        # and the clean action prefix are displacements from this anchor.
+        anchor_norm = None
+        if self._delta_action:
+            ps = conditions.get("proprio_state")
+            if ps is None:
+                raise ValueError(
+                    "delta_action deploy requires conditions['proprio_state'] "
+                    "(the current robot state used as the delta anchor)."
+                )
+            anchor_norm = np.asarray(
+                arch.normalize_deploy_proprio(np.asarray(ps, dtype=np.float32).reshape(-1)),
+                dtype=np.float32,
+            )
 
         B = 1
         T = self._video_num_frames_latent()
@@ -170,7 +191,7 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         # clean prefix). k_a = number of executed actions (capped to leave a future);
         # 0 at episode start (bootstrap) ⇒ no action prefix.
         act_prefix = (
-            self._prep_action_prefix(conditions, atok)
+            self._prep_action_prefix(conditions, atok, anchor_norm=anchor_norm)
             if (self._streaming and self._action_clean_prefix)
             else None
         )
@@ -220,6 +241,12 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
 
         self._step_c += 1
         actions_np = actions.squeeze(0).float().cpu().numpy()
+        # Delta actions: tokens are displacements from the current state in the
+        # normalized space — add the normalized anchor BEFORE unnormalizing so the
+        # rot6d/grip dims land back on the training manifold (the downstream
+        # eef20d→ee16d conversion orthonormalizes the recovered 6d rotation).
+        if self._delta_action:
+            actions_np = actions_np + anchor_norm[None, :]
         normalizer = getattr(arch, "action_normalizer", None)
         if normalizer is not None:
             actions_np = normalizer.unnormalize(actions_np)
@@ -263,7 +290,9 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
             device=self._device, dtype=self._dtype
         ).unsqueeze(0)
 
-    def _prep_action_prefix(self, conditions: dict, atok: int) -> Optional[torch.Tensor]:
+    def _prep_action_prefix(
+        self, conditions: dict, atok: int, anchor_norm: Optional[np.ndarray] = None
+    ) -> Optional[torch.Tensor]:
         """Executed-past actions → clean action prefix ``(1, k_a, action_dim)``.
 
         ``conditions['action_history']`` is the actions the policy sent to the env
@@ -272,7 +301,11 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         to the engine's output) and align token i ↔ the i-th executed action (token i
         is the action into frame i+1, anchored at episode frame 0 — which requires
         ``history_len`` to span the episode). Cap ``k_a`` to leave >=1 future token;
-        returns None when no history (episode-start bootstrap)."""
+        returns None when no history (episode-start bootstrap).
+
+        Delta actions: the executed past is also stored absolute, so after
+        normalizing it we subtract the same ``anchor_norm`` used for the future
+        tokens — the model conditions on displacements, not absolute states."""
         hist = conditions.get("action_history") or []
         if not hist:
             return None
@@ -286,6 +319,8 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         normalizer = getattr(self.architecture, "action_normalizer", None)
         if normalizer is not None:
             arr = np.asarray(normalizer.normalize(arr), dtype=np.float32)
+        if self._delta_action and anchor_norm is not None:
+            arr = (arr - anchor_norm[None, :]).astype(np.float32)
         t = torch.from_numpy(np.ascontiguousarray(arr)).to(device=self._device, dtype=self._dtype)
         return t.unsqueeze(0)  # (1, k_a, action_dim)
 

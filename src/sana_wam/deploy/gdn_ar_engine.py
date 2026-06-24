@@ -66,6 +66,14 @@ class GDNARInferenceEngine(BaseInferenceEngine):
         self._video_steps = int(_inf("video_steps", denoise_steps) or denoise_steps)
         self._action_steps = int(_inf("action_steps", denoise_steps) or denoise_steps)
         self._seed = int(_inf("seed", 0) or 0)
+        # Delta actions (GDN-AR per-chunk): each generate predicts ONE chunk whose
+        # tokens are displacements from the current proprio (matching training, where
+        # chunk c's target is anchored to its per-chunk proprio_c). Reconstruct absolute
+        # = unnormalize(delta + normalize(current_state)). Read the MODEL-side flag (the
+        # GDN-AR loss applies the delta per-chunk; the dataloader stays absolute).
+        self._delta_action = bool(OmegaConf.select(cfg, "model.architecture.delta_action", default=False))
+        if self._delta_action and not bool(getattr(self.architecture, "uses_proprioception", False)):
+            raise ValueError("model.architecture.delta_action requires proprioception (the delta anchor).")
         # Which latent band of the freshly-encoded clip is the current obs chunk:
         # leading at episode start (training chunk 0, incl. the causal first-frame
         # token), trailing (latest chunk) thereafter. Mirrors ar_engine + training.
@@ -240,6 +248,21 @@ class GDNARInferenceEngine(BaseInferenceEngine):
         pred_action = self._step_with_obs_latent(obs_latent, context, seq_lens, proprio)
 
         actions = pred_action.squeeze(0).float().cpu().numpy()
+        # Delta actions: the chunk's tokens are displacements from the current state in
+        # the normalized space — add the normalized current proprio (the per-chunk
+        # anchor training used) BEFORE unnormalizing, so rot6d/grip land on the training
+        # manifold (eef20d→ee16d then orthonormalizes the recovered 6d rotation).
+        if self._delta_action:
+            ps = conditions.get("proprio_state")
+            if ps is None:
+                raise ValueError(
+                    "delta_action deploy requires conditions['proprio_state'] (the delta anchor)."
+                )
+            anchor_norm = np.asarray(
+                self.architecture.normalize_deploy_proprio(np.asarray(ps, dtype=np.float32).reshape(-1)),
+                dtype=np.float32,
+            )
+            actions = actions + anchor_norm[None, :]
         normalizer = getattr(self.architecture, "action_normalizer", None)
         if normalizer is not None:
             actions = normalizer.unnormalize(actions)

@@ -27,6 +27,11 @@ model:
     # Clean ACTION prefix (Design B), same as the 0.068 frozen-SANA run.
     action_clean_prefix: true
     action_prefix_dropout: 0.3
+    # R0 (DART-style on-distribution proxy): fraction of latent-std Gaussian noise
+    # added to the observed clean-prefix latents at train time, to robustify the
+    # action head against off-manifold observations (closed-loop covariate shift).
+    # 0.0 = off; overridden per-run on the CLI for the σ sweep.
+    obs_prefix_noise_std: 0.0
 
   video_backbone:
     name: sana_video_2b
@@ -57,6 +62,12 @@ dataloader:
   robot: aloha-agilex
   variant: clean_50
   action_mode: eef
+  # Delta (relative) actions: predict displacement from the current state instead
+  # of the absolute EEF target. Attacks the diagnosed closed-loop compounding error
+  # by re-anchoring every inference to the observed state. Reuses the absolute
+  # min-max normalizer/stats (delta is taken in normalized space); deploy
+  # reconstructs absolute = unnormalize(delta + normalize(current_state)).
+  delta_action: true
   # IDENTICAL dataloader to train_sana_wm_gdn_ar.yaml (proven valid for lift_pot
   # tc=8) so this is a clean BRIDGE-only isolation — same data + same backbone.
   vae_type: ltx2

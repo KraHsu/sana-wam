@@ -42,6 +42,16 @@ class DualSystemCrossAttnArchitecture(BaseWAMArchitecture):
         # prefix (mirrors the video TI2V clean prefix). Off ⇒ legacy behavior.
         self._action_clean_prefix: bool = False
         self._action_prefix_dropout: float = 0.0
+        # R0 (DART-style on-distribution proxy): training-time Gaussian perturbation
+        # of the OBSERVED clean-prefix video latents, as a fraction of the latent std.
+        # Robustifies the action head to observations off the expert manifold (a cheap
+        # stand-in for the closed-loop covariate shift). 0.0 ⇒ off (legacy).
+        self._obs_prefix_noise_std: float = 0.0
+        # MODEL-SIDE delta actions (GDN-AR only): each chunk's action target is the
+        # displacement from THAT chunk's per-chunk proprio anchor. Used by the GDN-AR
+        # compute_loss (which has proprio_c) — NOT the cross-attn path (that uses the
+        # dataloader-side single-anchor `dataloader.delta_action`). Off ⇒ absolute.
+        self._delta_action: bool = False
         if cfg is None:
             return
         cfg = dict(cfg) if isinstance(cfg, dict) else {k: v for k, v in cfg.items()}
@@ -68,6 +78,8 @@ class DualSystemCrossAttnArchitecture(BaseWAMArchitecture):
         self._init_proprio_context(cfg, text_dim=text_dim)
         self._action_clean_prefix = bool(cfg.get("action_clean_prefix", False))
         self._action_prefix_dropout = float(cfg.get("action_prefix_dropout", 0.0) or 0.0)
+        self._obs_prefix_noise_std = float(cfg.get("obs_prefix_noise_std", 0.0) or 0.0)
+        self._delta_action = bool(cfg.get("delta_action", False))
 
         action_dim_hidden = int(cfg.get("dim", 1024))
         num_heads = int(cfg.get("num_heads", 16))
@@ -211,6 +223,20 @@ class DualSystemCrossAttnArchitecture(BaseWAMArchitecture):
             zero = clean_mask.view(B, 1, T, 1, 1)
             v_sigma_f = torch.where(zero, torch.zeros_like(v_sigma_f), v_sigma_f)
         noisy_video = (1 - v_sigma_f) * clean_video + v_sigma_f * v_noise
+        # R0 (DART-style on-distribution proxy): perturb ONLY the observed clean-prefix
+        # frames so the action head conditions on observations off the expert manifold —
+        # a cheap stand-in for the closed-loop visual covariate shift. Future frames are
+        # untouched (they remain GT denoising targets), and the prefix is already excluded
+        # from the video loss, so this changes only what the ACTION stream sees. Scale is
+        # relative to the latent std so it self-calibrates to the VAE. Train-only.
+        if (
+            self.training
+            and self._obs_prefix_noise_std > 0.0
+            and prefix_lens is not None
+        ):
+            scale = self._obs_prefix_noise_std * clean_video.detach().std()
+            obs_perturb = torch.randn_like(noisy_video) * scale
+            noisy_video = torch.where(zero, noisy_video + obs_perturb, noisy_video)
         # Route the target through the scheduler so a future scheduler with a
         # different flow-matching parameterization stays consistent (currently
         # noise - sample). The video scheduler's signature takes a timestep arg.
