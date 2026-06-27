@@ -51,7 +51,7 @@ def _expanded_linear_attn(
     phi_q: Tensor,
     phi_k: Tensor,
     mask: Optional[Tensor] = None,
-    eps: float = 1e-15,
+    eps: float = 1e-8,
 ) -> Tensor:
     """``O(N²)`` mask-aware reference for SANA's dual-track linear attention.
 
@@ -105,6 +105,21 @@ def _expanded_linear_attn(
             f"phi_k={tuple(phi_k.shape)}, tilde_k={tuple(tilde_k.shape)}."
         )
 
+    # Upcast bf16/fp16 to fp32 for the attention math. Mirrors upstream SANA
+    # ``LiteLAReLURope.attn_matmul`` (q/k/v .float() before QK^T / sum). Running
+    # the whole linear-attn formula in bf16 bleeds ~3% mean-relative error per
+    # layer, which compounds across the joint MoT stack (the SANA-vs-Wan gap and
+    # the deploy 11%->37.5% reproduction fix). fp32/fp64 callers (math-equivalence
+    # tests) are left untouched so their fp64-tolerance asserts still bind.
+    orig_dtype = v.dtype
+    compute_dtype = torch.float32 if orig_dtype in (torch.bfloat16, torch.float16) else orig_dtype
+    if compute_dtype != orig_dtype:
+        tilde_q = tilde_q.to(compute_dtype)
+        tilde_k = tilde_k.to(compute_dtype)
+        v = v.to(compute_dtype)
+        phi_q = phi_q.to(compute_dtype)
+        phi_k = phi_k.to(compute_dtype)
+
     a = tilde_q @ tilde_k.transpose(-1, -2)  # (B, H, N, N)
     b = phi_q @ phi_k.transpose(-1, -2)  # (B, H, N, N)
 
@@ -115,7 +130,8 @@ def _expanded_linear_attn(
 
     num = a @ v  # (B, H, N, d)
     denom = b.sum(dim=-1, keepdim=True) + eps  # (B, H, N, 1)
-    return num / denom
+    out = num / denom
+    return out.to(orig_dtype) if compute_dtype != orig_dtype else out
 
 
 def _mask_to_chunk_index(mask: Tensor) -> Optional[List[int]]:
@@ -241,7 +257,7 @@ def _chunked_linear_attn(
     phi_q: Tensor,
     phi_k: Tensor,
     chunk_index: List[int],
-    eps: float = 1e-15,
+    eps: float = 1e-8,
 ) -> Tensor:
     """``O(N · d²)`` cumsum implementation for monotonic block-causal masks.
 
@@ -289,10 +305,23 @@ def _chunked_linear_attn(
         raise ValueError(f"chunk_index must start at 0 and end at N={tilde_q.shape[-2]}; got {chunk_index}.")
 
     B, H, N, d = tilde_q.shape
-    out = torch.empty_like(v)
 
-    s_mat = torch.zeros(B, H, d, d, dtype=v.dtype, device=v.device)
-    z_vec = torch.zeros(B, H, 1, d, dtype=v.dtype, device=v.device)
+    # Upcast bf16/fp16 inputs AND the cumulative state to fp32. The running
+    # state S = Σ V^T K accumulates O(N) outer products, so bf16's ~7-bit
+    # mantissa makes per-layer error compound with sequence length and depth.
+    # fp32/fp64 callers pass through untouched (math-equivalence tests).
+    orig_dtype = v.dtype
+    compute_dtype = torch.float32 if orig_dtype in (torch.bfloat16, torch.float16) else orig_dtype
+    if compute_dtype != orig_dtype:
+        tilde_q = tilde_q.to(compute_dtype)
+        tilde_k = tilde_k.to(compute_dtype)
+        v = v.to(compute_dtype)
+        phi_q = phi_q.to(compute_dtype)
+        phi_k = phi_k.to(compute_dtype)
+
+    out = torch.empty(B, H, N, d, dtype=compute_dtype, device=v.device)
+    s_mat = torch.zeros(B, H, d, d, dtype=compute_dtype, device=v.device)
+    z_vec = torch.zeros(B, H, 1, d, dtype=compute_dtype, device=v.device)
 
     for c in range(len(chunk_index) - 1):
         i_start, i_end = int(chunk_index[c]), int(chunk_index[c + 1])
@@ -316,7 +345,7 @@ def _chunked_linear_attn(
         denom = (phi_q_c @ z_vec.transpose(-1, -2)) + eps  # (B, H, s_c, 1)
         out[:, :, i_start:i_end, :] = num / denom
 
-    return out
+    return out.to(orig_dtype) if compute_dtype != orig_dtype else out
 
 
 def _chunked_linear_attn_checkpointed(
@@ -326,7 +355,7 @@ def _chunked_linear_attn_checkpointed(
     phi_q: Tensor,
     phi_k: Tensor,
     chunk_index: List[int],
-    eps: float = 1e-15,
+    eps: float = 1e-8,
 ) -> Tensor:
     """Per-chunk gradient-checkpointed variant of :func:`_chunked_linear_attn`.
 
@@ -378,11 +407,23 @@ def _chunked_linear_attn_checkpointed(
         )
 
     B, H, N, d = tilde_q.shape
-    out_chunks: List[Tensor] = []
 
-    s_mat = torch.zeros(B, H, d, d, dtype=v.dtype, device=v.device)
-    z_vec = torch.zeros(B, H, 1, d, dtype=v.dtype, device=v.device)
-    eps_t = torch.tensor(eps, dtype=v.dtype, device=v.device)
+    # Same fp32 upcast policy as :func:`_chunked_linear_attn` — only bf16/fp16
+    # inputs upcast; fp32/fp64 pass through. State crosses the checkpoint
+    # boundary at the compute dtype so backward recompute matches the forward.
+    orig_dtype = v.dtype
+    compute_dtype = torch.float32 if orig_dtype in (torch.bfloat16, torch.float16) else orig_dtype
+    if compute_dtype != orig_dtype:
+        tilde_q = tilde_q.to(compute_dtype)
+        tilde_k = tilde_k.to(compute_dtype)
+        v = v.to(compute_dtype)
+        phi_q = phi_q.to(compute_dtype)
+        phi_k = phi_k.to(compute_dtype)
+
+    out_chunks: List[Tensor] = []
+    s_mat = torch.zeros(B, H, d, d, dtype=compute_dtype, device=v.device)
+    z_vec = torch.zeros(B, H, 1, d, dtype=compute_dtype, device=v.device)
+    eps_t = torch.tensor(eps, dtype=compute_dtype, device=v.device)
 
     def _chunk_step(tq_c, pq_c, tk_c, v_c, pk_c, s_in, z_in, eps_in):
         s_new = s_in + v_c.transpose(-1, -2) @ tk_c
@@ -416,7 +457,8 @@ def _chunked_linear_attn_checkpointed(
         )
         out_chunks.append(out_c)
 
-    return torch.cat(out_chunks, dim=2)
+    result = torch.cat(out_chunks, dim=2)
+    return result.to(orig_dtype) if compute_dtype != orig_dtype else result
 
 
 __all__ = [
