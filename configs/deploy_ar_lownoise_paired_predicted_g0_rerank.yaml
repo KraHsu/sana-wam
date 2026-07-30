@@ -1,0 +1,46 @@
+# Common-random-number control for the measured-cache A/B. This is intentionally
+# separate from the canonical baseline config.
+checkpoint_path: null
+checkpoint_name: checkpoint_step_12000.safetensors
+device: cuda:0
+server:
+  host: "127.0.0.1"
+  ws_port: 8850
+  http_port: 8848
+
+inference:
+  video_steps: 10
+  action_steps: 10
+  seed: null
+  episode_noise_mode: paired
+  episode_noise_base_seed: 20260715
+  cache_feedback_mode: predicted
+  cache_feedback_fallback: error
+  shift: 5.0
+  ar_obs_chunk_mode: rolling_buffer
+  ar_obs_latent_band: auto
+  ar_proprio_mode: per_step
+  generation_zero_rerank:
+    enabled: true
+    candidate_count: 5
+    ranker_path: /home/zch/workspace/sana-wam/logs/outcome_groups30_g5_20260721/summary_action_ranker/ranker.npz
+    expected_ranker_sha256: c5af1d0d6c145e06c127b4f0d9292a5a05d523ed1a0317d24b482a3f6d5cc964
+
+policy:
+  execute_horizon: null
+  temporal_ensemble: true
+  history_len: 113
+  feedback_history_len: 256
+
+optimization:
+  decode_video: false
+  async_inference:
+    mode: none
+  prompt_embed_cache:
+    maxsize: 32
+
+telemetry:
+  enabled: true
+  output_dir: ./telemetry/server
+  include_chunks: true
+  flush_every: 32

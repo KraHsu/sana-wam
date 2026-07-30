@@ -150,6 +150,25 @@ class SanaMoTJointDriver(MoTJointDriver):
                 f"got '{a_kernel}'. Cross-modality inner products require kernel-aligned "
                 "Q/K on both sides; set ActionDiT(attn_kernel='linear_relu') in the config."
             )
+        video_aligned = bool(
+            getattr(vb, "aligned_positive_rope_kernel", False)
+        )
+        action_aligned = bool(
+            getattr(ab, "aligned_positive_rope_kernel", False)
+        )
+        if video_aligned != action_aligned:
+            raise ValueError(
+                "aligned_positive_rope_kernel must be enabled on both video "
+                "and action streams or neither"
+            )
+        self.aligned_positive_rope_kernel = video_aligned
+        video_mode = getattr(vb, "aligned_positive_rope_mode", None)
+        action_mode = getattr(ab, "aligned_positive_rope_mode", None)
+        if video_aligned and video_mode != action_mode:
+            raise ValueError(
+                "aligned_positive_rope_mode must match on video and action streams"
+            )
+        self.aligned_positive_rope_mode = video_mode if video_aligned else None
 
     def run_joint_loop(self, *args, **kwargs):
         """Reset the chunk-index cache, then delegate to the base loop.
@@ -176,7 +195,9 @@ class SanaMoTJointDriver(MoTJointDriver):
         attn_mask: Optional[Tensor] = None,
         *,
         suppress_inner_attn_ckpt: bool = False,
-    ) -> Tuple["BlockLoopState", "ActionState"]:
+    ) -> Tuple["BlockLoopState", "ActionState"] | tuple[
+        "BlockLoopState", "ActionState", Tensor
+    ]:
         """Override of :meth:`MoTJointDriver._step_impl`.
 
         Mirrors the parent's structure (pre_attn → concat → mixed → split →
@@ -229,7 +250,7 @@ class SanaMoTJointDriver(MoTJointDriver):
             and not suppress_inner_attn_ckpt
         )
 
-        mixed = self._mixed_attention(
+        mixed_result = self._mixed_attention(
             q_cat,
             k_cat,
             v_cat,
@@ -240,10 +261,23 @@ class SanaMoTJointDriver(MoTJointDriver):
             s_video=s_video,
             s_action=s_action,
         )
+        attention_aux = None
+        if isinstance(mixed_result, tuple):
+            if len(mixed_result) != 2:
+                raise RuntimeError(
+                    "mixed attention auxiliary return must be (output, auxiliary)"
+                )
+            mixed, attention_aux = mixed_result
+            if not isinstance(mixed, Tensor) or not isinstance(attention_aux, Tensor):
+                raise TypeError("mixed attention output and auxiliary must be tensors")
+        else:
+            mixed = mixed_result
 
         attn_v, attn_a = mixed.split([s_video, s_action], dim=1)
         vstate = vb.post_attn_at_layer(layer_id, vstate, attn_v.contiguous(), vpost)
         astate = ab.post_attn_at_layer(layer_id, astate, attn_a.contiguous(), apost)
+        if attention_aux is not None:
+            return vstate, astate, attention_aux
         return vstate, astate
 
     def _mixed_attention(  # type: ignore[override]

@@ -10,6 +10,7 @@ The base composes a ``video_backbone`` and an ``action_backbone``; each concrete
 architecture implements its own ``forward()``.
 """
 
+import copy
 import functools
 import logging
 import os
@@ -149,15 +150,31 @@ class BaseWAMArchitecture(ABC, nn.Module):
         if vb_cfg is None:
             return
         source = self._cfg_get(vb_cfg, "_source", None)
-        self.video_backbone = SanaVideoBackbone.from_pretrained(source if source is not None else cfg)
+        build_kwargs = {}
+        build_device = self._cfg_get(vb_cfg, "_device", None)
+        checkpoint_dir = self._cfg_get(vb_cfg, "_ckpt_dir", None)
+        if build_device is not None:
+            build_kwargs["device"] = str(build_device)
+        if checkpoint_dir is not None:
+            build_kwargs["ckpt_dir"] = str(checkpoint_dir)
+        self.video_backbone = SanaVideoBackbone.from_pretrained(
+            source if source is not None else cfg,
+            **build_kwargs,
+        )
 
     def _resolve_video_dim(self, cfg) -> int:
         """Resolve video_dim from config or video_backbone; raise if neither provides it."""
-        dim = int(cfg.get("video_dim", 0)) if isinstance(cfg, dict) else int(getattr(cfg, "video_dim", 0))
+        dim = (
+            int(cfg.get("video_dim", 0))
+            if isinstance(cfg, dict)
+            else int(getattr(cfg, "video_dim", 0))
+        )
         if dim == 0 and self.video_backbone is not None:
             dim = self.video_backbone.dim
         if not dim:
-            raise ValueError("video_dim must be specified in config or inferred from video_backbone")
+            raise ValueError(
+                "video_dim must be specified in config or inferred from video_backbone"
+            )
         return dim
 
     def _resolve_text_dim(self, cfg, *, default: int = 4096) -> int:
@@ -212,15 +229,25 @@ class BaseWAMArchitecture(ABC, nn.Module):
 
     @property
     def action_dim(self) -> int:
-        return self.action_backbone.action_dim if self.action_backbone is not None else 0
+        return (
+            self.action_backbone.action_dim if self.action_backbone is not None else 0
+        )
 
     @property
     def bridge_layers(self) -> tuple:
-        return getattr(self.action_backbone, "bridge_layers", ()) if self.action_backbone is not None else ()
+        return (
+            getattr(self.action_backbone, "bridge_layers", ())
+            if self.action_backbone is not None
+            else ()
+        )
 
     @property
     def expert_layers(self) -> tuple:
-        return getattr(self.action_backbone, "expert_layers", ()) if self.action_backbone is not None else ()
+        return (
+            getattr(self.action_backbone, "expert_layers", ())
+            if self.action_backbone is not None
+            else ()
+        )
 
     @property
     def trainable_action_module(self) -> Optional[nn.Module]:
@@ -230,7 +257,8 @@ class BaseWAMArchitecture(ABC, nn.Module):
     @property
     def uses_proprioception(self) -> bool:
         return bool(getattr(self, "_use_proprioception_context", False)) or (
-            self.action_backbone is not None and self.action_backbone.uses_proprioception
+            self.action_backbone is not None
+            and self.action_backbone.uses_proprioception
         )
 
     def _init_proprio_context(self, cfg, *, text_dim: int = 4096) -> None:
@@ -244,26 +272,38 @@ class BaseWAMArchitecture(ABC, nn.Module):
             return
         state_dim = int(self._cfg_get(cfg, "state_dim", 0) or 0)
         if state_dim <= 0:
-            raise ValueError("use_proprioception=True requires explicit state_dim for context-token proprio.")
+            raise ValueError(
+                "use_proprioception=True requires explicit state_dim for context-token proprio."
+            )
         self.proprio_dim = state_dim
         self.proprio_encoder = nn.Linear(state_dim, self.context_dim)
 
-    def _append_proprio_context_token(self, pipeline_inputs: dict, proprio_state: Optional[Tensor]) -> dict:
+    def _append_proprio_context_token(
+        self, pipeline_inputs: dict, proprio_state: Optional[Tensor]
+    ) -> dict:
         """Append one proprio token to raw text context and extend context_mask."""
         if not bool(getattr(self, "_use_proprioception_context", False)):
             return pipeline_inputs
         if self.proprio_encoder is None:
-            raise RuntimeError("proprio context is enabled but proprio_encoder is not initialized.")
+            raise RuntimeError(
+                "proprio context is enabled but proprio_encoder is not initialized."
+            )
         if proprio_state is None:
-            raise ValueError("use_proprioception=True requires `proprio_state` from sample['proprio'] or obs['state'].")
+            raise ValueError(
+                "use_proprioception=True requires `proprio_state` from sample['proprio'] or obs['state']."
+            )
         if proprio_state.ndim == 1:
             proprio_state = proprio_state.unsqueeze(0)
         elif proprio_state.ndim == 3 and proprio_state.shape[1] == 1:
             proprio_state = proprio_state[:, 0, :]
         if proprio_state.ndim != 2:
-            raise ValueError(f"proprio_state must be [B, D] or [B, 1, D], got shape {tuple(proprio_state.shape)}")
+            raise ValueError(
+                f"proprio_state must be [B, D] or [B, 1, D], got shape {tuple(proprio_state.shape)}"
+            )
         if proprio_state.shape[1] != self.proprio_dim:
-            raise ValueError(f"proprio_state last dim must be {self.proprio_dim}, got {proprio_state.shape[1]}")
+            raise ValueError(
+                f"proprio_state last dim must be {self.proprio_dim}, got {proprio_state.shape[1]}"
+            )
 
         context = pipeline_inputs["context"]
         if context.shape[0] != proprio_state.shape[0]:
@@ -273,8 +313,20 @@ class BaseWAMArchitecture(ABC, nn.Module):
                 raise ValueError(
                     f"Batch mismatch between context and proprio_state: {context.shape[0]} vs {proprio_state.shape[0]}"
                 )
+        # Proprio modality-augmentation (training only) — forces the action to learn
+        # a vision-grounded pathway instead of leaning on the near-sufficient proprio
+        # state (decodability gate: proprio ~sufficient in-distribution; OOD-correction
+        # probe: vision is the only grounded signal once proprio drifts). noise perturbs
+        # the raw state (matches the OOD drift); dropout zeros+masks the whole token.
+        noise_std = float(getattr(self, "_proprio_noise_std", 0.0) or 0.0)
+        if self.training and noise_std > 0:
+            proprio_state = proprio_state + torch.randn_like(proprio_state) * noise_std
         proprio_token = (
-            self.proprio_encoder(proprio_state.to(device=context.device, dtype=self.proprio_encoder.weight.dtype))
+            self.proprio_encoder(
+                proprio_state.to(
+                    device=context.device, dtype=self.proprio_encoder.weight.dtype
+                )
+            )
             .to(dtype=context.dtype)
             .unsqueeze(1)
         )
@@ -284,14 +336,32 @@ class BaseWAMArchitecture(ABC, nn.Module):
             seq_lens = pipeline_inputs.get("seq_lens")
             if seq_lens is not None:
                 seq_lens = seq_lens.to(device=context.device)
-                positions = torch.arange(context.shape[1], device=context.device).unsqueeze(0)
+                positions = torch.arange(
+                    context.shape[1], device=context.device
+                ).unsqueeze(0)
                 context_mask = positions < seq_lens.unsqueeze(1)
             else:
-                context_mask = torch.ones((context.shape[0], context.shape[1]), dtype=torch.bool, device=context.device)
+                context_mask = torch.ones(
+                    (context.shape[0], context.shape[1]),
+                    dtype=torch.bool,
+                    device=context.device,
+                )
         else:
             context_mask = context_mask.to(device=context.device, dtype=torch.bool)
 
-        proprio_mask = torch.ones((context_mask.shape[0], 1), dtype=torch.bool, device=context_mask.device)
+        proprio_mask = torch.ones(
+            (context_mask.shape[0], 1), dtype=torch.bool, device=context_mask.device
+        )
+        drop_p = float(getattr(self, "_proprio_dropout", 0.0) or 0.0)
+        if self.training and drop_p > 0:
+            # Per-row Bernoulli drop: zero the encoded token AND mask it out, so dropped
+            # rows see NO proprio (a clean "absent" signal, not a degenerate min-pose).
+            keep = (
+                torch.rand(proprio_token.shape[0], device=proprio_token.device)
+                >= drop_p
+            )
+            proprio_token = proprio_token * keep.view(-1, 1, 1).to(proprio_token.dtype)
+            proprio_mask = proprio_mask & keep.view(-1, 1)
         updated = dict(pipeline_inputs)
         updated["context"] = torch.cat([context, proprio_token], dim=1)
         updated["context_mask"] = torch.cat([context_mask, proprio_mask], dim=1)
@@ -353,11 +423,21 @@ class BaseWAMArchitecture(ABC, nn.Module):
 
         was_tensor = isinstance(proprio_state, torch.Tensor)
         device = proprio_state.device if was_tensor else None
-        dtype = proprio_state.dtype if was_tensor and proprio_state.is_floating_point() else None
-        arr = proprio_state.detach().cpu().numpy() if was_tensor else np.asarray(proprio_state, dtype=np.float32)
+        dtype = (
+            proprio_state.dtype
+            if was_tensor and proprio_state.is_floating_point()
+            else None
+        )
+        arr = (
+            proprio_state.detach().cpu().numpy()
+            if was_tensor
+            else np.asarray(proprio_state, dtype=np.float32)
+        )
         norm = normalizer.normalize(arr.astype(np.float32, copy=False))
         if was_tensor:
-            return torch.from_numpy(norm).to(device=device, dtype=dtype or torch.float32)
+            return torch.from_numpy(norm).to(
+                device=device, dtype=dtype or torch.float32
+            )
         return norm
 
     # --- Checkpoint save / load ---
@@ -403,9 +483,13 @@ class BaseWAMArchitecture(ABC, nn.Module):
 
         state_dict = load_file(path)
         has_meta = any(p.device.type == "meta" for p in self.parameters())
-        missing, unexpected = self.load_state_dict(state_dict, strict=False, assign=has_meta)
+        missing, unexpected = self.load_state_dict(
+            state_dict, strict=False, assign=has_meta
+        )
         if allow_missing_patterns:
-            tolerated = [k for k in missing if any(pat in k for pat in allow_missing_patterns)]
+            tolerated = [
+                k for k in missing if any(pat in k for pat in allow_missing_patterns)
+            ]
             if tolerated:
                 logger.warning(
                     "load_checkpoint: %d param(s) absent from checkpoint kept at default init "
@@ -418,7 +502,9 @@ class BaseWAMArchitecture(ABC, nn.Module):
                 )
             missing = [k for k in missing if k not in tolerated]
         if strict and (missing or unexpected):
-            raise RuntimeError(f"Strict load failed: missing={missing}, unexpected={unexpected}")
+            raise RuntimeError(
+                f"Strict load failed: missing={missing}, unexpected={unexpected}"
+            )
 
     # --- Training: module management ---
 
@@ -447,13 +533,24 @@ class BaseWAMArchitecture(ABC, nn.Module):
         # :class:`VideoBackbone` ABC still work — they simply don't carry a
         # ``shift_video`` attribute and we fall back to the scheduler's
         # template default, matching the production no-override path.
-        video_shift = getattr(self.video_backbone, "shift_video", None) if self.video_backbone is not None else None
+        video_shift = (
+            getattr(self.video_backbone, "shift_video", None)
+            if self.video_backbone is not None
+            else None
+        )
+        action_loss_weighting = (
+            getattr(self.action_backbone, "loss_weighting", None)
+            if self.action_backbone is not None
+            else None
+        )
         for name, bb in self.backbones.items():
             if not hasattr(bb, "scheduler"):
                 continue
             kwargs = {"training": True}
             if name == "video_backbone" and video_shift is not None:
                 kwargs["shift"] = float(video_shift)
+            if name == "action_backbone" and action_loss_weighting is not None:
+                kwargs["loss_weighting"] = str(action_loss_weighting)
             bb.scheduler.set_timesteps(num_timesteps, **kwargs)
 
     def freeze_modules(self, names: list[str]) -> list[str]:
@@ -495,7 +592,9 @@ class BaseWAMArchitecture(ABC, nn.Module):
                 frozen.append(name)
         return frozen
 
-    def get_trainable_modules(self, freeze_list: list[str] = ()) -> dict[str, nn.Module]:
+    def get_trainable_modules(
+        self, freeze_list: list[str] = ()
+    ) -> dict[str, nn.Module]:
         """Return top-level trainable sub-modules.
 
         Walks ``self.named_children()`` and returns modules that have at
@@ -512,7 +611,9 @@ class BaseWAMArchitecture(ABC, nn.Module):
                 result[name] = mod
         return result
 
-    def move_frozen_to_device(self, device: torch.device, names: tuple[str, ...] = ("text_encoder", "vae")) -> None:
+    def move_frozen_to_device(
+        self, device: torch.device, names: tuple[str, ...] = ("text_encoder", "vae")
+    ) -> None:
         """Move named frozen modules to device.
 
         Searches via ``get_submodule`` on self first, then on each backbone.
@@ -581,7 +682,9 @@ class BaseWAMArchitecture(ABC, nn.Module):
         trainer no longer needs to thread these flags through every loss call.
         """
         self._use_gradient_checkpointing = bool(use_gradient_checkpointing)
-        self._use_gradient_checkpointing_offload = bool(use_gradient_checkpointing_offload)
+        self._use_gradient_checkpointing_offload = bool(
+            use_gradient_checkpointing_offload
+        )
         self._max_timestep_boundary = float(max_timestep_boundary)
         self._min_timestep_boundary = float(min_timestep_boundary)
 
@@ -601,7 +704,9 @@ class BaseWAMArchitecture(ABC, nn.Module):
             Dict with all preprocessed video latents, text embeddings, action
             tensors, masks, and forward-time flags ready for ``compute_loss``.
         """
-        from sana_wam.dataloader.transforms.pipeline import FirstFrameConditioningTransform
+        from sana_wam.dataloader.transforms.pipeline import (
+            FirstFrameConditioningTransform,
+        )
         from sana_wam.utils import downsample_video_mask_to_latent
 
         if isinstance(batch, dict):
@@ -626,6 +731,7 @@ class BaseWAMArchitecture(ABC, nn.Module):
         all_video_masks: list = []
         all_clean_prefix: list = []
         all_clean_prefix_actions: list = []
+        all_phase6_plan_rows: list = []
 
         for sample in samples:
             all_frames.append(sample["video"])
@@ -655,10 +761,14 @@ class BaseWAMArchitecture(ABC, nn.Module):
                 elif proprio.ndim == 2 and proprio.shape[0] == 1:
                     proprio = proprio[0]
                 else:
-                    raise ValueError(f"sample['proprio'] must be [D] or [1, D], got shape {tuple(proprio.shape)}")
+                    raise ValueError(
+                        f"sample['proprio'] must be [D] or [1, D], got shape {tuple(proprio.shape)}"
+                    )
             all_proprios.append(proprio)
 
-            pseq = sample.get("proprio_seq")  # F4: full state seq (T_state, D), optional
+            pseq = sample.get(
+                "proprio_seq"
+            )  # F4: full state seq (T_state, D), optional
             if isinstance(pseq, np.ndarray):
                 pseq = torch.from_numpy(pseq)
             if pseq is not None:
@@ -674,11 +784,16 @@ class BaseWAMArchitecture(ABC, nn.Module):
             all_action_masks.append(amask)
             all_video_masks.append(vmask)
             all_clean_prefix.append(int(sample.get("num_clean_prefix_latent", 0) or 0))
-            all_clean_prefix_actions.append(int(sample.get("num_clean_prefix_actions", 0) or 0))
+            all_clean_prefix_actions.append(
+                int(sample.get("num_clean_prefix_actions", 0) or 0)
+            )
+            all_phase6_plan_rows.append(sample.get("phase6_plan_row"))
 
         ref_flags = [r is not None for r in all_ref_images]
         if any(ref_flags) and not all(ref_flags):
-            raise ValueError("Mixed reference images in batch: all samples must be consistent.")
+            raise ValueError(
+                "Mixed reference images in batch: all samples must be consistent."
+            )
 
         # Optional per-sample pre-encoded text embedding (cached offline).
         # Backbones that don't consume it silently drop the kwarg via ``**kw``.
@@ -699,7 +814,9 @@ class BaseWAMArchitecture(ABC, nn.Module):
                 if t.ndim == 3 and t.shape[0] == 1:
                     t = t[0]
                 if t.ndim != 2:
-                    raise ValueError(f"pre_encoded_text must be (L, D) or (1, L, D); got {tuple(t.shape)}")
+                    raise ValueError(
+                        f"pre_encoded_text must be (L, D) or (1, L, D); got {tuple(t.shape)}"
+                    )
                 tensors.append(t)
             lens = {t.shape[0] for t in tensors}
             if len(lens) > 1:
@@ -752,7 +869,9 @@ class BaseWAMArchitecture(ABC, nn.Module):
             **preprocess_extra,
         )
 
-        action_data = torch.cat(all_actions, dim=0) if all_actions[0] is not None else None
+        action_data = (
+            torch.cat(all_actions, dim=0) if all_actions[0] is not None else None
+        )
 
         inputs = {
             **preprocessed,
@@ -767,13 +886,38 @@ class BaseWAMArchitecture(ABC, nn.Module):
             "actions": action_data,
         }
 
+        phase6_row_flags = [row is not None for row in all_phase6_plan_rows]
+        if any(phase6_row_flags) and not all(phase6_row_flags):
+            raise ValueError(
+                "Mixed Phase-6 plan metadata in batch: every sample must carry "
+                "phase6_plan_row, or none may carry it."
+            )
+        if all(phase6_row_flags):
+            if any(not isinstance(row, dict) for row in all_phase6_plan_rows):
+                raise TypeError("phase6_plan_row must be a plain dict")
+            # Keep the exact strings, hashes, and domain seeds available to both
+            # the trainer's step check and Phase-6 loss terms.
+            inputs["phase6_plan_rows"] = tuple(
+                copy.deepcopy(row) for row in all_phase6_plan_rows
+            )
+
         if self.uses_proprioception:
             inputs["proprio_state"] = torch.stack(all_proprios, dim=0).contiguous()
             if all_proprio_seqs and all(p is not None for p in all_proprio_seqs):
-                inputs["proprio_seq"] = torch.stack(all_proprio_seqs, dim=0).contiguous()
+                inputs["proprio_seq"] = torch.stack(
+                    all_proprio_seqs, dim=0
+                ).contiguous()
 
-        if all_action_masks[0] is not None:
-            inputs["action_is_pad"] = torch.stack([~m for m in all_action_masks], dim=0).to(device=_device)
+        action_mask_flags = [mask is not None for mask in all_action_masks]
+        if any(action_mask_flags) and not all(action_mask_flags):
+            raise ValueError(
+                "Mixed action masks in batch: every sample must carry action_mask, "
+                "or none may carry it."
+            )
+        if all(action_mask_flags):
+            inputs["action_is_pad"] = torch.stack(
+                [~m for m in all_action_masks], dim=0
+            ).to(device=_device)
         if all_video_masks[0] is not None:
             # ``latent[0]`` is a clean conditioning frame (and must be excluded
             # from the loss mask) when either the batch carries
@@ -781,13 +925,18 @@ class BaseWAMArchitecture(ABC, nn.Module):
             # backbone's configuration always reserves ``latent[0]`` for
             # conditioning (``needs_first_frame_skip``). SANA is text-to-video:
             # neither holds, so ``latent[0]`` is a fully-noised, supervised frame.
-            skip_first = inputs.get("first_frame_latents") is not None or self.video_backbone.needs_first_frame_skip
+            skip_first = (
+                inputs.get("first_frame_latents") is not None
+                or self.video_backbone.needs_first_frame_skip
+            )
             # Pass the backbone's temporal_compression so the tail-grouping
             # divisor matches the actual latent-T produced by the VAE. See
             # VideoBackbone.temporal_compression for the source-of-truth contract.
             temporal_factor = int(self.video_backbone.temporal_compression)
             latent_masks = [
-                downsample_video_mask_to_latent(~m, temporal_factor=temporal_factor, skip_first=skip_first)
+                downsample_video_mask_to_latent(
+                    ~m, temporal_factor=temporal_factor, skip_first=skip_first
+                )
                 for m in all_video_masks
             ]
             inputs["video_is_pad"] = torch.stack(latent_masks, dim=0).to(device=_device)
@@ -907,4 +1056,3 @@ class BaseWAMArchitecture(ABC, nn.Module):
         None.
         """
         ...
-

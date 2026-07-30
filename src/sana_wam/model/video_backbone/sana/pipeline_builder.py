@@ -148,6 +148,9 @@ def build_mini_sana_pipeline(
     dtype: torch.dtype = torch.float32,
     attn_kernel: str = "linear_relu",
     chunk_size: int = 3,
+    additional_flash_attn: str | None = None,
+    flash_attn_window_count: list[int] | None = None,
+    continuous_timestep_conditioning: bool = False,
 ) -> SanaPipe:
     """Mini-config factory for unit tests: random-weight ``SanaMSVideo``.
 
@@ -194,6 +197,8 @@ def build_mini_sana_pipeline(
         y_norm=True,
         linear_head_dim=linear_head_dim,
         t_kernel_size=3,
+        additional_flash_attn=additional_flash_attn,
+        flash_attn_window_count=flash_attn_window_count,
         mlp_acts=("silu", "silu", None),
         model_max_length=8,
         caption_channels=64,
@@ -234,6 +239,7 @@ def build_mini_sana_pipeline(
             "fhw": (f, h, w),
             "attn_kernel": attn_kernel,
             "chunk_size": chunk_size,
+            "continuous_timestep_conditioning": continuous_timestep_conditioning,
         },
     )
 
@@ -272,6 +278,12 @@ class _PipeSpec:
     (``blocks_split.py``); this flag is what finally *sets* that attribute on
     every attention module, closing a previously dead config path. Default
     ``False`` keeps bf16 attention (byte-identical to existing fork behavior)."""
+    continuous_timestep_conditioning: bool = False
+    """Use FP32 fractional video timesteps through the SANA embedder boundary.
+
+    Missing/false preserves the legacy model-dtype then ``long()`` contract.
+    This changes no parameters, but it is part of the checkpoint config contract.
+    """
     attn_kernel: str = "linear_relu"
     """Video self-attention family. ``"linear_relu"`` = SANA ``LiteLAReLURope``
     (factorized linear attn, the published 480p checkpoint). ``"gdn"`` = upstream
@@ -359,8 +371,9 @@ def _resolve_model_path_and_kwargs(
             vae_candidate = os.path.join(model_path, "vae", "Wan2.1_VAE.pth")
             if vae_path is None and os.path.isfile(vae_candidate):
                 vae_path = vae_candidate
-            if not model_kwargs:
-                model_kwargs = preset_kwargs
+            # YAML model_kwargs are incremental architecture overrides; they
+            # must not replace the bundle's complete 2B topology preset.
+            model_kwargs = {**preset_kwargs, **model_kwargs}
             logger.info(
                 "SANA deploy self-contained: %s/checkpoints/*.pth not found; "
                 "using config.json preset for architecture spec and skipping "
@@ -374,8 +387,7 @@ def _resolve_model_path_and_kwargs(
         model_path = discovered.model_path
         if vae_path is None:
             vae_path = discovered.vae_path
-        if not model_kwargs:
-            model_kwargs = discovered.model_kwargs
+        model_kwargs = {**discovered.model_kwargs, **model_kwargs}
     elif isinstance(model_path, str) and model_path and not model_kwargs:
         raise ValueError(
             "SANA video_backbone.model_path is set but not a local bundle "
@@ -421,6 +433,9 @@ def _spec_from_dictconfig(vb_cfg, *, ckpt_dir: Optional[str] = None) -> _PipeSpe
         model_kwargs=model_kwargs,
         flow_shift=float(vb_cfg.get("flow_shift", 3.0)),
         fp32_attention=bool(vb_cfg.get("fp32_attention", False)),
+        continuous_timestep_conditioning=bool(
+            vb_cfg.get("continuous_timestep_conditioning", False)
+        ),
         attn_kernel=str(vb_cfg.get("attn_kernel", "linear_relu")),
         chunk_size=int(vb_cfg.get("chunk_size", 3)),
         use_first_frame_cond=bool(vb_cfg.get("use_first_frame_cond", False)),
@@ -658,6 +673,9 @@ def _spec_from_dict(d: dict, *, ckpt_dir: Optional[str] = None) -> _PipeSpec:
         model_kwargs=model_kwargs,
         flow_shift=float(d.get("flow_shift", 3.0)),
         fp32_attention=bool(d.get("fp32_attention", False)),
+        continuous_timestep_conditioning=bool(
+            d.get("continuous_timestep_conditioning", False)
+        ),
         attn_kernel=str(d.get("attn_kernel", "linear_relu")),
         chunk_size=int(d.get("chunk_size", 3)),
         use_first_frame_cond=bool(d.get("use_first_frame_cond", False)),
@@ -691,6 +709,16 @@ def _build_pipe_from_spec(
     model_kwargs = _apply_attn_kernel(
         spec.model_kwargs, spec.attn_kernel, pretrained_gdn=(spec.init_dit_from is not None)
     )
+    positive_feature_map = model_kwargs.pop("strictly_positive_feature_map", None)
+    if positive_feature_map is not None:
+        if spec.attn_kernel != "linear_relu":
+            raise ValueError(
+                "strictly_positive_feature_map requires attn_kernel='linear_relu'"
+            )
+        if model_kwargs.get("linear_feature_map") != "learnable":
+            raise ValueError(
+                "strictly_positive_feature_map requires linear_feature_map='learnable'"
+            )
     if spec.attn_kernel == "gdn":
         model_kwargs.setdefault("chunk_size", spec.chunk_size)
     # VAE-driven in_channels: the LTX2 latent is 128ch, so the DiT patch-embedder
@@ -705,6 +733,20 @@ def _build_pipe_from_spec(
         )
         model_kwargs["in_channels"] = 128
     dit = factory(**model_kwargs)
+    if positive_feature_map is not None:
+        from sana_wam.model.video_backbone.sana.strictly_positive_feature_map import (
+            install_strictly_positive_feature_maps,
+        )
+
+        installed = install_strictly_positive_feature_maps(
+            dit, positive_feature_map
+        )
+        logger.info(
+            "Installed %d strictly-positive SANA feature maps: beta=%s delta=%s",
+            installed,
+            positive_feature_map.get("beta", 16.0),
+            positive_feature_map.get("delta", 1e-4),
+        )
 
     # Close the dead config path: blocks_split / GDN honor getattr(attn,
     # "fp32_attention", ...) but nothing set it. Stamp it onto every attention
@@ -835,6 +877,7 @@ def _build_pipe_from_spec(
             "attn_kernel": spec.attn_kernel,
             "chunk_size": spec.chunk_size,
             "use_first_frame_cond": spec.use_first_frame_cond,
+            "continuous_timestep_conditioning": spec.continuous_timestep_conditioning,
         },
     )
 

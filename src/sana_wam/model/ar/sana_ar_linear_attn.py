@@ -115,6 +115,16 @@ class ARSeqMeta:
         noisy / clean tokens at frame ``g`` (or ``None`` if empty). Precomputed in
         :func:`build_ar_seq_meta` (on CPU, sync-free) so the kernel avoids
         ``bool(.any())`` / ``.nonzero()`` device syncs every frame, every layer.
+    key_is_pad
+        Optional ``(B, N)`` boolean tensor. ``True`` keys are excluded from both
+        clean-history sufficient states and within-frame noisy attention. Query
+        rows are retained; applying the same key mask at every layer prevents a
+        padded query state from becoming visible to a later valid query.
+    key_is_pad_validated
+        ``True`` only when :func:`build_ar_seq_meta` has already performed the
+        data-dependent all-padded-row check. This keeps the per-layer fast path
+        free of a CUDA synchronization while retaining fail-closed validation
+        for directly constructed test/ad-hoc metadata.
     """
 
     frame_ids: Tensor
@@ -123,6 +133,8 @@ class ARSeqMeta:
     num_frames: int = 0
     noisy_idx_per_frame: Tuple[Optional[Tensor], ...] = ()
     clean_idx_per_frame: Tuple[Optional[Tensor], ...] = ()
+    key_is_pad: Optional[Tensor] = None
+    key_is_pad_validated: bool = False
 
 
 def build_ar_seq_meta(
@@ -132,6 +144,7 @@ def build_ar_seq_meta(
     action_tokens_per_chunk: int,
     window: int,
     device: torch.device | str = "cpu",
+    key_is_pad: Optional[Tensor] = None,
 ) -> ARSeqMeta:
     """Build :class:`ARSeqMeta` for the canonical duplicated layout.
 
@@ -181,6 +194,23 @@ def build_ar_seq_meta(
     noisy_plan, clean_plan = _index_plan(frame_ids, noise_ids, num_frames)
 
     dev = torch.device(device)
+    if key_is_pad is not None:
+        if not isinstance(key_is_pad, Tensor):
+            raise TypeError("key_is_pad must be a tensor or None")
+        if key_is_pad.dtype != torch.bool or key_is_pad.layout != torch.strided:
+            raise TypeError("key_is_pad must be a strided boolean tensor")
+        if key_is_pad.ndim != 2 or key_is_pad.shape[1] != frame_ids.numel():
+            raise ValueError(
+                "key_is_pad must have shape [batch, tokens] with "
+                f"tokens={frame_ids.numel()}, got {tuple(key_is_pad.shape)}"
+            )
+        if key_is_pad.device != dev:
+            raise ValueError(
+                f"key_is_pad must be on {dev}, got {key_is_pad.device}"
+            )
+        if bool(key_is_pad.all(dim=1).any()):
+            raise ValueError("every sample needs at least one non-padded AR key")
+        key_is_pad = key_is_pad.detach()
     return ARSeqMeta(
         frame_ids=frame_ids.to(dev),
         noise_ids=noise_ids.to(dev),
@@ -188,6 +218,8 @@ def build_ar_seq_meta(
         num_frames=num_frames,
         noisy_idx_per_frame=tuple(None if t is None else t.to(dev) for t in noisy_plan),
         clean_idx_per_frame=tuple(None if t is None else t.to(dev) for t in clean_plan),
+        key_is_pad=key_is_pad,
+        key_is_pad_validated=key_is_pad is not None,
     )
 
 
@@ -232,6 +264,46 @@ def _resolve_index_plan(
     return noisy, clean, G
 
 
+def _resolve_key_is_pad(
+    meta: ARSeqMeta,
+    *,
+    device: torch.device,
+    n_tokens: int,
+    batch_size: Optional[int] = None,
+) -> Optional[Tensor]:
+    """Validate and return the dynamic batch key-padding mask."""
+    key_is_pad = meta.key_is_pad
+    if key_is_pad is None:
+        return None
+    if not isinstance(key_is_pad, Tensor):
+        raise TypeError("meta.key_is_pad must be a tensor or None")
+    if key_is_pad.dtype != torch.bool or key_is_pad.layout != torch.strided:
+        raise TypeError("meta.key_is_pad must be a strided boolean tensor")
+    if key_is_pad.ndim != 2:
+        raise ValueError(
+            "meta.key_is_pad must have shape [batch, tokens], "
+            f"got {tuple(key_is_pad.shape)}"
+        )
+    expected = (
+        (batch_size, n_tokens)
+        if batch_size is not None
+        else (key_is_pad.shape[0], n_tokens)
+    )
+    if tuple(key_is_pad.shape) != expected:
+        raise ValueError(
+            f"meta.key_is_pad must have shape {expected}, got {tuple(key_is_pad.shape)}"
+        )
+    if key_is_pad.device != device:
+        raise ValueError(
+            f"meta.key_is_pad must be on {device}, got {key_is_pad.device}"
+        )
+    if type(meta.key_is_pad_validated) is not bool:
+        raise TypeError("meta.key_is_pad_validated must be boolean")
+    if not meta.key_is_pad_validated and bool(key_is_pad.all(dim=1).any()):
+        raise ValueError("every sample needs at least one non-padded AR key")
+    return key_is_pad.detach()
+
+
 def ar_build_dense_mask(meta: ARSeqMeta) -> Tensor:
     """Materialize the exact LingBot-VA ``(N, N)`` bool attention mask.
 
@@ -262,7 +334,17 @@ def ar_build_dense_mask(meta: ARSeqMeta) -> Tensor:
 
     base = clean2clean | noise2clean | noise2noise
     window_ok = (fi - fj).abs() <= meta.window
-    return base & window_ok
+    base = base & window_ok
+    key_is_pad = _resolve_key_is_pad(
+        meta,
+        device=f.device,
+        n_tokens=f.numel(),
+    )
+    if key_is_pad is None:
+        return base
+    # Keep every query row, but exclude padded keys. The singleton head axis
+    # makes this directly broadcastable to (B, H, N, N).
+    return base.unsqueeze(0).unsqueeze(1) & (~key_is_pad[:, None, None, :])
 
 
 def _ar_expanded_reference(
@@ -278,6 +360,19 @@ def _ar_expanded_reference(
 
     ``O(N²)`` — for tests and as the fallback the fast path is validated against.
     """
+    key_is_pad = _resolve_key_is_pad(
+        meta,
+        device=tilde_q.device,
+        n_tokens=tilde_q.shape[-2],
+        batch_size=tilde_q.shape[0],
+    )
+    if key_is_pad is not None:
+        pad = key_is_pad[:, None, :, None]
+        # A zero attention score is not sufficient when a padded K/V contains
+        # NaN: 0 * NaN remains NaN. Sanitize padded keys before every reduction.
+        tilde_k = tilde_k.masked_fill(pad, 0)
+        phi_k = phi_k.masked_fill(pad, 0)
+        v = v.masked_fill(pad, 0)
     mask = ar_build_dense_mask(meta).to(tilde_q.device)
     return _expanded_linear_attn(tilde_q, tilde_k, v, phi_q, phi_k, mask=mask, eps=eps)
 
@@ -288,6 +383,7 @@ def _per_frame_clean_states(
     phi_k: Tensor,
     clean_idx_per_frame: Tuple[Optional[Tensor], ...],
     num_frames: int,
+    key_is_pad: Optional[Tensor],
 ) -> Tuple[Tensor, Tensor]:
     """Accumulate clean-key dual-track states bucketed by ``frame_id``.
 
@@ -311,6 +407,11 @@ def _per_frame_clean_states(
         tk = tilde_k[:, :, idx, :]
         vv = v[:, :, idx, :]
         pk = phi_k[:, :, idx, :]
+        if key_is_pad is not None:
+            pad = key_is_pad[:, idx][:, None, :, None]
+            tk = tk.masked_fill(pad, 0)
+            pk = pk.masked_fill(pad, 0)
+            vv = vv.masked_fill(pad, 0)
         Sf[g] = vv.transpose(-1, -2) @ tk  # (B, H, d, d)
         zf[g] = pk.sum(dim=-2, keepdim=True)  # (B, H, 1, d)
     return Sf, zf
@@ -324,7 +425,11 @@ def _ar_chunked_linear_attn(
     phi_k: Tensor,
     meta: ARSeqMeta,
     eps: float = 1e-15,
-) -> Tensor:
+    *,
+    action_video_memory_adapter=None,
+    layer_id: Optional[int] = None,
+    return_action_video_numerators: bool = False,
+) -> Tensor | Tuple[Tensor, Tensor]:
     """``O(N · d²)`` structured kernel — equivalent to :func:`_ar_expanded_reference`.
 
     See module docstring for the windowed-clean + within-frame-noise
@@ -337,6 +442,10 @@ def _ar_chunked_linear_attn(
         )
     if phi_q.shape != tilde_q.shape or phi_k.shape != tilde_k.shape:
         raise ValueError("phi_q/phi_k must match tilde_q/tilde_k shapes.")
+    if action_video_memory_adapter is not None and layer_id is None:
+        raise ValueError("an action video-memory adapter requires layer_id")
+    if type(return_action_video_numerators) is not bool:
+        raise TypeError("return_action_video_numerators must be boolean")
 
     B, H, N, d = tilde_q.shape
     frame_ids = meta.frame_ids
@@ -351,16 +460,41 @@ def _ar_chunked_linear_attn(
     # Precomputed per-frame index plan (sync-free in the hot path; see
     # build_ar_seq_meta). noisy_idx[g] doubles as the within-frame noise-block keys.
     noisy_idx, clean_idx, G = _resolve_index_plan(meta, tilde_q.device, N)
+    key_is_pad = _resolve_key_is_pad(
+        meta,
+        device=tilde_q.device,
+        n_tokens=N,
+        batch_size=B,
+    )
 
     # Per-frame clean states and their inclusive prefix sums.
     # Pcum_S[g] = Σ_{g' < g} Sf[g']  (so Pcum_S[hi+1] - Pcum_S[lo] = sum over [lo, hi]).
-    Sf, zf = _per_frame_clean_states(tilde_k, v, phi_k, clean_idx, G)
+    Sf, zf = _per_frame_clean_states(
+        tilde_k, v, phi_k, clean_idx, G, key_is_pad
+    )
     Pcum_S = torch.zeros(G + 1, B, H, d, d, dtype=v.dtype, device=v.device)
     Pcum_z = torch.zeros(G + 1, B, H, 1, d, dtype=v.dtype, device=v.device)
     Pcum_S[1:] = torch.cumsum(Sf, dim=0)
     Pcum_z[1:] = torch.cumsum(zf, dim=0)
 
+    # The canonical prefix above remains untouched.  The extra prefix is only a
+    # read-side view over even frame ids, used to compute an action-query delta.
+    # Keeping the original reduction is what makes identity-init endpoints exact.
+    video_Pcum_S: Optional[Tensor] = None
+    video_Pcum_z: Optional[Tensor] = None
+    if action_video_memory_adapter is not None or return_action_video_numerators:
+        video_frame = (
+            torch.arange(G, device=v.device, dtype=torch.long) % 2 == 0
+        )
+        video_Sf = Sf * video_frame.view(G, 1, 1, 1, 1)
+        video_zf = zf * video_frame.view(G, 1, 1, 1, 1)
+        video_Pcum_S = torch.zeros_like(Pcum_S)
+        video_Pcum_z = torch.zeros_like(Pcum_z)
+        video_Pcum_S[1:] = torch.cumsum(video_Sf, dim=0)
+        video_Pcum_z[1:] = torch.cumsum(video_zf, dim=0)
+
     out = torch.empty_like(v)
+    action_video_numerators: list[Tensor] = []
 
     def _window_state(lo: int, hi: int) -> Optional[Tuple[Tensor, Tensor]]:
         """Σ over clean frames in [lo, hi] (inclusive); None if empty."""
@@ -371,6 +505,19 @@ def _ar_chunked_linear_attn(
             return None
         s = Pcum_S[hi + 1] - Pcum_S[lo]  # (B, H, d, d)
         z = Pcum_z[hi + 1] - Pcum_z[lo]  # (B, H, 1, d)
+        return s, z
+
+    def _video_window_state(
+        lo: int, hi: int
+    ) -> Optional[Tuple[Tensor, Tensor]]:
+        """Even-frame part of the same clean-history window."""
+        if video_Pcum_S is None or video_Pcum_z is None or hi < lo:
+            return None
+        lo = max(lo, 0)
+        if hi < lo:
+            return None
+        s = video_Pcum_S[hi + 1] - video_Pcum_S[lo]
+        z = video_Pcum_z[hi + 1] - video_Pcum_z[lo]
         return s, z
 
     for g in range(G):
@@ -388,6 +535,29 @@ def _ar_chunked_linear_attn(
             #    hi=g-1 for noisy queries).
             hi = g if noise_flag == 1 else g - 1
             ws = _window_state(lo, hi)
+            video_ws = None
+            if (
+                (action_video_memory_adapter is not None or return_action_video_numerators)
+                and g % 2 == 1
+                and noise_flag == 0
+            ):
+                video_ws = _video_window_state(lo, hi)
+                if video_ws is not None:
+                    if ws is None:
+                        raise RuntimeError(
+                            "video window exists while canonical window is empty"
+                        )
+                    if return_action_video_numerators:
+                        action_video_numerators.append(
+                            tq @ video_ws[0].transpose(-1, -2)
+                        )
+                    if action_video_memory_adapter is not None:
+                        delta_s, delta_z = (
+                            action_video_memory_adapter.forward_delta(
+                                int(layer_id), *video_ws
+                            )
+                        )
+                        ws = (ws[0] + delta_s, ws[1] + delta_z)
             if ws is not None:
                 s_win, z_win = ws
                 num = tq @ s_win.transpose(-1, -2)  # (B, H, |q|, d)
@@ -404,6 +574,11 @@ def _ar_chunked_linear_attn(
                 tk = tilde_k[:, :, kidx, :]
                 pk = phi_k[:, :, kidx, :]
                 vv = v[:, :, kidx, :]
+                if key_is_pad is not None:
+                    pad = key_is_pad[:, kidx][:, None, :, None]
+                    tk = tk.masked_fill(pad, 0)
+                    pk = pk.masked_fill(pad, 0)
+                    vv = vv.masked_fill(pad, 0)
                 a = tq @ tk.transpose(-1, -2)  # (B, H, |q|, |k|)
                 bb = pq @ pk.transpose(-1, -2)  # (B, H, |q|, |k|)
                 num = num + a @ vv
@@ -411,4 +586,17 @@ def _ar_chunked_linear_attn(
 
             out[:, :, qidx, :] = num / (denom + eps)
 
-    return out
+    if not return_action_video_numerators:
+        return out
+    expected_chunks = (G + 1) // 2
+    if len(action_video_numerators) != expected_chunks:
+        raise RuntimeError(
+            "action-facing numerator capture did not cover every action chunk: "
+            f"expected {expected_chunks}, got {len(action_video_numerators)}"
+        )
+    query_widths = {int(tensor.shape[-2]) for tensor in action_video_numerators}
+    if len(query_widths) != 1:
+        raise RuntimeError(
+            "action-facing numerator chunks have inconsistent query widths"
+        )
+    return out, torch.stack(action_video_numerators, dim=1)

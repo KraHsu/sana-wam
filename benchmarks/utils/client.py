@@ -22,6 +22,7 @@ returns actions already denormalized to physical units.
 
 import base64
 import json
+from numbers import Integral
 from pathlib import Path
 from typing import Optional
 from urllib import error as _urlerror
@@ -37,7 +38,9 @@ class ServerError(RuntimeError):
     a bare ``HTTPError: HTTP Error 400: Bad Request``.
     """
 
-    def __init__(self, status: int, code: str = "", message: str = "", raw_body: str = ""):
+    def __init__(
+        self, status: int, code: str = "", message: str = "", raw_body: str = ""
+    ):
         descriptor = f"[{status}] {code or 'http_error'}: {message or raw_body or '<empty body>'}"
         super().__init__(descriptor)
         self.status = status
@@ -122,7 +125,9 @@ def build_payload(
     return payload
 
 
-def post(server: str, endpoint: str, payload: Optional[dict] = None, timeout: float = 300) -> dict:
+def post(
+    server: str, endpoint: str, payload: Optional[dict] = None, timeout: float = 300
+) -> dict:
     """POST JSON to server and return parsed response.
 
     Raises :class:`ServerError` on 4xx / 5xx so callers can log the server's
@@ -131,7 +136,9 @@ def post(server: str, endpoint: str, payload: Optional[dict] = None, timeout: fl
     """
     url = f"{server.rstrip('/')}{endpoint}"
     data = json.dumps(payload or {}).encode("utf-8")
-    req = request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+    req = request.Request(
+        url, data=data, headers={"Content-Type": "application/json"}, method="POST"
+    )
     try:
         with request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
@@ -152,10 +159,29 @@ def get(server: str, endpoint: str, timeout: float = 10) -> dict:
         raise _read_http_error(exc) from exc
 
 
-def reset(server: str, timeout: float = 10) -> dict:
+def reset(
+    server: str,
+    timeout: float = 10,
+    *,
+    episode_key: Optional[str] = None,
+    model_noise_seed: Optional[int] = None,
+    metadata: Optional[dict] = None,
+) -> dict:
     """Clear the server's episode state.
 
     Drops ``obs_history``, the action buffer, and the ensemble buffer. Call
     this between episodes so the next ``predict`` starts from a clean slate.
     """
-    return post(server, "/reset", {}, timeout=timeout)
+    payload = dict(metadata or {})
+    if episode_key is not None:
+        payload["episode_key"] = str(episode_key)
+    if model_noise_seed is not None:
+        if isinstance(model_noise_seed, bool) or not isinstance(
+            model_noise_seed, Integral
+        ):
+            raise ValueError(
+                "model_noise_seed must be an integer, got "
+                f"{type(model_noise_seed).__name__}"
+            )
+        payload["model_noise_seed"] = int(model_noise_seed)
+    return post(server, "/reset", payload, timeout=timeout)

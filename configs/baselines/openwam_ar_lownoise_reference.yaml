@@ -1,0 +1,142 @@
+accelerate:
+  compute_environment: LOCAL_MACHINE
+  distributed_type: DEEPSPEED
+  num_machines: 1
+  num_processes: 2
+  mixed_precision: bf16
+  deepspeed_config:
+    zero_stage: 2
+    gradient_accumulation_steps: 4
+    gradient_clipping: 1.0
+    offload_optimizer_device: none
+    offload_param_device: none
+    zero3_init_flag: false
+    zero3_save_16bit_model: false
+model:
+  architecture:
+    framework: dual_system
+    variant: autoregressive
+    action_dim: 20
+    use_proprioception: true
+    state_dim: 20
+    bridge_layers: null
+    bridge_interval: 1
+    mot_checkpoint_mixed_attn: true
+    attention_mask_mode: joint
+    video_attention_mask_mode: first_frame_causal
+    ar_frame_chunk_size: 2
+    ar_attn_window: 72
+    ar_noisy_cond_prob: 0.5
+    ar_cond_max_ratio: 0.3
+    proprio_per_chunk: true
+    ar_bootstrap_clean_prefix: true
+    proprio_action_dropout_prob: 0.3
+    action_loss_weighting: low_noise
+    joint_graft: false
+    joint_graft_idx: null
+    joint_graft_every_n: 0
+  video_backbone:
+    name: sana_video_2b
+    model_path: /DATA/share/SANA-Video_2B_480p
+    freeze: false
+    attn_kernel: linear_relu
+    text_encoder_name: /DATA/share/gemma-2-2b-it
+    model_kwargs:
+      additional_flash_attn: window_flash
+      flash_attn_window_count:
+      - 1
+      - 1
+      - 4
+      linear_feature_map: learnable
+  action_backbone:
+    dim: 1152
+    ffn_dim: 4608
+    attn_kernel: linear_relu
+dataloader:
+  type: robotwin
+  dataset_dir: /DATA/share/RoboTwin2.0/dataset
+  task_name: adjust_bottle
+  robot: aloha-agilex
+  variant: clean_50
+  action_mode: eef
+  num_frames: 113
+  video_stride: 4
+  height: 384
+  width: 320
+  split: train
+  val_ratio: 0.05
+  repeat: 1
+  window_stride: 1
+  multiview: true
+  camera_layout:
+  - head_camera
+  - left_camera
+  - right_camera
+  target_camera: head_camera
+  normalize_mode: min-max
+  filter_static_segments: true
+  static_segment_threshold: 1.0e-05
+  max_static_retry: 3
+  train_tasks: null
+  holdout_tasks: null
+  val_variant: null
+  text_embedding_cache_dir: null
+  text_embedding_dropout: 0.0
+  temporal_compression: 4
+  causal_temporal: true
+training_strategy:
+  lambda_video: 1.0
+  lambda_action: 1.0
+  freeze:
+  - video_backbone._pipe.text_encoder
+  - video_backbone._pipe.vae
+  - video_backbone._encoder
+  - video_backbone._pipe.image_encoder
+  - video_backbone._pipe._vae_inner
+  - video_backbone._pipe._reason1_inner
+  - vlm_backbone.vlm_model
+training:
+  debug: false
+  learning_rate: 0.0001
+  adam_betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  num_epochs: 40
+  max_steps: 12000
+  batch_size: 2
+  gradient_accumulation_steps: 2
+  lr_scheduler: cosine
+  warmup_ratio: 0.05
+  lr_min_ratio: 0.01
+  action_lr: null
+  video_lr: ${oc.select:model.video_backbone.recommended_video_lr,null}
+  lora_lr: null
+  use_gradient_checkpointing: true
+  use_gradient_checkpointing_offload: false
+  initialize_model_on_cpu: false
+  max_timestep_boundary: 1.0
+  min_timestep_boundary: 0.0
+  action_timestep_per_token: false
+  lora_base_model: null
+  lora_target_modules: q,k,v,o,ffn.0,ffn.2
+  lora_rank: 32
+  output_path: /home/zch/wuji-openwam-dev/sandbox/sana_ar_graft_AC_lownoise_only
+  save_steps: 2000
+  keep_last_k_ckpts: 8
+  dataset_num_workers: 4
+  decoupled:
+    enabled: false
+    video_beta_a: 0.5
+    video_beta_b: 1.0
+    warmup_steps: 0
+  dream_lr: 0.001
+project:
+  name: open-wam
+  output_dir: outputs/${now:%Y-%m-%d_%H-%M-%S}
+  seed: 42
+  wandb:
+    project: open-wam
+    run_name: null
+    entity: null

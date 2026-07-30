@@ -1,0 +1,302 @@
+schema_version: 2
+baseline_id: sana_ar_window_graft_lownoise_seedfixed_20260708
+status: native_inference_verified
+status_reason: >-
+  The exact checkpoint passes the native strict loader, a two-chunk H200 smoke,
+  and a fixed-seed bitwise differential against the current external OpenWAM
+  tree. A complete native RoboTwin run finished 8/100. Exact July source,
+  portable artifacts, and native training-loop parity remain outside this status.
+
+source:
+  repository: /home/zch/wuji-openwam-dev
+  branch: feat/why_sana_is_bad
+  base_commit: fe39cb2402e6503cfe81737c61cdf54444df3f07
+  worktree_was_dirty: true
+  checkpoint_metadata: null
+  exact_training_source_commit: null
+
+training:
+  config_copy: configs/baselines/openwam_ar_lownoise_reference.yaml
+  config_sha256: 0b3d8640776ce7d7542dcb2978b9984abf619c28d4b33afd6a5b5ca974216909
+  task: adjust_bottle
+  robot: aloha-agilex
+  dataset_variant: clean_50
+  action_mode: eef
+  max_steps: 12000
+  action_loss_weighting: low_noise
+  low_noise_gamma: 2.0
+  ar_frame_chunk_size: 2
+  ar_attn_window: 72
+  proprio_action_dropout_prob: 0.3
+  additional_flash_attn: window_flash
+  flash_attn_window_count: [1, 1, 4]
+  linear_feature_map: learnable
+
+artifacts:
+  checkpoint:
+    path: /home/zch/wuji-openwam-dev/sandbox/sana_ar_graft_AC_lownoise_only/2026-07-04_13-03-25/checkpoint_step_12000.safetensors
+    size_bytes: 11689906174
+    sha256: aea6b58c9107aeeeffba561f39ffedfc3f8fd8420a4abfcab9038c8cdd4a129d
+  action_stats:
+    path: /home/zch/wuji-openwam-dev/sandbox/sana_ar_graft_AC_lownoise_only/2026-07-04_13-03-25/action_stats.npy
+    sha256: 2404b012a04f4e7d09e72fdfdddb4288099866a32f5e42e127cf4b5613df5cfc
+  evaluation_log:
+    path: /home/zch/wuji-openwam-dev/logs_eval_ar_lownoise_seedfix.log
+    sha256: d8d13b986312bcfdefd9767649fc919407bb38ec09d3f20caa41db42b8fe9730
+  evaluation_wrapper_log:
+    path: /home/zch/wuji-openwam-dev/logs_reeval_ar_lownoise_seedfix_wrapper.log
+    sha256: b30133aa744fc4c9b34d1bd9e1a8e7e630180cd3448d13de8b22c4f594ca4337
+  deployment_log:
+    path: /home/zch/wuji-openwam-dev/logs_dep_ar_lownoise_seedfix.log
+    sha256: 91fdb44e5fc3b24d87fae584b3f4f95259224da99bd7d08262931196d052a4eb
+  native_evaluation_log:
+    path: /home/zch/workspace/sana-wam/logs/native_ar_lownoise_20260714/eval.log
+    size_bytes: 953048
+    sha256: aed0e4a553f41bff0c8f7efd78777e634c337cab7a902debc63bbe85951df62c
+  native_server_log:
+    path: /home/zch/workspace/sana-wam/logs/native_ar_lownoise_20260714/server.log
+    size_bytes: 5242546
+    sha256: 2767c0b2dc2dc85f4e6120908f199936b186f56a1aa33d41f8c946cca792a0fc
+  native_result:
+    path: "/home/zch/workspace/sana-wam/logs/native_ar_lownoise_20260714/robotwin_runtime/eval_result/adjust_bottle/sana_wam2robotwin_interface/demo_clean/sana_native_ar_lownoise_seedfixed_n100/2026-07-14 18:06:28/_result.txt"
+    size_bytes: 62
+    sha256: 2395afd1d54593a477ae1f4f64014e4972c4cfd50295678af5e67ef808a2d0b1
+  native_differential_report:
+    path: /home/zch/workspace/sana-wam/logs/native_ar_lownoise_20260714/differential/comparison.json
+    size_bytes: 7303
+    sha256: dd2018bcb961f866a44e42b1233bedcdf5688e053b156937c372c4e324d662d3
+  history113_evaluation_log:
+    path: /home/zch/workspace/sana-wam/logs/history113_confirm_n100_20260715/eval.log
+    size_bytes: 941862
+    sha256: 4cec56163f691a9e5415852f2156a3b421f4404aec7e4c5432cd05c375205471
+  history113_server_log:
+    path: /home/zch/workspace/sana-wam/logs/history113_confirm_n100_20260715/server.log
+    size_bytes: 5174045
+    sha256: c947fb64029c197530b96662001e2f5a848f8f1816807fba72c5efc3c2c53fe6
+  history113_result:
+    path: "/home/zch/workspace/sana-wam/logs/history113_confirm_n100_20260715/robotwin_runtime/eval_result/adjust_bottle/sana_wam2robotwin_interface/demo_clean/sana_native_ar_lownoise_history113_n100_confirm/2026-07-15 09:31:03/_result.txt"
+    size_bytes: 61
+    sha256: 3fdb0cd7d10a3894b61f999c29dc421c658bfecf989f2d2723cae03d5d42b6ab
+
+evaluation:
+  date: 2026-07-08
+  task: adjust_bottle
+  data_label: demo_clean
+  requested_episodes: 100
+  completed_episodes: 86
+  successes: 8
+  success_rate: 0.0930232558
+  first_reported_seed: 100001
+  last_reported_seed: 100121
+  stopped_reason: wrapper_polling_cap
+  video_steps: 10
+  action_steps: 10
+  configured_schedule_label: sync
+  effective_denoise_order: chunk0_action_only_then_later_chunks_video_then_action
+  deploy_seed: null
+  effective_video_shift: 3.0
+  effective_action_shift: 5.0
+  action_tokens_per_chunk: 28
+  video_num_frames: 29
+  resolution: [384, 320]
+  policy_history_len: 10
+  temporal_ensemble_configured: true
+  temporal_ensemble_effective: false
+  deploy_config: configs/baselines/deploy_ar_lownoise_seedfixed.yaml
+
+native_evaluation:
+  started_utc: 2026-07-14T18:06:23Z
+  finished_utc: 2026-07-14T23:34:54Z
+  duration_seconds: 19711
+  exit_code: 0
+  task: adjust_bottle
+  data_label: demo_clean
+  dataset_variant: clean_50
+  instruction_type: unseen
+  requested_episodes: 100
+  completed_episodes: 100
+  successes: 8
+  failures: 92
+  success_rate: 0.08
+  unique_episode_seeds: 100
+  first_reported_seed: 100001
+  last_reported_seed: 100140
+  successful_seeds: [100026, 100033, 100081, 100085, 100096, 100117, 100119, 100128]
+  scene_seed_argument: 0
+  deploy_seed: null
+  effective_step_limit: 400
+  step_limit_source: robotwin_upstream_default
+  repository_step_limit_overrides: 0
+  video_steps: 10
+  action_steps: 10
+  effective_denoise_order: chunk0_action_only_then_later_chunks_video_then_action
+  effective_video_shift: 3.0
+  effective_action_shift: 5.0
+  action_tokens_per_chunk: 28
+  policy_history_len: 10
+  temporal_ensemble_configured: true
+  temporal_ensemble_effective: false
+  predict_requests: 37585
+  reset_requests: 200
+  video_artifacts: 100
+  video_min_bytes: 81848
+  video_max_bytes: 662348
+  technical_error_count: 0
+  deploy_config_sha256_at_run: a359171520a26385449270e992f9dc53ebdd47fb756c66c5b7091c7dd97333a0
+  server_bind_host_at_run: 0.0.0.0
+  unrelated_external_404_requests: 7
+  external_predict_requests: 0
+  external_reset_requests: 0
+  current_safe_bind_host: 127.0.0.1
+  current_deploy_config_sha256: 7d397fcd9537a3586e0de73d584473e94680c9aa6eb5a10cea4f4134084937d9
+  comparison_to_historical:
+    historical_successes: 8
+    historical_completed_episodes: 86
+    historical_success_rate: 0.0930232558
+    rate_difference: -0.0130232558
+    native_wilson_95: [0.0410934615, 0.1499810770]
+    historical_wilson_95: [0.0478922842, 0.1729574112]
+    fisher_exact_two_sided_p: 0.7975941165
+    interpretation: no_detectable_difference_not_an_equivalence_proof
+
+native_port:
+  low_noise_scheduler: implemented
+  ar_action_loss_weighting: implemented
+  ambient_entropy_default: implemented
+  explicit_debug_seed: implemented
+  bootstrap_chunk0_gate: implemented
+  window_flash_constructor: implemented
+  window_flash_split_residual: implemented
+  learnable_linear_feature_map: implemented
+  action_only_proprio_dropout: implemented
+  sana_2b_preset_incremental_merge: implemented
+  temporal_mlp_contiguous_guard: implemented
+  cpu_regression_tests:
+    result: passed
+    passed: 180
+    skipped: 26
+  checkpoint_schema:
+    expected_keys: 1741
+    checkpoint_keys: 1741
+    missing_keys: 0
+    unexpected_keys: 0
+    shape_mismatches: 0
+  loader_verification:
+    date: 2026-07-14
+    device: cpu
+    checkpoint_name: checkpoint_step_12000.safetensors
+    strict: true
+    result: passed
+    loaded_state_keys: 1741
+    video_attention: LiteLAReLURope
+    video_feature_map: LearnableFeatureMap
+    video_graft: WindowAttention
+    action_normalizer: ActionNormalizer
+  gpu_smoke_verification:
+    date: 2026-07-14
+    device: NVIDIA H200
+    physical_gpu: 7
+    visible_device: cuda:0
+    checkpoint_name: checkpoint_step_12000.safetensors
+    observations: 29
+    generated_chunks: 2
+    bootstrap_action_only: passed
+    steady_video_then_action: passed
+    action_shape: [29, 20]
+    finite_actions: true
+    final_engine_step_c: 2
+    load_seconds: 42.068
+    load_allocated_gib: 10.967
+    inference_peak_allocated_gib: 11.646
+    bootstrap_latency_ms: 1190.37
+    steady_latency_ms: 1024.46
+  differential_verification:
+    date: 2026-07-14
+    scope: current_dirty_external_tree_vs_current_native_tree
+    device: NVIDIA H200
+    physical_gpu: 5
+    seed: 20260714
+    observations: 29
+    generated_chunks: 2
+    processed_images_equal: true
+    states_equal: true
+    prompts_equal: true
+    scheduler_sigmas_equal: true
+    physical_actions_bitwise_equal: true
+    normalized_bootstrap_chunk_bitwise_equal: true
+    normalized_steady_chunk_bitwise_equal: true
+    normalized_max_abs_error: 0.0
+    normalized_mean_abs_error: 0.0
+    result: PASS_BITWISE
+
+followup_evaluations:
+  history113:
+    date: 2026-07-15
+    deploy_config: configs/deploy_ar_lownoise_history113.yaml
+    deploy_config_sha256: 1ca81fdcdbfc07b794baf3b344ef6dfa132f8eca0c00a8b5c9c54bb1a3f12de2
+    single_variable: policy.history_len
+    canonical_value: 10
+    experimental_value: 113
+    cadence_probe:
+      raw_frames: 113
+      video_stride: 4
+      sampled_frames: 29
+      canonical_real_samples_at_steady_state: 3
+      experimental_real_samples_at_step_112: 29
+    screening:
+      completed_episodes: 30
+      successes: 5
+      success_rate: 0.1666666667
+      fresh_confirmation_prefix_successes: 2
+      interpretation: not_reproduced_under_fresh_ambient_noise
+    confirmation:
+      started_utc: 2026-07-15T09:30:57Z
+      finished_utc: 2026-07-15T14:59:35Z
+      exit_code: 0
+      completed_episodes: 100
+      successes: 10
+      failures: 90
+      success_rate: 0.10
+      successful_seeds: [100025, 100030, 100056, 100064, 100065, 100096, 100101, 100121, 100128, 100140]
+      predict_requests: 37100
+      reset_requests: 200
+      video_artifacts: 100
+      empty_video_artifacts: 0
+      repository_step_limit_overrides: 0
+      comparison_to_canonical:
+        canonical_successes: 8
+        canonical_completed_episodes: 100
+        rate_difference: 0.02
+        shared_success_seeds: [100096, 100128]
+        new_success_seeds: [100025, 100030, 100056, 100064, 100065, 100101, 100121, 100140]
+        lost_success_seeds: [100026, 100033, 100081, 100085, 100117, 100119]
+        history113_wilson_95: [0.0552291371, 0.1743656615]
+        fisher_exact_two_sided_p: 0.8055980366
+        paired_mcnemar_exact_p: 0.7905273438
+        interpretation: no_detectable_improvement
+
+training_reproduction:
+  native_training_parity: false
+  known_differences:
+    - >-
+      The native trainer does not reproduce the external dream_lr optimizer
+      group, max_steps microbatch accounting, or the Accelerate/DeepSpeed LR
+      scheduler trajectory.
+    - >-
+      The external max_grad_norm and project.seed semantics are not wired into
+      the native trainer, and training_strategy fields use a different schema.
+
+known_gaps:
+  - >-
+    The openwam training worktree was not committed and the checkpoint contains
+    no source metadata, so the exact July 4 training source cannot be reconstructed.
+  - >-
+    The fixed-seed GPU differential proves current-tree inference parity for
+    two recorded chunks, not parity with the unavailable July training binary.
+  - >-
+    The run directory is not portable or self-contained: construction still
+    depends on the absolute /DATA SANA bundle, Wan VAE, and Gemma assets.
+  - >-
+    The July implementation itself has a window-graft train/deploy mismatch:
+    training attends within four-frame temporal windows, while deploy sees one
+    two-frame chunk and the graft degenerates to per-frame spatial attention.

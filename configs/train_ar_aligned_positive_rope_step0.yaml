@@ -1,0 +1,111 @@
+# Single-variable SANA AR experiment: replace only the learnable-ReLU video
+# feature map with a checkpoint-compatible strictly-positive softplus map.
+
+model:
+  architecture:
+    framework: dual_system
+    variant: autoregressive
+    action_dim: 20
+    use_proprioception: true
+    state_dim: 20
+    bridge_layers: null
+    bridge_interval: 1
+    mot_checkpoint_mixed_attn: true
+    attention_mask_mode: joint
+    video_attention_mask_mode: first_frame_causal
+    ar_frame_chunk_size: 2
+    ar_attn_window: 72
+    ar_noisy_cond_prob: 0.5
+    ar_cond_max_ratio: 0.3
+    proprio_per_chunk: true
+    ar_bootstrap_clean_prefix: true
+    proprio_action_dropout_prob: 0.3
+    action_loss_weighting: low_noise
+    aligned_positive_rope_kernel:
+      mode: post_rope
+      beta: 16.0
+      delta: 1.0e-4
+    joint_graft: false
+    joint_graft_idx: null
+    joint_graft_every_n: 0
+  video_backbone:
+    name: sana_video_2b
+    model_path: /DATA/share/SANA-Video_2B_480p
+    freeze: false
+    attn_kernel: linear_relu
+    text_encoder_name: /DATA/share/gemma-2-2b-it
+    model_kwargs:
+      additional_flash_attn: window_flash
+      flash_attn_window_count: [1, 1, 4]
+      linear_feature_map: learnable
+      strictly_positive_feature_map:
+        beta: 16.0
+        delta: 1.0e-4
+  action_backbone:
+    dim: 1152
+    ffn_dim: 4608
+    attn_kernel: linear_relu
+
+dataloader:
+  type: robotwin
+  dataset_dir: /DATA/share/RoboTwin2.0/dataset
+  task_name: adjust_bottle
+  robot: aloha-agilex
+  variant: clean_50
+  action_mode: eef
+  num_frames: 113
+  video_stride: 4
+  height: 384
+  width: 320
+  split: train
+  val_ratio: 0.05
+  repeat: 1
+  window_stride: 1
+  multiview: true
+  camera_layout: [head_camera, left_camera, right_camera]
+  target_camera: head_camera
+  normalize_mode: min-max
+  action_stats_path: /home/zch/wuji-openwam-dev/sandbox/sana_ar_graft_AC_lownoise_only/2026-07-04_13-03-25/action_stats.npy
+  filter_static_segments: true
+  static_segment_threshold: 1.0e-5
+  max_static_retry: 3
+  train_tasks: null
+  holdout_tasks: null
+  val_variant: null
+  text_embedding_cache_dir: null
+  text_embedding_dropout: 0.0
+  temporal_compression: 4
+  causal_temporal: true
+  delta_action: false
+
+training:
+  output_dir: /home/zch/wuji-openwam-dev/sandbox/sana_ar_strict_positive_fm_beta16_delta1e4
+  init_checkpoint: /home/zch/wuji-openwam-dev/sandbox/sana_ar_graft_AC_lownoise_only/2026-07-04_13-03-25/checkpoint_step_12000.safetensors
+  init_checkpoint_sha256: aea6b58c9107aeeeffba561f39ffedfc3f8fd8420a4abfcab9038c8cdd4a129d
+  action_stats_sha256: 2404b012a04f4e7d09e72fdfdddb4288099866a32f5e42e127cf4b5613df5cfc
+  trainable_parameter_patterns:
+    - video_backbone.dit.blocks.*.attn.kernel_func.*
+  eval_modules:
+    - video_backbone.vae
+    - video_backbone.text_encoder
+  save_initial_checkpoint: false
+  max_steps: 100
+  save_steps: 0
+  save_at_steps: [25, 100]
+  keep_last_k: 2
+  batch_size: 1
+  gradient_accumulation_steps: 1
+  num_workers: 4
+  video_lr: 1.0e-5
+  action_lr: 0.0
+  weight_decay: 0.0
+  grad_clip: 1.0
+  warmup_steps: 10
+  lr_schedule_steps: 100
+  lambda_video: 1.0
+  lambda_action: 1.0
+  use_gradient_checkpointing: true
+  deepspeed: null
+  expected_world_size: 1
+  seed: 42
+  debug: false

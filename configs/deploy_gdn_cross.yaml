@@ -33,7 +33,7 @@ inference:
   video_steps: 4              # flow-matching steps for the predicted video clip
   action_steps: 4             # flow-matching steps for the predicted action clip
   action_tokens: 0            # 0 ⇒ infer from clip (num_frames - 1)
-  seed: 0
+  seed: null                    # ambient episode noise; integer = deterministic debug
   streaming: true             # rebuild+re-encode observed history each step
   predict_horizon_frames: 1   # latent frames to leave for prediction each step
 

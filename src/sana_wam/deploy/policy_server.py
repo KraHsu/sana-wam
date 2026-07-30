@@ -53,13 +53,79 @@ import io
 import json
 import logging
 import os
+import signal
 import time
+from numbers import Integral
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+
+def _public_policy_step_info(policy_info: dict) -> dict:
+    """Expose only JSON-safe rollout coordinates needed by strict clients."""
+    scalar_fields = (
+        "policy_step",
+        "generation_index",
+        "chunk_offset",
+        "buffer_remaining",
+        "generated",
+        "chunk_len",
+        "chunk_index",
+        "action_frame_id",
+        "ar_step_after",
+        "generation_noise_schedule",
+        "generation_noise_seed",
+    )
+    public = {
+        key: policy_info[key]
+        for key in scalar_fields
+        if isinstance(policy_info.get(key), (bool, int, float, str))
+    }
+    feedback = policy_info.get("cache_feedback")
+    if isinstance(feedback, dict):
+        feedback_fields = (
+            "status",
+            "reason",
+            "source_generation_index",
+            "fallback",
+        )
+        public["cache_feedback"] = {
+            key: feedback[key]
+            for key in feedback_fields
+            if isinstance(feedback.get(key), (bool, int, float, str))
+        }
+    rerank = policy_info.get("generation_zero_rerank")
+    if isinstance(rerank, dict):
+        scalar_fields = (
+            "ranker_sha256",
+            "candidate_count",
+            "selected_candidate_index",
+            "selected_candidate_seed",
+            "generation_index",
+            "ar_step_after",
+        )
+        public_rerank = {
+            key: rerank[key]
+            for key in scalar_fields
+            if isinstance(rerank.get(key), (bool, int, float, str))
+        }
+        for key in (
+            "candidate_seeds",
+            "candidate_scores",
+            "candidate_actions_normalized_sha256",
+        ):
+            values = rerank.get(key)
+            if isinstance(values, list) and all(
+                isinstance(value, (bool, int, float, str)) for value in values
+            ):
+                public_rerank[key] = values
+        public["generation_zero_rerank"] = public_rerank
+    return public
+
+
 _COMPILE_MODES = ("auto", "none")
 
 
@@ -82,7 +148,9 @@ def _normalize_compile_mode_in_cfg(cfg) -> None:
 
     mode = OmegaConf.select(cfg, "optimization.compile.mode", default=None)
     if mode is not None:
-        OmegaConf.update(cfg, "optimization.compile.mode", normalize_compile_mode(mode), merge=False)
+        OmegaConf.update(
+            cfg, "optimization.compile.mode", normalize_compile_mode(mode), merge=False
+        )
 
 
 def _apply_compile_mode_override(cfg, compile_mode: Optional[str]) -> None:
@@ -115,6 +183,10 @@ class ObsValidationError(ValueError):
     """
 
 
+class ResetConflictError(ValueError):
+    """Raised when the same episode key is retried with a different noise seed."""
+
+
 class PolicyServer:
     """WebSocket + HTTP policy server for WAM deployment.
 
@@ -137,6 +209,13 @@ class PolicyServer:
         self._policy = None
         self._request_count = 0
         self._total_latency = 0.0
+        self._active_episode_context: dict = {}
+        self._active_episode_key: Optional[str] = None
+
+        from sana_wam.deploy.telemetry import TelemetryRecorder
+
+        self._telemetry = TelemetryRecorder(cfg)
+        self._deployment_identity = self._build_deployment_identity(cfg)
 
         # Debug mode: save received images + actions + metadata per step.
         # ``_debug_episode`` is lazily initialized the first time reset() or
@@ -169,13 +248,25 @@ class PolicyServer:
 
         # Resolve view mode from saved config so every predict() can validate
         # + preprocess the client payload without re-reading it per-request.
-        from sana_wam.dataloader.transforms.multiview import DEFAULT_MULTIVIEW_CAMERA_LAYOUT
+        from sana_wam.dataloader.transforms.multiview import (
+            DEFAULT_MULTIVIEW_CAMERA_LAYOUT,
+        )
 
         dl = getattr(self.cfg, "dataloader", None)
-        self._multiview = bool(getattr(dl, "multiview", False)) if dl is not None else False
+        self._multiview = (
+            bool(getattr(dl, "multiview", False)) if dl is not None else False
+        )
         _layout = getattr(dl, "camera_layout", None) if dl is not None else None
-        self._camera_layout = list(_layout) if _layout is not None else list(DEFAULT_MULTIVIEW_CAMERA_LAYOUT)
-        self._target_camera = getattr(dl, "target_camera", "head_camera") if dl is not None else "head_camera"
+        self._camera_layout = (
+            list(_layout)
+            if _layout is not None
+            else list(DEFAULT_MULTIVIEW_CAMERA_LAYOUT)
+        )
+        self._target_camera = (
+            getattr(dl, "target_camera", "head_camera")
+            if dl is not None
+            else "head_camera"
+        )
         # Output canvas size: prefer inference.{height,width}, fall back to dataloader
         _inf = getattr(self.cfg, "inference", None)
         _h = getattr(_inf, "height", None) if _inf is not None else None
@@ -229,10 +320,22 @@ class PolicyServer:
         self._total_latency += latency_ms
 
         result = {
-            "action": action.tolist() if isinstance(action, np.ndarray) else list(action),
+            "action": action.tolist()
+            if isinstance(action, np.ndarray)
+            else list(action),
             "step": self._request_count,
             "latency_ms": round(latency_ms, 2),
+            "policy": _public_policy_step_info(self._policy.last_step_info),
         }
+
+        self._telemetry.record_step(
+            request_id=self._request_count,
+            state=state_raw,
+            action=result["action"],
+            latency_ms=result["latency_ms"],
+            policy_info=self._policy.last_step_info,
+            runtime_info=self._engine_runtime_info(),
+        )
 
         if self._debug:
             self._ensure_debug_episode()  # lazy-open episode 0 on first predict without reset
@@ -283,7 +386,11 @@ class PolicyServer:
         # Save the post-preprocessing image that went into the pipeline.
         if image_pil is not None:
             try:
-                image_pil.save(os.path.join(step_dir, "image_processed.jpg"), format="JPEG", quality=95)
+                image_pil.save(
+                    os.path.join(step_dir, "image_processed.jpg"),
+                    format="JPEG",
+                    quality=95,
+                )
             except Exception as exc:
                 logger.warning("Debug: failed to save processed image: %s", exc)
 
@@ -307,28 +414,185 @@ class PolicyServer:
         with open(os.path.join(step_dir, "meta.json"), "w") as f:
             json.dump(meta, f, indent=2)
 
-    def reset(self):
-        """Reset policy state."""
-        if self._policy is not None:
-            self._policy.reset()
+    @staticmethod
+    def _parse_reset_body(raw: str) -> dict:
+        return {} if not raw.strip() else json.loads(raw)
+
+    @staticmethod
+    def _normalize_reset_context(payload: Optional[dict]) -> dict:
+        if payload is None:
+            return {}
+        if not isinstance(payload, dict):
+            raise ValueError("reset payload must be a JSON object")
+        context = dict(payload)
+        context.pop("type", None)
+        episode_key = context.pop("episode_id", None)
+        canonical_key = context.get("episode_key")
+        if canonical_key is not None and episode_key is not None:
+            if str(canonical_key) != str(episode_key):
+                raise ValueError("episode_key and episode_id disagree")
+        if canonical_key is None:
+            canonical_key = episode_key
+        if canonical_key is not None:
+            canonical_key = str(canonical_key).strip()
+            if not canonical_key:
+                raise ValueError("episode_key must not be empty")
+            context["episode_key"] = canonical_key
+
+        model_seed = context.pop("model_seed", None)
+        canonical_seed = context.get("model_noise_seed")
+        if canonical_seed is not None and model_seed is not None:
+            if canonical_seed != model_seed:
+                raise ValueError("model_noise_seed and model_seed disagree")
+        if canonical_seed is None:
+            canonical_seed = model_seed
+        if canonical_seed is not None:
+            if isinstance(canonical_seed, bool) or not isinstance(
+                canonical_seed, Integral
+            ):
+                raise ValueError(
+                    "model_noise_seed must be an integer, got "
+                    f"{type(canonical_seed).__name__}"
+                )
+            canonical_seed = int(canonical_seed)
+            if canonical_seed < 0 or canonical_seed >= 1 << 63:
+                raise ValueError(
+                    f"model_noise_seed must be in [0, 2^63), got {canonical_seed}"
+                )
+            context["model_noise_seed"] = canonical_seed
+        return context
+
+    def _engine_runtime_info(self) -> dict:
+        info = getattr(self.engine, "runtime_info", {})
+        if callable(info):
+            info = info()
+        info = dict(info or {})
+        info["deployment_identity"] = dict(self._deployment_identity)
+        return info
+
+    def _build_deployment_identity(self, cfg) -> dict:
+        from omegaconf import OmegaConf
+
+        from sana_wam.deploy.telemetry import TELEMETRY_SCHEMA_VERSION
+
+        def select(path, default=None):
+            return OmegaConf.select(cfg, path, default=default)
+
+        rerank_runtime = getattr(self.engine, "runtime_info", {})
+        if callable(rerank_runtime):
+            rerank_runtime = rerank_runtime()
+        rerank_identity = dict(rerank_runtime or {}).get(
+            "generation_zero_rerank", {}
+        )
+        return {
+            "telemetry_schema_version": TELEMETRY_SCHEMA_VERSION,
+            "engine_class": type(self.engine).__name__,
+            "architecture_class": type(
+                getattr(self.engine, "architecture", None)
+            ).__name__,
+            "checkpoint_path": None,
+            "checkpoint_size": None,
+            "checkpoint_sha256": os.environ.get("SANA_WAM_CHECKPOINT_SHA256"),
+            "history_len": select("policy.history_len", 10),
+            "video_steps": select("inference.video_steps"),
+            "action_steps": select("inference.action_steps"),
+            "episode_noise_mode": select("inference.episode_noise_mode", "ambient"),
+            "episode_noise_base_seed": select("inference.episode_noise_base_seed", 0),
+            "generation_noise_schedule": select(
+                "inference.generation_noise_schedule.mode", "monotonic"
+            ),
+            "common_future_noise_base_seed": select(
+                "inference.generation_noise_schedule.base_seed", 0
+            ),
+            "cache_feedback_mode": select("inference.cache_feedback_mode", "predicted"),
+            "cache_feedback_fallback": select(
+                "inference.cache_feedback_fallback", "predicted"
+            ),
+            "ar_obs_chunk_mode": select(
+                "inference.ar_obs_chunk_mode", "rolling_buffer"
+            ),
+            "ar_obs_latent_band": select("inference.ar_obs_latent_band", "auto"),
+            "ar_proprio_mode": select("inference.ar_proprio_mode", "per_step"),
+            "num_frames": select("inference.num_frames"),
+            "video_num_frames": select("inference.video_num_frames"),
+            "video_stride": select("dataloader.video_stride", 1),
+            "action_mode": select("dataloader.action_mode"),
+            "normalize_mode": select("dataloader.normalize_mode"),
+            "action_tokens_per_chunk": getattr(
+                self.engine, "_action_tokens_per_chunk", None
+            ),
+            "ar_frame_chunk_size": getattr(self.engine, "_fcs", None),
+            "ar_attention_window": getattr(self.engine, "_window", None),
+            "generation_zero_rerank": rerank_identity,
+        }
+
+    def reset(self, payload: Optional[dict] = None) -> dict:
+        """Reset policy state, with named-reset idempotency for paired evals."""
+        context = self._normalize_reset_context(payload)
+        episode_key = context.get("episode_key")
+        if episode_key is not None and episode_key == self._active_episode_key:
+            requested_seed = context.get("model_noise_seed")
+            active_seed = self._engine_runtime_info().get("current_model_noise_seed")
+            requested_pair_key = context.get("noise_pair_key")
+            active_pair_key = self._active_episode_context.get("noise_pair_key")
+            if requested_pair_key is not None and requested_pair_key != active_pair_key:
+                raise ResetConflictError(
+                    f"episode {episode_key!r} is already active with noise_pair_key="
+                    f"{active_pair_key!r}, not {requested_pair_key!r}"
+                )
+            if requested_seed is not None and requested_seed != active_seed:
+                raise ResetConflictError(
+                    f"episode {episode_key!r} is already active with model_noise_seed="
+                    f"{active_seed}, not {requested_seed}"
+                )
+            return {
+                "status": "ok",
+                "episode_key": episode_key,
+                "noise_pair_key": active_pair_key,
+                "model_noise_seed": active_seed,
+                "duplicate": True,
+            }
+
+        self._telemetry.end_episode(self._engine_runtime_info(), reason="reset")
+        self._init_policy()
+        self._policy.reset(episode_context=context)
+        self._active_episode_context = context
+        self._active_episode_key = episode_key
         self._request_count = 0
         self._total_latency = 0.0
         if self._debug:
             # Lazy-init on first reset (-> episode 0); otherwise advance by 1.
-            self._debug_episode = 0 if self._debug_episode is None else self._debug_episode + 1
+            self._debug_episode = (
+                0 if self._debug_episode is None else self._debug_episode + 1
+            )
             self._debug_step = 0
             ep_dir = os.path.join(self._debug_dir, f"ep{self._debug_episode:04d}")
             os.makedirs(ep_dir, exist_ok=True)
             logger.info("Debug episode %d → %s", self._debug_episode, ep_dir)
+        runtime_info = self._engine_runtime_info()
+        self._telemetry.start_episode(context, runtime_info)
+        return {
+            "status": "ok",
+            "episode_key": episode_key,
+            "noise_pair_key": context.get("noise_pair_key"),
+            "model_noise_seed": runtime_info.get("current_model_noise_seed"),
+            "duplicate": False,
+        }
 
     def shutdown(self):
         """Clean up async resources."""
         if self._policy is not None:
             self._policy.shutdown()
+        self._telemetry.end_episode(self._engine_runtime_info(), reason="shutdown")
+        self._telemetry.close()
 
     def get_info(self) -> dict:
         """Return server info and statistics."""
-        avg_latency = self._total_latency / self._request_count if self._request_count > 0 else 0.0
+        avg_latency = (
+            self._total_latency / self._request_count
+            if self._request_count > 0
+            else 0.0
+        )
         policy_cfg = getattr(self.cfg, "policy", self.cfg)
         if self._policy is not None:
             async_info = self._policy.async_info
@@ -336,7 +600,9 @@ class PolicyServer:
             from sana_wam.deploy.optimizations import resolve_async_inference_config
             from sana_wam.deploy.policy import build_async_info
 
-            async_config = resolve_async_inference_config(self.cfg, policy_cfg=policy_cfg)
+            async_config = resolve_async_inference_config(
+                self.cfg, policy_cfg=policy_cfg
+            )
             async_info = build_async_info(async_config, policy_cfg)
         return {
             "model": "sana-wam",
@@ -347,6 +613,14 @@ class PolicyServer:
                 "temporal_ensemble": getattr(policy_cfg, "temporal_ensemble", True),
             },
             "async_inference": async_info,
+            "episode": {
+                "context": self._active_episode_context,
+                "key": self._active_episode_key,
+            },
+            "inference_runtime": self._engine_runtime_info(),
+            "telemetry": {
+                "enabled": self._telemetry.enabled,
+            },
         }
 
     def _decode_obs(self, obs: dict) -> dict:
@@ -383,13 +657,17 @@ class PolicyServer:
                 try:
                     return Image.open(io.BytesIO(bytes(x))).convert("RGB")
                 except Exception as e:
-                    raise ObsValidationError(f"{ctx}: failed to decode raw image bytes ({e})")
+                    raise ObsValidationError(
+                        f"{ctx}: failed to decode raw image bytes ({e})"
+                    )
             if isinstance(x, str):
                 try:
                     raw = base64.b64decode(x)
                     return Image.open(io.BytesIO(raw)).convert("RGB")
                 except Exception as e:
-                    raise ObsValidationError(f"{ctx}: failed to decode base64 JPEG ({e})")
+                    raise ObsValidationError(
+                        f"{ctx}: failed to decode base64 JPEG ({e})"
+                    )
             raise ObsValidationError(
                 f"{ctx}: expected base64 JPEG string, raw bytes, or PIL.Image, got {type(x).__name__}"
             )
@@ -465,7 +743,10 @@ class PolicyServer:
 
         # --- Dispatch by server's configured view mode ---
         if not self._multiview:
-            if imgs.get("left_wrist_camera") is not None or imgs.get("right_wrist_camera") is not None:
+            if (
+                imgs.get("left_wrist_camera") is not None
+                or imgs.get("right_wrist_camera") is not None
+            ):
                 logger.info(
                     "[obs] single-view mode (target_camera=%s); ignoring wrist camera inputs.",
                     self._target_camera,
@@ -481,11 +762,17 @@ class PolicyServer:
 
             def _decode_or_black(raw, ctx: str) -> Image.Image:
                 if raw is None:
-                    return Image.new("RGB", (self._img_width, self._img_height), (0, 0, 0))
+                    return Image.new(
+                        "RGB", (self._img_width, self._img_height), (0, 0, 0)
+                    )
                 return _as_pil(raw, ctx=ctx)
 
-            left_pil = _decode_or_black(imgs.get("left_wrist_camera"), ctx="images['left_wrist_camera']")
-            right_pil = _decode_or_black(imgs.get("right_wrist_camera"), ctx="images['right_wrist_camera']")
+            left_pil = _decode_or_black(
+                imgs.get("left_wrist_camera"), ctx="images['left_wrist_camera']"
+            )
+            right_pil = _decode_or_black(
+                imgs.get("right_wrist_camera"), ctx="images['right_wrist_camera']"
+            )
 
             # Map the fixed client-side keys to camera_layout positions:
             #   head_camera        -> layout[0]  (top)
@@ -511,7 +798,9 @@ class PolicyServer:
             try:
                 state = np.asarray(obs["state"], dtype=np.float32).reshape(-1)
             except (TypeError, ValueError) as exc:
-                raise ObsValidationError(f"state must be a flat numeric list/array ({exc})") from exc
+                raise ObsValidationError(
+                    f"state must be a flat numeric list/array ({exc})"
+                ) from exc
             if expected_state_dim is not None and state.size != expected_state_dim:
                 raise ObsValidationError(
                     f"state dimension mismatch: expected {expected_state_dim}, got {state.size}. "
@@ -519,7 +808,11 @@ class PolicyServer:
                 )
             obs["state"] = state
         elif _requires_proprio():
-            expected = f" length {expected_state_dim}" if expected_state_dim is not None else ""
+            expected = (
+                f" length {expected_state_dim}"
+                if expected_state_dim is not None
+                else ""
+            )
             raise ObsValidationError(
                 f"this checkpoint requires obs['state']{expected}; "
                 "send raw proprio state for proprio-conditioned checkpoints."
@@ -527,7 +820,9 @@ class PolicyServer:
 
         return obs
 
-    def run(self, host: str = "0.0.0.0", port: int = 8850, http_port: Optional[int] = None):
+    def run(
+        self, host: str = "0.0.0.0", port: int = 8850, http_port: Optional[int] = None
+    ):
         """Start the WebSocket + HTTP server.
 
         Requires ``websockets`` and ``aiohttp`` packages.
@@ -537,7 +832,9 @@ class PolicyServer:
             import websockets
             from aiohttp import web
         except ImportError:
-            raise ImportError("Server dependencies required. Install with:\n  pip install websockets aiohttp")
+            raise ImportError(
+                "Server dependencies required. Install with:\n  pip install websockets aiohttp"
+            )
 
         self._init_policy()
 
@@ -551,8 +848,10 @@ class PolicyServer:
                         msg_type = data.get("type", "obs")
 
                         if msg_type == "reset":
-                            self.reset()
-                            await websocket.send(json.dumps({"type": "reset_ack"}))
+                            result = self.reset(data)
+                            await websocket.send(
+                                json.dumps({"type": "reset_ack", **result})
+                            )
                         elif msg_type == "obs":
                             result = self.predict(data)
                             result["type"] = "action"
@@ -567,7 +866,17 @@ class PolicyServer:
                                     }
                                 )
                             )
-                    except ObsValidationError as e:
+                    except ResetConflictError as e:
+                        await websocket.send(
+                            json.dumps(
+                                {
+                                    "type": "error",
+                                    "code": "episode_reset_conflict",
+                                    "message": str(e),
+                                }
+                            )
+                        )
+                    except (ObsValidationError, ValueError) as e:
                         # Client-side mistake: bad payload shape / missing cameras / bad base64.
                         # Logged at INFO so it doesn't look like a server crash.
                         logger.info("[obs] validation failed: %s", e)
@@ -603,7 +912,11 @@ class PolicyServer:
             except ObsValidationError as e:
                 logger.info("[obs] validation failed: %s", e)
                 return web.json_response(
-                    {"type": "error", "code": "obs_validation_error", "message": str(e)},
+                    {
+                        "type": "error",
+                        "code": "obs_validation_error",
+                        "message": str(e),
+                    },
                     status=400,
                 )
             except Exception as e:
@@ -615,8 +928,24 @@ class PolicyServer:
 
         async def http_reset(request):
             """HTTP POST /reset endpoint."""
-            self.reset()
-            return web.json_response({"status": "ok"})
+            try:
+                raw = await request.text()
+                data = self._parse_reset_body(raw)
+                return web.json_response(self.reset(data))
+            except ResetConflictError as e:
+                return web.json_response(
+                    {
+                        "type": "error",
+                        "code": "episode_reset_conflict",
+                        "message": str(e),
+                    },
+                    status=409,
+                )
+            except (ValueError, json.JSONDecodeError) as e:
+                return web.json_response(
+                    {"type": "error", "code": "invalid_reset", "message": str(e)},
+                    status=400,
+                )
 
         async def http_health(request):
             """HTTP GET /health endpoint."""
@@ -627,6 +956,14 @@ class PolicyServer:
             return web.json_response(self.get_info())
 
         async def start_servers():
+            stop_event = asyncio.Event()
+            loop = asyncio.get_running_loop()
+            for stop_signal in (signal.SIGINT, signal.SIGTERM):
+                try:
+                    loop.add_signal_handler(stop_signal, stop_event.set)
+                except (NotImplementedError, RuntimeError):
+                    pass
+
             # HTTP server
             app = web.Application()
             app.router.add_post("/predict", http_predict)
@@ -642,9 +979,12 @@ class PolicyServer:
             logger.info("HTTP server started on %s:%d", host, resolved_http_port)
 
             # WebSocket server
-            async with websockets.serve(ws_handler, host, port):
-                logger.info("WebSocket server started on ws://%s:%d", host, port)
-                await asyncio.Future()  # Run forever
+            try:
+                async with websockets.serve(ws_handler, host, port):
+                    logger.info("WebSocket server started on ws://%s:%d", host, port)
+                    await stop_event.wait()
+            finally:
+                await runner.cleanup()
 
         resolved_http_port = 8848 if http_port is None else http_port
         logger.info(
@@ -654,10 +994,17 @@ class PolicyServer:
             host,
             resolved_http_port,
         )
-        asyncio.run(start_servers())
+        try:
+            asyncio.run(start_servers())
+        except KeyboardInterrupt:
+            pass
+        finally:
+            self.shutdown()
 
 
-def build_server_from_config(cfg, ckpt_dir: str, device: str = "cuda"):
+def build_server_from_config(
+    cfg, ckpt_dir: str, device: str = "cuda", ckpt_name: str | None = None
+):
     """Build a PolicyServer from a self-contained checkpoint directory.
 
     Aligns with ``scripts/deploy.py`` — uses ``load_from_checkpoint_dir`` so
@@ -673,7 +1020,11 @@ def build_server_from_config(cfg, ckpt_dir: str, device: str = "cuda"):
     from sana_wam.deploy import build_engine
     from sana_wam.deploy.model_loader import load_from_checkpoint_dir
 
-    training_cfg, architecture = load_from_checkpoint_dir(ckpt_dir, device=device)
+    training_cfg, architecture = load_from_checkpoint_dir(
+        ckpt_dir,
+        device=device,
+        ckpt_name=ckpt_name,
+    )
 
     # Mirror scripts/deploy.py: let dataloader provide inference frame/resolution
     # fallbacks before merging deploy overrides on top, so server.predict() runs
@@ -686,18 +1037,43 @@ def build_server_from_config(cfg, ckpt_dir: str, device: str = "cuda"):
     if dl is not None:
         inf = OmegaConf.select(deploy_cfg, "inference", default=OmegaConf.create({}))
         if OmegaConf.select(inf, "num_frames", default=None) is None:
-            OmegaConf.update(inf, "num_frames", OmegaConf.select(dl, "num_frames", default=33), merge=False)
+            OmegaConf.update(
+                inf,
+                "num_frames",
+                OmegaConf.select(dl, "num_frames", default=33),
+                merge=False,
+            )
         if OmegaConf.select(inf, "video_num_frames", default=None) is None:
-            OmegaConf.update(inf, "video_num_frames", _infer_video_num_frames(dl), merge=False)
+            OmegaConf.update(
+                inf, "video_num_frames", _infer_video_num_frames(dl), merge=False
+            )
         if OmegaConf.select(inf, "height", default=None) is None:
-            OmegaConf.update(inf, "height", OmegaConf.select(dl, "height", default=480), merge=False)
+            OmegaConf.update(
+                inf, "height", OmegaConf.select(dl, "height", default=480), merge=False
+            )
         if OmegaConf.select(inf, "width", default=None) is None:
-            OmegaConf.update(inf, "width", OmegaConf.select(dl, "width", default=832), merge=False)
+            OmegaConf.update(
+                inf, "width", OmegaConf.select(dl, "width", default=832), merge=False
+            )
         OmegaConf.update(deploy_cfg, "inference", inf, merge=True)
 
     merged = OmegaConf.merge(training_cfg, deploy_cfg)
-    engine = build_engine(cfg=merged, architecture=architecture, training_cfg=training_cfg)
-    return PolicyServer(engine=engine, cfg=merged)
+    engine = build_engine(
+        cfg=merged, architecture=architecture, training_cfg=training_cfg
+    )
+    server = PolicyServer(engine=engine, cfg=merged)
+    checkpoint_name = ckpt_name or OmegaConf.select(
+        deploy_cfg, "checkpoint_name", default=None
+    )
+    if checkpoint_name is not None:
+        checkpoint_path = Path(ckpt_dir).expanduser().resolve() / str(checkpoint_name)
+        server._deployment_identity.update(
+            {
+                "checkpoint_path": str(checkpoint_path),
+                "checkpoint_size": checkpoint_path.stat().st_size,
+            }
+        )
+    return server
 
 
 def _build_argparser() -> argparse.ArgumentParser:
@@ -715,10 +1091,22 @@ def _build_argparser() -> argparse.ArgumentParser:
         help="Checkpoint directory (config.yaml + checkpoint_step_*.safetensors). "
         "Same meaning as scripts/deploy.py --ckpt-dir.",
     )
+    parser.add_argument(
+        "--ckpt-name",
+        type=str,
+        default=None,
+        help="Exact checkpoint filename within --ckpt-dir.",
+    )
     parser.add_argument("--device", type=str, default="cuda", help="Inference device.")
-    parser.add_argument("--host", type=str, default=None, help="WebSocket/HTTP bind host override.")
-    parser.add_argument("--ws-port", type=int, default=None, help="WebSocket port override.")
-    parser.add_argument("--http-port", type=int, default=None, help="HTTP port override.")
+    parser.add_argument(
+        "--host", type=str, default=None, help="WebSocket/HTTP bind host override."
+    )
+    parser.add_argument(
+        "--ws-port", type=int, default=None, help="WebSocket port override."
+    )
+    parser.add_argument(
+        "--http-port", type=int, default=None, help="HTTP port override."
+    )
     parser.add_argument(
         "--compile-mode",
         type=_normalize_compile_mode_arg,
@@ -727,12 +1115,22 @@ def _build_argparser() -> argparse.ArgumentParser:
         help="Override compile strategy: auto or none.",
     )
     # Mock mode
-    parser.add_argument("--mock", action="store_true", help="Run in mock mode (random actions, no weights required).")
     parser.add_argument(
-        "--mock-action-dim", type=int, default=20, help="Action dimension for mock engine (default: 20)."
+        "--mock",
+        action="store_true",
+        help="Run in mock mode (random actions, no weights required).",
     )
     parser.add_argument(
-        "--mock-latency-ms", type=float, default=2000.0, help="Simulated inference latency in ms (default: 2000)."
+        "--mock-action-dim",
+        type=int,
+        default=20,
+        help="Action dimension for mock engine (default: 20).",
+    )
+    parser.add_argument(
+        "--mock-latency-ms",
+        type=float,
+        default=2000.0,
+        help="Simulated inference latency in ms (default: 2000).",
     )
     parser.add_argument(
         "--async-mode",
@@ -756,10 +1154,15 @@ def _build_argparser() -> argparse.ArgumentParser:
     )
     # Debug mode
     parser.add_argument(
-        "--debug", action="store_true", help="Enable debug mode: save received images + actions + metadata per step."
+        "--debug",
+        action="store_true",
+        help="Enable debug mode: save received images + actions + metadata per step.",
     )
     parser.add_argument(
-        "--debug-dir", type=str, default="./server_debug", help="Directory for debug output (default: ./server_debug)."
+        "--debug-dir",
+        type=str,
+        default="./server_debug",
+        help="Directory for debug output (default: ./server_debug).",
     )
     parser.add_argument(
         "overrides",
@@ -807,7 +1210,11 @@ def main(argv: Optional[list[str]] = None):
             latency_ms=args.mock_latency_ms,
         )
     else:
-        config_path = Path(args.config) if args.config else project_root / "configs" / "deploy.yaml"
+        config_path = (
+            Path(args.config)
+            if args.config
+            else project_root / "configs" / "deploy.yaml"
+        )
         cfg = OmegaConf.load(config_path)
         if "defaults" in cfg:
             OmegaConf.update(cfg, "defaults", OmegaConf.create([]), merge=False)
@@ -823,7 +1230,9 @@ def main(argv: Optional[list[str]] = None):
     server_cfg = getattr(cfg, "server", None)
     if server_cfg is None:
         deploy_cfg = getattr(cfg, "deploy", None)
-        server_cfg = getattr(deploy_cfg, "server", None) if deploy_cfg is not None else None
+        server_cfg = (
+            getattr(deploy_cfg, "server", None) if deploy_cfg is not None else None
+        )
 
     host = args.host or getattr(server_cfg, "host", "0.0.0.0")
     ws_port = args.ws_port or getattr(server_cfg, "ws_port", 8850)
@@ -840,6 +1249,7 @@ def main(argv: Optional[list[str]] = None):
             cfg=cfg,
             ckpt_dir=args.ckpt_dir,
             device=args.device,
+            ckpt_name=args.ckpt_name,
         )
         server._debug = args.debug
         server._debug_dir = args.debug_dir

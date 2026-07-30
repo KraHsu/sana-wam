@@ -56,6 +56,48 @@ def _t2i_modulate(x, shift, scale):
     return x * (1 + scale) + shift
 
 
+def _validate_masked_window_partition(
+    window_attention: Any, temporal_chunk_frames: int
+) -> None:
+    """Require each real frame to occupy its own temporal attention window."""
+    temporal_window_count = getattr(
+        window_attention, "temporal_window_count", None
+    )
+    if type(temporal_window_count) is not int or temporal_window_count <= 0:
+        raise TypeError(
+            "masked AR window attention requires a positive integer "
+            "temporal_window_count"
+        )
+    frames = int(temporal_chunk_frames)
+    temporal_window = (
+        frames + temporal_window_count - 1
+    ) // temporal_window_count
+    if temporal_window != 1:
+        raise ValueError(
+            "masked AR window attention requires one latent frame per "
+            "temporal window"
+        )
+
+
+def _timestep_for_embedding(
+    timestep: Tensor,
+    norm_scale_factor: float,
+    *,
+    continuous_timestep_conditioning: bool,
+) -> Tensor:
+    """Apply the checkpoint's video timestep contract at the embedder boundary."""
+    if continuous_timestep_conditioning:
+        if timestep.dtype != torch.float32:
+            raise TypeError(
+                "continuous_timestep_conditioning requires float32 video "
+                f"timesteps, got {timestep.dtype}"
+            )
+        return timestep / norm_scale_factor
+    if norm_scale_factor != 1.0:
+        return (timestep.float() / norm_scale_factor).to(torch.float32)
+    return timestep.long().to(torch.float32)
+
+
 def _rope_freqs_with_frame_index(rope_module, frame_index: Tensor, h: int, w: int, device) -> Tensor:
     """Build wan-style RoPE freqs but with EXPLICIT per-frame absolute indices.
 
@@ -154,6 +196,7 @@ class SanaMSVideoSplit:
         frame_timesteps: Optional[Tensor] = None,
         rope_frame_index: Optional[Tensor] = None,
         frame_proprio_emb: Optional[Tensor] = None,
+        continuous_timestep_conditioning: bool = False,
         **kwargs: Any,
     ) -> dict:
         """Run the pre-block-loop portion of ``SanaMSVideo.forward``.
@@ -176,11 +219,11 @@ class SanaMSVideoSplit:
         dit = self._dit
         bs = x.shape[0]
         x = x.to(dit.dtype)
-        # Mirror upstream type discipline:
-        if dit.timestep_norm_scale_factor != 1.0:
-            timestep = (timestep.float() / dit.timestep_norm_scale_factor).to(torch.float32)
-        else:
-            timestep = timestep.long().to(torch.float32)
+        timestep = _timestep_for_embedding(
+            timestep,
+            dit.timestep_norm_scale_factor,
+            continuous_timestep_conditioning=continuous_timestep_conditioning,
+        )
         y = y.to(dit.dtype)
 
         dit.f, dit.h, dit.w = (
@@ -260,10 +303,11 @@ class SanaMSVideoSplit:
                 raise ValueError(
                     f"frame_timesteps must be (B={bs}, F={n_frames}); got {tuple(frame_timesteps.shape)}."
                 )
-            if dit.timestep_norm_scale_factor != 1.0:
-                ft = (frame_timesteps.float() / dit.timestep_norm_scale_factor).to(torch.float32)
-            else:
-                ft = frame_timesteps.long().to(torch.float32)
+            ft = _timestep_for_embedding(
+                frame_timesteps,
+                dit.timestep_norm_scale_factor,
+                continuous_timestep_conditioning=continuous_timestep_conditioning,
+            )
             te_pf = dit.t_embedder(ft.reshape(-1))  # (B*F, D) per-frame embedding
             if frame_proprio_emb is not None:
                 # F4: additive per-frame proprio delta (zero-init encoder ⇒ no-op at start).
@@ -441,11 +485,56 @@ class SanaMSVideoSplit:
         k_heads = k.reshape(B, h_count, h_d, N)
         v_heads = v_raw.reshape(B, h_count, h_d, N)
 
-        q_relu = attn.kernel_func(q_heads)
-        k_relu = attn.kernel_func(k_heads)
-
-        q_rot = _apply_rope_lite(q_relu, rotary_emb) if rotary_emb is not None else q_relu
-        k_rot = _apply_rope_lite(k_relu, rotary_emb) if rotary_emb is not None else k_relu
+        aligned_mode = getattr(attn, "aligned_positive_rope_kernel", None)
+        if aligned_mode == "post_rope":
+            q_pos = (
+                _apply_rope_lite(q_heads, rotary_emb)
+                if rotary_emb is not None
+                else q_heads
+            )
+            k_pos = (
+                _apply_rope_lite(k_heads, rotary_emb)
+                if rotary_emb is not None
+                else k_heads
+            )
+            # Numerator and denominator consume these exact same positive
+            # features, restoring a normalized non-negative attention kernel.
+            q_relu = attn.kernel_func(q_pos)
+            k_relu = attn.kernel_func(k_pos)
+            q_rot, k_rot = q_relu, k_relu
+        elif aligned_mode == "unrotated":
+            q_relu = attn.kernel_func(q_heads)
+            k_relu = attn.kernel_func(k_heads)
+            q_rot, k_rot = q_relu, k_relu
+        elif aligned_mode == "absolute_rope":
+            q_features = attn.kernel_func(q_heads)
+            k_features = attn.kernel_func(k_heads)
+            q_rot = (
+                _apply_rope_lite(q_features, rotary_emb)
+                if rotary_emb is not None
+                else q_features
+            )
+            k_rot = (
+                _apply_rope_lite(k_features, rotary_emb)
+                if rotary_emb is not None
+                else k_features
+            )
+            # Preserve SANA's signed RoPE numerator but normalize it by an
+            # absolute-feature upper bound: sum |q_d k_jd| >= |q dot k_j|.
+            q_relu, k_relu = q_rot.abs(), k_rot.abs()
+        else:
+            q_relu = attn.kernel_func(q_heads)
+            k_relu = attn.kernel_func(k_heads)
+            q_rot = (
+                _apply_rope_lite(q_relu, rotary_emb)
+                if rotary_emb is not None
+                else q_relu
+            )
+            k_rot = (
+                _apply_rope_lite(k_relu, rotary_emb)
+                if rotary_emb is not None
+                else k_relu
+            )
 
         # Reshape to MoT contract: (B, h, h_d, N) → (B, N, h*h_d) = (B, S, H*D).
         def to_mot(t: Tensor) -> Tensor:
@@ -468,6 +557,11 @@ class SanaMSVideoSplit:
             "_q_relu_heads": q_relu,
             "_k_relu_heads": k_relu,
             "_v_heads": v_heads,
+            # Inputs for the optional parallel window-flash residual. Keep the
+            # video-only pre-attention tokens so the split path matches the
+            # upstream single-stream block.
+            "_x_sa_in": x_sa_in,
+            "_rotary_emb": rotary_emb,
         }
         return to_mot(q_rot), to_mot(k_rot), to_mot(v_heads), post_state
 
@@ -517,6 +611,8 @@ class SanaMSVideoSplit:
         h: int,
         w: int,
         image_embeds: Optional[Tensor] = None,
+        temporal_chunk_frames: Optional[int] = None,
+        frame_is_pad: Optional[Tensor] = None,
     ) -> Tensor:
         """Apply ``proj + gate + cross_attn + FFN`` to attention output.
 
@@ -532,6 +628,102 @@ class SanaMSVideoSplit:
         # ``attn_out`` is shaped (B, N, C); ``proj`` is a Linear(C, C).
         proj_out = attn.proj(attn_out)
 
+        if temporal_chunk_frames is not None:
+            temporal_chunk_frames = int(temporal_chunk_frames)
+            if temporal_chunk_frames <= 0:
+                raise ValueError("temporal_chunk_frames must be positive")
+            if f % temporal_chunk_frames != 0:
+                raise ValueError(
+                    f"video frames f={f} must be divisible by "
+                    f"temporal_chunk_frames={temporal_chunk_frames}"
+                )
+            expected_tokens = f * h * w
+            if attn_out.shape[1] != expected_tokens:
+                raise ValueError(
+                    "chunkwise temporal operators require a dense frame-major "
+                    f"video layout with {expected_tokens} tokens, got {attn_out.shape[1]}"
+                )
+        if frame_is_pad is not None:
+            if temporal_chunk_frames is None:
+                raise ValueError(
+                    "frame_is_pad requires chunkwise temporal operators"
+                )
+            if not isinstance(frame_is_pad, Tensor):
+                raise TypeError("frame_is_pad must be a tensor or None")
+            if frame_is_pad.dtype != torch.bool or frame_is_pad.layout != torch.strided:
+                raise TypeError("frame_is_pad must be a strided boolean tensor")
+            expected_frame_mask_shape = (attn_out.shape[0], f)
+            if tuple(frame_is_pad.shape) != expected_frame_mask_shape:
+                raise ValueError(
+                    "frame_is_pad must exactly match the post-attention frame shape "
+                    f"{expected_frame_mask_shape}, got {tuple(frame_is_pad.shape)}"
+                )
+            if frame_is_pad.device != attn_out.device:
+                raise ValueError(
+                    f"frame_is_pad must be on {attn_out.device}, "
+                    f"got {frame_is_pad.device}"
+                )
+            if type(block.mlp).__name__ != "GLUMBConvTemp":
+                raise TypeError(
+                    "masked AR temporal semantics require exact GLUMBConvTemp"
+                )
+            frame_is_pad = frame_is_pad.detach()
+
+        def _chunk_ranges():
+            frames = temporal_chunk_frames or f
+            tokens_per_frame = h * w
+            tokens_per_chunk = frames * tokens_per_frame
+            for frame_start in range(0, f, frames):
+                token_start = frame_start * tokens_per_frame
+                yield frames, token_start, token_start + tokens_per_chunk
+
+        def _chunk_frame_is_pad(frames: int, token_start: int):
+            if frame_is_pad is None:
+                return None
+            tokens_per_frame = h * w
+            frame_start = token_start // tokens_per_frame
+            return frame_is_pad[:, frame_start : frame_start + frames]
+
+        def _run_chunk_mlp(mlp_input: Tensor, frames: int, token_start: int):
+            kwargs = {"HW": (frames, h, w)}
+            chunk_is_pad = _chunk_frame_is_pad(frames, token_start)
+            if chunk_is_pad is not None:
+                kwargs["frame_is_pad"] = chunk_is_pad
+            return block.mlp(mlp_input.contiguous(), **kwargs)
+
+        # The AR path applies every non-cached temporal operator independently
+        # per physical chunk. This makes the full duplicated training layout use
+        # exactly the same window/padding boundaries as cache inference.
+        def _chunk_rotary(rotary_emb: Optional[Tensor], start: int, end: int):
+            if rotary_emb is None or temporal_chunk_frames is None:
+                return rotary_emb
+            if rotary_emb.ndim < 2 or rotary_emb.shape[-2] != f * h * w:
+                raise ValueError(
+                    "chunkwise window attention requires RoPE token axis at -2 "
+                    f"with length {f * h * w}; got {tuple(rotary_emb.shape)}"
+                )
+            return rotary_emb[..., start:end, :]
+
+        # Match SanaVideoMSBlock.forward: the optional softmax/window-attention
+        # graft is parallel to linear attention, then gated as one residual.
+        block_fa = getattr(block, "flash_attn_additional", None)
+        if block_fa is not None:
+            if frame_is_pad is not None:
+                for frames, _, _ in _chunk_ranges():
+                    _validate_masked_window_partition(block_fa, frames)
+            x_sa_in = post_state["_x_sa_in"]
+            rotary_emb = post_state["_rotary_emb"]
+            graft_chunks = [
+                block_fa(
+                    x_sa_in[:, start:end].contiguous(),
+                    rotary_emb=_chunk_rotary(rotary_emb, start, end),
+                    HW=(frames, h, w),
+                )
+                for frames, start, end in _chunk_ranges()
+            ]
+            graft_raw = torch.cat(graft_chunks, dim=1)
+            proj_out = (proj_out + block.learnable_fa_scale * graft_raw).contiguous()
+
         gate_msa = post_state["gate_msa"]
         # Per-frame path: gates are (B, F, 1, D) and must be applied to x grouped
         # by frame; mirrors ``forward_frame_aware`` (lines 221-252). Default path
@@ -545,9 +737,6 @@ class SanaMSVideoSplit:
             def _pf_gate(g: Tensor, val: Tensor) -> Tensor:
                 return (g * val.reshape(B, Fdim, tpf, C)).reshape(B, N, C)
 
-        # Optional secondary flash-attention residual (sana_multi_scale_video.py:298-299).
-        # Assumes ``additional_flash_attn=None`` (the 2B config), so
-        # ``flash_attn_additional`` is None.
         if per_frame:
             x = post_state["residual_x"] + block.drop_path(_pf_gate(gate_msa, proj_out))
         else:
@@ -566,10 +755,22 @@ class SanaMSVideoSplit:
                 post_state["shift_mlp"],
                 post_state["scale_mlp"],
             ).reshape(B, N, C)
-            mlp_out = block.mlp(mlp_in, HW=(f, h, w))
+            mlp_out = torch.cat(
+                [
+                    _run_chunk_mlp(mlp_in[:, start:end], frames, start)
+                    for frames, start, end in _chunk_ranges()
+                ],
+                dim=1,
+            )
             x = x + block.drop_path(_pf_gate(post_state["gate_mlp"], mlp_out))
         else:
             mlp_in = _t2i_modulate(block.norm2(x), post_state["shift_mlp"], post_state["scale_mlp"])
-            mlp_out = block.mlp(mlp_in, HW=(f, h, w))
+            mlp_out = torch.cat(
+                [
+                    _run_chunk_mlp(mlp_in[:, start:end], frames, start)
+                    for frames, start, end in _chunk_ranges()
+                ],
+                dim=1,
+            )
             x = x + block.drop_path(post_state["gate_mlp"] * mlp_out)
         return x

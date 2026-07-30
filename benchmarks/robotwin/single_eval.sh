@@ -17,6 +17,10 @@
 #   ROBOTWIN_PYTHON  — Python interpreter for the RoboTwin env
 # Optional env vars:
 #   ROBOTWIN_TEST_NUM — cap RoboTwin eval episodes for smoke runs (default: upstream 100)
+#   ROBOTWIN_ENV_SEED_INDEX — RoboTwin start-seed index (default: 0 -> 100000;
+#                             use 1 -> 200000 for training-data collection)
+#   ROBOTWIN_ENV_SEED_OFFSET — offset within the selected 100xxx block
+#   ROBOTWIN_STEP_LIMITS_PATH — alternate task_name->step_lim YAML
 set -euo pipefail
 
 if [[ $# -lt 4 ]]; then
@@ -38,7 +42,8 @@ ckpt_setting="${3:-sana_wam}"
 gpu_id="${4:-0}"
 http_port="${5:-${ROBOTWIN_HTTP_PORT:-8848}}"
 host="${6:-${ROBOTWIN_POLICY_HOST:-127.0.0.1}}"
-seed="0"
+seed="${ROBOTWIN_ENV_SEED_INDEX:-0}"
+seed_offset="${ROBOTWIN_ENV_SEED_OFFSET:-0}"
 
 robotwin_python="${ROBOTWIN_PYTHON:-python}"
 policy_config_template="${POLICY_CONFIG_PATH:-${SCRIPT_DIR}/policy_config.yml}"
@@ -60,6 +65,14 @@ if ! [[ "${http_port}" =~ ^[0-9]+$ ]] || (( http_port < 1 || http_port > 65535 )
 fi
 if ! [[ "${host}" =~ ^[A-Za-z0-9_.:-]+$ ]]; then
     echo "[ERROR] Invalid host '${host}'. Expected hostname/IP characters only." >&2
+    exit 1
+fi
+if ! [[ "${seed}" =~ ^[0-9]+$ ]]; then
+    echo "[ERROR] Invalid ROBOTWIN_ENV_SEED_INDEX '${seed}'. Expected a non-negative integer." >&2
+    exit 1
+fi
+if ! [[ "${seed_offset}" =~ ^[0-9]+$ ]] || (( 10#${seed_offset} >= 100000 )); then
+    echo "[ERROR] Invalid ROBOTWIN_ENV_SEED_OFFSET '${seed_offset}'. Expected an integer in [0, 100000)." >&2
     exit 1
 fi
 
@@ -99,6 +112,8 @@ echo "ckpt_setting : ${ckpt_setting}"
 echo "server       : http://${host}:${http_port}"
 echo "gpu          : ${gpu_id}"
 echo "seed         : ${seed}"
+echo "seed offset  : ${seed_offset}"
+echo "step limits  : ${ROBOTWIN_STEP_LIMITS_PATH:-${SCRIPT_DIR}/step_limits.yml}"
 
 PYTHONUNBUFFERED=1 PYTHONWARNINGS=ignore::UserWarning \
 "${robotwin_python}" "${robotwin_eval_script}" \

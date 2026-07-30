@@ -51,6 +51,18 @@ class ARLinearStateCache:
     def reset(self) -> None:
         self._entries = [[] for _ in range(self.num_layers)]
 
+    def snapshot(self) -> List[List[Dict]]:
+        """Copy cache structure while retaining immutable tensor references."""
+        return [[entry.copy() for entry in entries] for entries in self._entries]
+
+    def restore_snapshot(self, snapshot: List[List[Dict]]) -> None:
+        """Atomically restore a snapshot returned by :meth:`snapshot`."""
+        if len(snapshot) != self.num_layers:
+            raise ValueError(
+                f"cache snapshot has {len(snapshot)} layers, expected {self.num_layers}"
+            )
+        self._entries = [[entry.copy() for entry in entries] for entries in snapshot]
+
     def clear_pred(self) -> None:
         """Drop all predicted (not-yet-confirmed) entries across every layer.
 
@@ -60,19 +72,75 @@ class ARLinearStateCache:
         for layer in range(self.num_layers):
             self._entries[layer] = [e for e in self._entries[layer] if not e["is_pred"]]
 
-    def update(self, layer_id: int, frame_id: int, S: Tensor, z: Tensor, *, is_pred: bool) -> None:
+    def pop_frame(self, frame_id: int) -> List[List[Dict]]:
+        """Remove and return every layer's entries for ``frame_id``.
+
+        The returned per-layer snapshot keeps tensor references intact so a caller
+        can restore the previous frame if recomputing measured feedback fails.
+        """
+        target = int(frame_id)
+        snapshot: List[List[Dict]] = []
+        for layer in range(self.num_layers):
+            entries = self._entries[layer]
+            snapshot.append([e for e in entries if e["frame_id"] == target])
+            self._entries[layer] = [e for e in entries if e["frame_id"] != target]
+        return snapshot
+
+    def restore_frame(self, snapshot: List[List[Dict]]) -> None:
+        """Restore a snapshot returned by :meth:`pop_frame`."""
+        if len(snapshot) != self.num_layers:
+            raise ValueError(
+                f"cache snapshot has {len(snapshot)} layers, expected {self.num_layers}"
+            )
+        for layer, entries in enumerate(snapshot):
+            self._entries[layer].extend(entries)
+            self._entries[layer].sort(key=lambda entry: entry["frame_id"])
+
+    def info(self) -> Dict:
+        """Return small, tensor-free cache metadata for telemetry and ``/info``."""
+        frame_ids = sorted(
+            {entry["frame_id"] for entries in self._entries for entry in entries}
+        )
+        predicted = sum(
+            int(entry["is_pred"]) for entries in self._entries for entry in entries
+        )
+        return {
+            "num_layers": self.num_layers,
+            "window": self.window,
+            "entries": sum(len(entries) for entries in self._entries),
+            "predicted_entries": predicted,
+            "confirmed_entries": sum(len(entries) for entries in self._entries)
+            - predicted,
+            "frame_ids": frame_ids,
+        }
+
+    def update(
+        self, layer_id: int, frame_id: int, S: Tensor, z: Tensor, *, is_pred: bool
+    ) -> None:
         """Write the clean ``(S, z)`` state for ``frame_id`` at ``layer_id``.
 
         Evicts entries older than the sliding window relative to ``frame_id`` to
         keep the cache bounded (LingBot's ring buffer).
         """
         entries = self._entries[layer_id]
-        entries.append({"frame_id": int(frame_id), "S": S, "z": z, "is_pred": bool(is_pred)})
+        if any(entry["frame_id"] == int(frame_id) for entry in entries):
+            raise ValueError(
+                f"cache already contains layer={layer_id}, frame_id={int(frame_id)}; "
+                "remove or replace the frame instead of appending a duplicate"
+            )
+        entries.append(
+            {"frame_id": int(frame_id), "S": S, "z": z, "is_pred": bool(is_pred)}
+        )
         cutoff = int(frame_id) - self.window
         self._entries[layer_id] = [e for e in entries if e["frame_id"] >= cutoff]
 
     def windowed_state(
-        self, layer_id: int, query_frame: int, *, hi_inclusive: int, window: Optional[int] = None
+        self,
+        layer_id: int,
+        query_frame: int,
+        *,
+        hi_inclusive: int,
+        window: Optional[int] = None,
     ) -> Optional[Tuple[Tensor, Tensor]]:
         """Sum cached ``(S, z)`` over frames in ``[query_frame - window, hi_inclusive]``.
 
@@ -94,8 +162,38 @@ class ARLinearStateCache:
             return None
         return S_sum, z_sum
 
+    def windowed_video_state(
+        self,
+        layer_id: int,
+        query_frame: int,
+        *,
+        hi_inclusive: int,
+        window: Optional[int] = None,
+    ) -> Optional[Tuple[Tensor, Tensor]]:
+        """Sum only even-frame video entries in the canonical query window.
 
-def clean_state_from_tokens(tilde_k: Tensor, v: Tensor, phi_k: Tensor) -> Tuple[Tensor, Tensor]:
+        This is a read-only side view for an action-facing video-memory adapter.
+        It intentionally does not change the entry schema, eviction, ordering, or
+        the canonical :meth:`windowed_state` reduction used by video and clean
+        action rows.
+        """
+        win = self.window if window is None else int(window)
+        lo = query_frame - win
+        S_sum: Optional[Tensor] = None
+        z_sum: Optional[Tensor] = None
+        for e in self._entries[layer_id]:
+            fid = e["frame_id"]
+            if fid % 2 == 0 and lo <= fid <= hi_inclusive:
+                S_sum = e["S"] if S_sum is None else S_sum + e["S"]
+                z_sum = e["z"] if z_sum is None else z_sum + e["z"]
+        if S_sum is None:
+            return None
+        return S_sum, z_sum
+
+
+def clean_state_from_tokens(
+    tilde_k: Tensor, v: Tensor, phi_k: Tensor
+) -> Tuple[Tensor, Tensor]:
     """Dual-track clean state for a set of (single-frame) clean key tokens.
 
     ``S = Σ_j v_j ⊗ tilde_k_j`` ``(B, H, d, d)``; ``z = Σ_j phi_k_j`` ``(B, H, 1, d)``.
@@ -133,7 +231,9 @@ def ar_inference_attn(
         denom = phi_q @ z_win.transpose(-1, -2)  # (B, H, Nq, 1)
     else:
         num = torch.zeros_like(tilde_q)
-        denom = torch.zeros(*tilde_q.shape[:-1], 1, dtype=tilde_q.dtype, device=tilde_q.device)
+        denom = torch.zeros(
+            *tilde_q.shape[:-1], 1, dtype=tilde_q.dtype, device=tilde_q.device
+        )
 
     a = tilde_q @ tilde_k_self.transpose(-1, -2)  # (B, H, Nq, Nk)
     bb = phi_q @ phi_k_self.transpose(-1, -2)  # (B, H, Nq, Nk)

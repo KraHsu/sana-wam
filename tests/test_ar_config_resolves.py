@@ -30,6 +30,8 @@ def test_ar_config_flattens_to_autoregressive():
     assert float(p["ar_noisy_cond_prob"]) == 0.5
     assert bool(p["proprio_per_chunk"]) is True
     assert bool(p["ar_bootstrap_clean_prefix"]) is True
+    assert float(p["proprio_action_dropout_prob"]) == 0.0
+    assert p["action_loss_weighting"] == "none"
 
     # SANA linear-attn dispatch on both sides: video_backbone subdict kept
     # nested; action-backbone fields (incl. attn_kernel) merged to top level.

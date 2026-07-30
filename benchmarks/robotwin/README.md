@@ -18,13 +18,15 @@ first (see [Start the server](#3-start-the-server)).
 ## Per-task step_lim overrides
 
 RoboTwin ships upstream per-task step limits in `task_config/_eval_step_limit.yml`.
-To tweak them without patching the RoboTwin source tree, edit
+The repository default leaves every override commented out, so all tasks use
+RoboTwin's own limits. To opt into a deliberate override without patching the
+RoboTwin source tree, edit
 [`step_limits.yml`](step_limits.yml) in this directory:
 
 ```yaml
-adjust_bottle: 160
-open_laptop: 288
-put_bottles_dustbin: 640
+# adjust_bottle: 160
+# open_laptop: 288
+# put_bottles_dustbin: 640
 ```
 
 Semantics:
@@ -102,6 +104,8 @@ bash single_eval.sh adjust_bottle demo_clean sana_wam 0 8848 127.0.0.1
 | `ROBOTWIN_HTTP_PORT` | no (default `8848`) | Server HTTP port (overridden by the 5th positional arg). |
 | `ROBOTWIN_POLICY_HOST` | no (default `127.0.0.1`) | Server host (overridden by the 6th positional arg). |
 | `ROBOTWIN_TEST_NUM` | no (default upstream `100`) | Cap on eval episodes for smoke runs. |
+| `ROBOTWIN_ENV_SEED_INDEX` | no (default `0`) | RoboTwin start-seed index: `0` starts at `100000`; use `1` to start fresh training-data collection at `200000`. A fixed prompt manifest overrides this start seed. |
+| `ROBOTWIN_STEP_LIMITS_PATH` | no | Alternate task-to-step-limit YAML; useful for pinning baseline-specific semantics. |
 | `POLICY_CONFIG_PATH` | no | Override the `policy_config.yml` template path. |
 
 ## Export evaluation results to CSV

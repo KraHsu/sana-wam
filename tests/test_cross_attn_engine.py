@@ -59,7 +59,6 @@ def test_cross_attn_engine_denoise_loop():
     eng = CrossAttnInferenceEngine(cfg=cfg, architecture=arch)
 
     # Stub the encode steps (mini pipe has no VAE / text encoder).
-    C = arch.video_backbone.dim  # not used; latent channels = 16
     first = torch.randn(1, 16, 1, 8, 8, device=dev, dtype=dt)
     ctx = torch.randn(1, 8, 64, device=dev, dtype=dt)
     seq = torch.full((1,), 8, dtype=torch.long, device=dev)
@@ -210,6 +209,7 @@ def test_build_obs_clip_anchors_at_frame0_and_caps():
     eng._raw_num_frames = 9
     eng._video_stride = 2
     eng._video_num_frames = 5  # (9-1)//2 + 1
+    eng._temporal_compression = 1  # isolate cadence/cap behavior in this test
     eng._warned_overlong = False
 
     def clip_for(n):
@@ -224,3 +224,21 @@ def test_build_obs_clip_anchors_at_frame0_and_caps():
     assert clip_for(20) == [0, 2, 4, 6, 8]
     assert eng._warned_overlong is True
 
+
+def test_build_obs_clip_snaps_to_vae_temporal_compression():
+    from sana_wam.deploy.cross_attn_engine import CrossAttnInferenceEngine
+
+    eng = CrossAttnInferenceEngine.__new__(CrossAttnInferenceEngine)
+    eng._raw_num_frames = 9
+    eng._video_stride = 1
+    eng._video_num_frames = 9
+    eng._temporal_compression = 4
+    eng._warned_overlong = False
+
+    def clip_for(n):
+        return eng._build_obs_clip({"obs_history": [{"image": f} for f in range(n)]})
+
+    assert clip_for(3) == [0]
+    assert clip_for(5) == [0, 1, 2, 3, 4]
+    assert clip_for(8) == [0, 1, 2, 3, 4]
+    assert clip_for(9) == list(range(9))

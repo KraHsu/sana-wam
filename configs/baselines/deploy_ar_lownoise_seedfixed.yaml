@@ -1,0 +1,35 @@
+# Native sana-wam deployment settings matching the recorded seed-fixed AR eval.
+checkpoint_path: null
+checkpoint_name: checkpoint_step_12000.safetensors
+device: cuda:0
+server:
+  # RoboTwin runs locally for the canonical evaluation; do not expose the
+  # unauthenticated predict/reset endpoints on public interfaces by default.
+  host: "127.0.0.1"
+  ws_port: 8850
+  http_port: 8848
+
+inference:
+  video_steps: 10
+  action_steps: 10
+  seed: null
+  # Retained from the generic July deploy config. ARInferenceEngine does not
+  # consume this field: effective shifts are video=3.0 and action=5.0.
+  shift: 5.0
+  ar_obs_chunk_mode: rolling_buffer
+  ar_obs_latent_band: auto
+  ar_proprio_mode: per_step
+
+policy:
+  execute_horizon: null
+  # The July run used WAMPolicy defaults from configs/deploy.yaml. Temporal
+  # ensembling was configured on but inactive under greedy execution.
+  temporal_ensemble: true
+  history_len: 10
+
+optimization:
+  decode_video: false
+  async_inference:
+    mode: none
+  prompt_embed_cache:
+    maxsize: 32

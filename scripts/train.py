@@ -4,6 +4,8 @@
 Usage (single GPU):
     python scripts/train.py --config configs/train_ar_sana.yaml [key=value ...]
 
+Formal Phase-6 accepts no dotlist overrides and requires an immutable launch ticket.
+
 Multi-GPU:
     NCCL_NVLS_ENABLE=0 torchrun --nproc_per_node=8 scripts/train.py \
         --config configs/train_ar_sana.yaml dataloader.train_tasks=[adjust_bottle,lift_pot]
@@ -33,7 +35,6 @@ import logging
 import sys
 from pathlib import Path
 
-import torch.distributed as dist
 from omegaconf import OmegaConf
 
 # Make ``sana_wam`` and the SANA submodule importable without an install.
@@ -41,17 +42,61 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
 sys.path.insert(0, str(_ROOT / "third_party" / "Sana"))
 
-from sana_wam.train.trainer import Trainer  # noqa: E402
+
+
+def _is_formal_phase6(cfg) -> bool:
+    training = cfg.get("training", {})
+    return any(
+        training.get(key, None) not in (None, "")
+        for key in (
+            "phase6_arm",
+            "phase6_registry",
+            "phase6_plan_artifact",
+            "phase6_dataset_contract_artifact",
+        )
+    )
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
+    ap.add_argument("--phase6-launch-ticket")
     args, overrides = ap.parse_known_args()
 
-    cfg = OmegaConf.merge(OmegaConf.load(args.config), OmegaConf.from_dotlist(overrides))
+    base_cfg = OmegaConf.load(args.config)
+    is_formal_phase6 = _is_formal_phase6(base_cfg)
+    launch_context = None
+    if is_formal_phase6:
+        if overrides:
+            raise RuntimeError("formal Phase-6 forbids every CLI config override")
+        if not args.phase6_launch_ticket:
+            raise RuntimeError("formal Phase-6 requires --phase6-launch-ticket")
+        from sana_wam.train.phase6_launch_manifest import (
+            authorize_formal_phase6_invocation,
+        )
 
-    world_size = int(os.environ.get("WORLD_SIZE", 1))
+        launch_context = authorize_formal_phase6_invocation(
+            ticket_path=args.phase6_launch_ticket,
+            config_path=args.config,
+            argv=[sys.executable, *sys.argv],
+            environment=os.environ,
+            working_directory=os.getcwd(),
+        )
+    elif args.phase6_launch_ticket:
+        raise RuntimeError("Phase-6 launch tickets are forbidden for legacy training")
+    cfg = OmegaConf.merge(base_cfg, OmegaConf.from_dotlist(overrides))
+
+    world_size = int(os.environ.get("WORLD_SIZE", "1"))
+    if is_formal_phase6 and world_size != 1:
+        raise RuntimeError(
+            "formal Phase-6 preflight requires WORLD_SIZE=1 before any torch/NCCL import"
+        )
+
+    # Formal Phase-6 rejects an invalid world size before importing torch or
+    # Trainer. Trainer then runs the full preflight as its first operation.
+    import torch.distributed as dist
+    from sana_wam.train.trainer import Trainer
+
     if world_size > 1:
         dist.init_process_group(backend="nccl")
 
@@ -61,7 +106,7 @@ def main():
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
 
-    trainer = Trainer(cfg)
+    trainer = Trainer(cfg, launch_context=launch_context)
     out = trainer.train()
     if rank == 0:
         logging.getLogger(__name__).info("Training done. Checkpoints in %s", out)

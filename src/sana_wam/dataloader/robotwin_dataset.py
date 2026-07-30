@@ -211,6 +211,7 @@ def _resolve_prompt(
     ep_file: str,
     split: str,
     task_name: str,
+    choice_seed: Optional[int] = None,
 ) -> str:
     """Pure function: build the training-time prompt from raw state.
 
@@ -230,6 +231,10 @@ def _resolve_prompt(
             anything else deterministically picks the first entry.
         task_name: Falls back to ``f"... performing a {task_name} task."``
             when instructions don't supply a prompt for this episode.
+        choice_seed: Optional stateless seed used to choose a training prompt.
+            ``None`` preserves the legacy global-RNG behavior. Phase-6 identity
+            enumeration always supplies a seed and therefore never calls
+            ``random.choice``.
 
     Returns:
         The final wrapped prompt string that the model sees.
@@ -246,7 +251,15 @@ def _resolve_prompt(
             pool = instr.get("seen") or instr.get("unseen") or []
             if pool:
                 if split == "train":
-                    base_prompt = random.choice(pool)
+                    if choice_seed is None:
+                        base_prompt = random.choice(pool)
+                    else:
+                        if isinstance(choice_seed, bool) or not isinstance(choice_seed, int) or choice_seed < 0:
+                            raise ValueError(
+                                "choice_seed must be a non-negative integer, "
+                                f"got {choice_seed!r}"
+                            )
+                        base_prompt = pool[choice_seed % len(pool)]
                 else:
                     base_prompt = pool[0]
             elif "instruction" in instr:
@@ -342,6 +355,7 @@ class RoboTwinDataset(BaseActionDataset):
         history_stride: int = 1,
         gdn_chunk_size: int = 1,
         delta_action: bool = False,
+        prompt_task_name: Optional[str] = None,
     ):
         super().__init__()
         self.robot = robot
@@ -409,6 +423,9 @@ class RoboTwinDataset(BaseActionDataset):
         self.repeat = repeat
         self.split = split
         self.task_name = task_name or "manipulation"
+        # Keep the audit task key canonical (underscores intact) while preserving
+        # the historical human-readable fallback prompt text.
+        self.prompt_task_name = prompt_task_name or self.task_name
         self.target_camera = target_camera
         self.window_stride = max(1, window_stride)
         self.video_stride = max(1, video_stride)
@@ -881,7 +898,7 @@ class RoboTwinDataset(BaseActionDataset):
             )
         return images
 
-    def _get_prompt(self, ep_idx: int) -> str:
+    def _get_prompt(self, ep_idx: int, *, choice_seed: Optional[int] = None) -> str:
         """Get the wrapped text prompt for episode *ep_idx*.
 
         Thin wrapper over :func:`_resolve_prompt` — all logic lives in the
@@ -892,7 +909,8 @@ class RoboTwinDataset(BaseActionDataset):
             instructions=self._instructions,
             ep_file=self._episode_files[ep_idx],
             split=self.split,
-            task_name=self.task_name,
+            task_name=self.prompt_task_name,
+            choice_seed=choice_seed,
         )
 
     def _read_eef_actions(self, f, start: int, end: int) -> np.ndarray:
@@ -1003,7 +1021,14 @@ class RoboTwinDataset(BaseActionDataset):
         cur = self.temporal_compression * (max(1, int(num_clean_prefix_latent)) - 1) * self.video_stride
         return min(cur, max(0, int(actual_valid_len) - 1))
 
-    def _build_sample(self, ep_idx: int, start: int, logical_len: Optional[int] = None) -> dict:
+    def _build_sample(
+        self,
+        ep_idx: int,
+        start: int,
+        logical_len: Optional[int] = None,
+        *,
+        prompt_override: Optional[str] = None,
+    ) -> dict:
         """Assemble a single sample at (ep_idx, start).
 
         - ``num_frames``: raw HDF5 window length (state/action rate).
@@ -1108,7 +1133,12 @@ class RoboTwinDataset(BaseActionDataset):
         else:
             is_static = False
 
-        prompt = self._get_prompt(ep_idx)
+        if prompt_override is not None:
+            if not isinstance(prompt_override, str) or not prompt_override:
+                raise ValueError("prompt_override must be a non-empty exact string")
+            prompt = prompt_override
+        else:
+            prompt = self._get_prompt(ep_idx)
 
         ep_key = f"episode_{ep_idx}"
         ep_scene = self._scene_info.get(ep_key, {})
@@ -1150,11 +1180,141 @@ class RoboTwinDataset(BaseActionDataset):
             "_is_static": is_static,
         }
 
-    def __getitem__(self, idx):
+    def _resolve_local_index(self, idx: int):
+        """Return window coordinates without decoding frames or opening HDF5."""
+        if isinstance(idx, bool) or not isinstance(idx, int):
+            raise TypeError(f"dataset index must be an integer, got {idx!r}")
+        if idx < 0 or idx >= len(self):
+            raise IndexError(idx)
         if self._val_samples is not None:
-            ep_idx, start, logical_len = self._val_samples[idx]
-        else:
-            ep_idx, start, logical_len = self._window_index[idx]
+            return self._val_samples[idx]
+        return self._window_index[idx]
+
+    def _validate_phase6_source_contract(self) -> None:
+        if self.split != "train":
+            raise ValueError(f"Phase-6 requires split='train', got {self.split!r}")
+        if self.variant != "clean_50":
+            raise ValueError(f"Phase-6 requires variant='clean_50', got {self.variant!r}")
+        if type(self.repeat) is not int or self.repeat != 1:
+            raise ValueError(f"Phase-6 requires repeat=1, got {self.repeat!r}")
+        if type(self.growing_history) is not bool or self.growing_history:
+            raise ValueError("Phase-6 ordinary windows require growing_history=False")
+        if type(self._filter_static_segments) is not bool or self._filter_static_segments:
+            raise ValueError("Phase-6 requires filter_static_segments=False")
+        text_transform = self._text_embedding_transform
+        if text_transform is not None and float(getattr(text_transform, "dropout_p", 0.0)) != 0.0:
+            raise ValueError("Phase-6 requires text embedding dropout to be zero")
+
+    def phase6_identity_at(
+        self,
+        local_index: int,
+        *,
+        dataset_index: int,
+        protocol_seed: int,
+    ):
+        """Return exact identity metadata without decoding any video or action."""
+        from sana_wam.dataloader.task_sample_plan import (
+            SampleIdentity,
+            derive_prompt_choice_seed,
+        )
+
+        self._validate_phase6_source_contract()
+        if isinstance(dataset_index, bool) or not isinstance(dataset_index, int) or dataset_index < 0:
+            raise ValueError(f"dataset_index must be a non-negative integer, got {dataset_index!r}")
+        ep_idx, start, _logical_len = self._resolve_local_index(local_index)
+        path = self._episode_files[ep_idx]
+        prompt_seed = derive_prompt_choice_seed(
+            protocol_seed,
+            self.task_name,
+            ep_idx,
+            path,
+            start,
+            dataset_index,
+        )
+        prompt = self._get_prompt(ep_idx, choice_seed=prompt_seed)
+        identity = SampleIdentity(
+            task_name=self.task_name,
+            episode_index=ep_idx,
+            episode_path=path,
+            start_frame=start,
+            prompt=prompt,
+            dataset_index=dataset_index,
+        )
+        identity.validate(expected_task=self.task_name)
+        return identity
+
+    def phase6_get_planned_item(
+        self,
+        local_index: int,
+        *,
+        planned_row,
+        protocol_seed: int,
+        plan_sha256: str,
+        identity_sha256: str,
+    ) -> dict:
+        """Materialize one bound row, injecting its prompt before text transforms."""
+        from sana_wam.dataloader.robotwin_plan_binding import phase6_plan_row_dict
+        from sana_wam.dataloader.task_sample_plan import PlanValidationError, PlannedSample
+
+        self._validate_phase6_source_contract()
+        if not isinstance(planned_row, PlannedSample):
+            raise PlanValidationError("planned_row must be a PlannedSample")
+        plan_row_payload = phase6_plan_row_dict(
+            planned_row,
+            plan_sha256=plan_sha256,
+            identity_sha256=identity_sha256,
+        )
+        expected = planned_row.identity
+        observed = self.phase6_identity_at(
+            local_index,
+            dataset_index=expected.dataset_index,
+            protocol_seed=protocol_seed,
+        )
+        if observed != expected:
+            raise PlanValidationError(
+                "runtime dataset identity differs from the bound plan row: "
+                f"expected={expected.audit_tuple!r}, observed={observed.audit_tuple!r}"
+            )
+
+        ep_idx, start, logical_len = self._resolve_local_index(local_index)
+        sample = self._build_sample(
+            ep_idx,
+            start,
+            logical_len,
+            prompt_override=expected.prompt,
+        )
+        if not isinstance(sample, dict):
+            raise PlanValidationError("planned sample materializer must return a dict")
+        sample.pop("_is_static", None)
+        if self._text_embedding_transform is not None:
+            sample = self._text_embedding_transform.apply(sample)
+            if not isinstance(sample, dict):
+                raise PlanValidationError(
+                    "planned text transform must preserve the sample dict"
+                )
+        if self._vae_latent_transform is not None:
+            sample = self._vae_latent_transform.apply(sample)
+        if not isinstance(sample, dict):
+            raise PlanValidationError("planned transforms must preserve the sample dict")
+
+        exact_fields = {
+            "task_name": expected.task_name,
+            "episode_index": expected.episode_index,
+            "episode_path": expected.episode_path,
+            "start_frame": expected.start_frame,
+            "prompt": expected.prompt,
+        }
+        for key, value in exact_fields.items():
+            if sample.get(key) != value:
+                raise PlanValidationError(
+                    f"materialized sample field {key!r} differs from the plan: "
+                    f"expected={value!r}, observed={sample.get(key)!r}"
+                )
+        sample["phase6_plan_row"] = plan_row_payload
+        return sample
+
+    def __getitem__(self, idx):
+        ep_idx, start, logical_len = self._resolve_local_index(idx)
 
         sample = self._build_sample(ep_idx, start, logical_len)
 
@@ -1298,6 +1458,8 @@ class MultiTaskRoboTwinDataset(BaseActionDataset):
         super().__init__()
         self.action_mode = action_mode
         self.task_name = task_name
+        self.dataset_type = "robotwin"
+        self.variant = variant
 
         # ---- Resolve variant(s) ----
         if variant == "both":
@@ -1456,6 +1618,7 @@ class MultiTaskRoboTwinDataset(BaseActionDataset):
 
         self._sub_datasets = []
         self._cumulative_lengths = []
+        self._task_names = []
         cumulative = 0
 
         try:
@@ -1482,7 +1645,8 @@ class MultiTaskRoboTwinDataset(BaseActionDataset):
                     _stack.enter_context(contextlib.redirect_stdout(_devnull))
                 ds = RoboTwinDataset(
                     data_root=data_root,
-                    task_name=display_name.split("/")[0].replace("_", " "),
+                    task_name=display_name.split("/")[0],
+                    prompt_task_name=display_name.split("/")[0].replace("_", " "),
                     action_stats_path=action_stats_path,
                     robot=robot,
                     variant=v,
@@ -1490,6 +1654,7 @@ class MultiTaskRoboTwinDataset(BaseActionDataset):
                     **kwargs,
                 )
             self._sub_datasets.append(ds)
+            self._task_names.append(ds.task_name)
             cumulative += len(ds)
             self._cumulative_lengths.append(cumulative)
 
@@ -1515,7 +1680,16 @@ class MultiTaskRoboTwinDataset(BaseActionDataset):
     def __len__(self):
         return self._total_length
 
-    def __getitem__(self, idx):
+    @property
+    def task_names(self):
+        return tuple(self._task_names)
+
+    def resolve_global_index(self, idx: int):
+        """Map a stable concatenated index to ``(child_index, local_index)``."""
+        if isinstance(idx, bool) or not isinstance(idx, int):
+            raise TypeError(f"dataset index must be an integer, got {idx!r}")
+        if idx < 0 or idx >= self._total_length:
+            raise IndexError(idx)
         # Binary search for the sub-dataset containing this index
         lo, hi = 0, len(self._cumulative_lengths) - 1
         while lo < hi:
@@ -1526,4 +1700,50 @@ class MultiTaskRoboTwinDataset(BaseActionDataset):
                 lo = mid + 1
         ds_idx = lo
         local_idx = idx if ds_idx == 0 else idx - self._cumulative_lengths[ds_idx - 1]
+        return ds_idx, local_idx
+
+    def phase6_identity_at(self, idx: int, *, protocol_seed: int):
+        ds_idx, local_idx = self.resolve_global_index(idx)
+        return self._sub_datasets[ds_idx].phase6_identity_at(
+            local_idx,
+            dataset_index=idx,
+            protocol_seed=protocol_seed,
+        )
+
+    def phase6_candidate_pools(self, contract, *, dataset_type: str = "robotwin"):
+        from sana_wam.dataloader.robotwin_plan_binding import enumerate_phase6_candidate_pools
+
+        return enumerate_phase6_candidate_pools(
+            self,
+            contract,
+            dataset_type=dataset_type,
+        )
+
+    def phase6_get_planned_item(
+        self,
+        idx: int,
+        *,
+        planned_row,
+        protocol_seed: int,
+        plan_sha256: str,
+        identity_sha256: str,
+    ) -> dict:
+        if planned_row.identity.dataset_index != idx:
+            from sana_wam.dataloader.task_sample_plan import PlanValidationError
+
+            raise PlanValidationError(
+                "planned dataset index mismatch: "
+                f"row={planned_row.identity.dataset_index}, request={idx}"
+            )
+        ds_idx, local_idx = self.resolve_global_index(idx)
+        return self._sub_datasets[ds_idx].phase6_get_planned_item(
+            local_idx,
+            planned_row=planned_row,
+            protocol_seed=protocol_seed,
+            plan_sha256=plan_sha256,
+            identity_sha256=identity_sha256,
+        )
+
+    def __getitem__(self, idx):
+        ds_idx, local_idx = self.resolve_global_index(idx)
         return self._sub_datasets[ds_idx][local_idx]

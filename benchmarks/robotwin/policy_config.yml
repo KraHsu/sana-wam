@@ -36,3 +36,9 @@ action_type: ee
 
 debug: false
 debug_dir: "./debug_images"  # where to save the raw per-camera JPEGs + meta.json
+
+# Compact command/achievement JSONL. ROBOTWIN_TELEMETRY_DIR enables it without
+# editing this file; image debug above remains independently disabled.
+telemetry_enabled: false
+telemetry_dir: "./telemetry/client"
+telemetry_flush_every: 32

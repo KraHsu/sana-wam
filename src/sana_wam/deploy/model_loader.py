@@ -58,7 +58,12 @@ def load_from_checkpoint_dir(
     ckpt_path = os.path.join(ckpt_dir, ckpt_name) if ckpt_name else _find_latest_checkpoint(ckpt_dir)
     logger.info("Loading checkpoint: %s", ckpt_path)
 
-    architecture = build_architecture(flatten_model_cfg(cfg.model))
+    flat_cfg = flatten_model_cfg(cfg.model)
+    # Component construction already places the DiT, VAE, and text encoder;
+    # honor the loader's target instead of implicitly staging them on cuda:0.
+    OmegaConf.update(flat_cfg, "video_backbone._device", device, merge=False)
+    OmegaConf.update(flat_cfg, "video_backbone._ckpt_dir", ckpt_dir, merge=False)
+    architecture = build_architecture(flat_cfg)
 
     mp = OmegaConf.select(cfg, "accelerate.mixed_precision", default="bf16")
     model_dtype = _DTYPE_MAP.get(str(mp).strip().lower(), torch.bfloat16)

@@ -38,9 +38,12 @@ _PROJECT_ROOT = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "..",
 if _PROJECT_ROOT not in _sys.path:
     _sys.path.insert(0, _PROJECT_ROOT)
 
+import atexit  # noqa: E402
+import base64  # noqa: E402
 import json  # noqa: E402
 import os  # noqa: E402
 import time  # noqa: E402
+import uuid  # noqa: E402
 from typing import Dict, Optional  # noqa: E402
 
 import cv2 as cv  # noqa: E402
@@ -49,18 +52,33 @@ import yaml  # noqa: E402
 
 from benchmarks.utils import action_conversion, client  # noqa: E402
 
+try:  # package import in tests; top-level import in RoboTwin's policy loader
+    from .closed_loop_telemetry import ClientTelemetryRecorder  # noqa: E402
+    from .dagger_live_takeover import LiveTakeoverRecorder  # noqa: E402
+except ImportError:  # pragma: no cover - exercised in the external RoboTwin process
+    from closed_loop_telemetry import ClientTelemetryRecorder  # noqa: E402
+    from dagger_live_takeover import LiveTakeoverRecorder  # noqa: E402
+
 # Fields that earlier versions of policy_config.yml used. They are ignored by
 # the current client contract (server decides multiview/single-view and camera
 # layout from the checkpoint's config.yaml), but we log them once so users can
 # clean up their YAML.
-_DEPRECATED_YAML_FIELDS = ("image_key", "image_size", "multiview", "multiview_image_size")
+_DEPRECATED_YAML_FIELDS = (
+    "image_key",
+    "image_size",
+    "multiview",
+    "multiview_image_size",
+)
 
 # --- Per-task step_lim overrides ---
 # A single YAML file of {task_name: int} lets users override RoboTwin's
 # upstream task_config/_eval_step_limit.yml without touching the RoboTwin
 # source tree. Missing tasks keep their upstream value (RoboTwin falls back
 # to 1000 when neither side defines one).
-_STEP_LIMITS_PATH = os.path.join(os.path.dirname(__file__), "step_limits.yml")
+_STEP_LIMITS_PATH = os.environ.get(
+    "ROBOTWIN_STEP_LIMITS_PATH",
+    os.path.join(os.path.dirname(__file__), "step_limits.yml"),
+)
 
 
 def _load_step_lim_overrides(path: str) -> Dict[str, int]:
@@ -123,7 +141,9 @@ def _parse_optional_int(value, field_name: str) -> Optional[int]:
         return None
     parsed = int(value)
     if parsed <= 0:
-        raise ValueError(f"{field_name} must be a positive integer or null, got {value!r}")
+        raise ValueError(
+            f"{field_name} must be a positive integer or null, got {value!r}"
+        )
     return parsed
 
 
@@ -173,6 +193,9 @@ class ModelClient:
         action_type: str = "qpos",
         debug: bool = False,
         debug_dir: str = "./debug_images",
+        telemetry_enabled: bool = False,
+        telemetry_dir: str = "./telemetry/client",
+        telemetry_flush_every: int = 32,
         **kwargs,  # absorb unused YAML fields for backwards compatibility
     ) -> None:
         """
@@ -213,6 +236,21 @@ class ModelClient:
         self._debug_dir = debug_dir
         self._episode = -1  # incremented to 0 on the first reset_model() call
         self._step = 0
+        self._episode_context: dict = {}
+        self._episode_key: Optional[str] = None
+        self._noise_pair_key: Optional[str] = None
+        self._awaiting_first_prompt = False
+        self._prompt_revision = 0
+        self._reset_session_id = os.environ.get(
+            "ROBOTWIN_RESET_SESSION_ID", uuid.uuid4().hex[:12]
+        )
+        self._pending_reset: Optional[dict] = None
+        self._last_interaction: dict = {}
+        self._telemetry = ClientTelemetryRecorder(
+            enabled=telemetry_enabled,
+            output_dir=telemetry_dir,
+            flush_every=telemetry_flush_every,
+        )
 
         self._server = f"http://{host}:{http_port}"
 
@@ -233,8 +271,65 @@ class ModelClient:
         )
 
         self._wait_until_healthy()
+        info = client.get(self._server, "/info")
+        self._server_info = dict(info)
+        self._episode_noise_mode = info.get("inference_runtime", {}).get(
+            "episode_noise_mode", "ambient"
+        )
+        if os.environ.get("ROBOTWIN_DAGGER_PLAN") and _STEP_LIM_OVERRIDES:
+            raise RuntimeError(
+                "live DAgger collection requires zero repository step-limit overrides"
+            )
+        self._dagger = LiveTakeoverRecorder.from_env(info)
+        if self._dagger.enabled:
+            if self._action_type != "ee" or self._action_indices is not None:
+                raise RuntimeError(
+                    "live DAgger collection requires action_type='ee' and no action_indices"
+                )
+            atexit.register(self._dagger.close)
 
-    def _wait_until_healthy(self, timeout_s: int = 300, poll_interval: float = 2.0) -> None:
+    def set_episode_context(
+        self,
+        *,
+        task_name=None,
+        task_config=None,
+        environment_seed=None,
+        episode_index=None,
+        prompt=None,
+        prompt_sha256=None,
+        prompt_source=None,
+        prompt_manifest_ordinal=None,
+        prompt_manifest_path=None,
+        prompt_manifest_sha256=None,
+        **_unused,
+    ) -> None:
+        """Receive the exact accepted RoboTwin scene identity from the wrapper."""
+        new_context = {
+            "task_name": task_name,
+            "task_config": task_config,
+            "environment_seed": environment_seed,
+            "episode_index": episode_index,
+        }
+        prompt_context = {
+            "prompt": prompt,
+            "prompt_sha256": prompt_sha256,
+            "prompt_source": prompt_source,
+            "prompt_manifest_ordinal": prompt_manifest_ordinal,
+            "prompt_manifest_path": prompt_manifest_path,
+            "prompt_manifest_sha256": prompt_manifest_sha256,
+        }
+        new_context.update(
+            {key: value for key, value in prompt_context.items() if value is not None}
+        )
+        if self._pending_reset is not None:
+            pending_context = self._pending_reset.get("source_context")
+            if pending_context != new_context:
+                self._pending_reset = None
+        self._episode_context = new_context
+
+    def _wait_until_healthy(
+        self, timeout_s: int = 300, poll_interval: float = 2.0
+    ) -> None:
         deadline = time.monotonic() + timeout_s
         last_exc: Optional[Exception] = None
         while time.monotonic() < deadline:
@@ -249,25 +344,111 @@ class ModelClient:
             f"sana-wam server did not become healthy within {timeout_s}s at {self._server}. Last error: {last_exc}"
         )
 
-    def reset(self, task_description: str = "") -> None:
+    def reset(
+        self, task_description: str = "", reset_reason: str = "prompt_change"
+    ) -> None:
         """Clear server episode state and (optionally) bump the debug episode counter.
 
         RoboTwin's ``reset_model()`` passes ``task_description=""`` at episode
         boundaries. We also reset internally when the task instruction changes
         mid-rollout, in which case ``task_description`` is non-empty.
         """
-        if task_description == "":
-            # Episode boundary — create a fresh debug dir.
-            self._episode += 1
+        is_boundary = task_description == ""
+        pending = self._pending_reset
+        if pending is None:
+            context = dict(self._episode_context)
+            environment_seed = context.get("environment_seed")
+            if (
+                is_boundary
+                and self._episode_noise_mode == "paired"
+                and environment_seed is None
+            ):
+                raise RuntimeError(
+                    "paired episode noise requires RoboTwin wrapper scene metadata; "
+                    "environment_seed is missing"
+                )
+            if is_boundary:
+                next_episode = self._episode + 1
+                next_prompt_revision = 0
+                awaiting_first_prompt = True
+                reset_reason = "episode_boundary"
+                if environment_seed is None:
+                    noise_pair_key = f"robotwin/fallback/episode-{next_episode:06d}"
+                    episode_key = (
+                        f"robotwin/session-{self._reset_session_id}/"
+                        f"episode-{next_episode:06d}"
+                    )
+                else:
+                    task_name = context.get("task_name") or "unknown_task"
+                    task_config = context.get("task_config") or "unknown_config"
+                    episode_index = context.get("episode_index")
+                    episode_number = (
+                        int(episode_index)
+                        if episode_index is not None
+                        else next_episode
+                    )
+                    noise_pair_key = f"robotwin/{task_name}/{task_config}/scene-{int(environment_seed)}"
+                    episode_key = (
+                        f"robotwin/session-{self._reset_session_id}/{task_name}/{task_config}/"
+                        f"scene-{int(environment_seed)}/episode-{episode_number}"
+                    )
+            else:
+                next_episode = self._episode
+                next_prompt_revision = self._prompt_revision + 1
+                awaiting_first_prompt = False
+                noise_pair_key = self._noise_pair_key
+                episode_key = f"{self._episode_key}/prompt-{next_prompt_revision}"
+            metadata = {
+                key: value for key, value in context.items() if value is not None
+            }
+            metadata.update(
+                {
+                    "reset_reason": reset_reason,
+                    "noise_pair_key": noise_pair_key,
+                    "reset_session_id": self._reset_session_id,
+                }
+            )
+            pending = {
+                "source_context": context,
+                "is_boundary": is_boundary,
+                "episode": next_episode,
+                "episode_key": episode_key,
+                "noise_pair_key": noise_pair_key,
+                "prompt_revision": next_prompt_revision,
+                "awaiting_first_prompt": awaiting_first_prompt,
+                "task_description": task_description,
+                "metadata": metadata,
+            }
+            self._pending_reset = pending
+
+        result = client.reset(
+            self._server,
+            timeout=30,
+            episode_key=pending["episode_key"],
+            metadata=pending["metadata"],
+        )
+        if result.get("status") != "ok":
+            raise RuntimeError(f"[SanaWAMClient] Server reset failed: {result}")
+
+        self._episode = pending["episode"]
+        self._episode_key = pending["episode_key"]
+        self._noise_pair_key = pending["noise_pair_key"]
+        self._prompt_revision = pending["prompt_revision"]
+        self._awaiting_first_prompt = pending["awaiting_first_prompt"]
+        self._task_description = pending["task_description"]
+        if pending["is_boundary"]:
             self._step = 0
             if self._debug:
                 ep_dir = os.path.join(self._debug_dir, f"ep{self._episode:04d}")
                 os.makedirs(ep_dir, exist_ok=True)
                 print(f"[SanaWAMClient] debug images → {ep_dir}")
-        self._task_description = task_description
-        result = client.reset(self._server, timeout=30)
-        if result.get("status") != "ok":
-            raise RuntimeError(f"[SanaWAMClient] Server reset failed: {result}")
+            telemetry_context = dict(pending["metadata"])
+            telemetry_context["episode_key"] = self._episode_key
+            self._telemetry.start_episode(telemetry_context, result)
+            dagger = getattr(self, "_dagger", None)
+            if dagger is not None and dagger.enabled:
+                dagger.start_episode(telemetry_context)
+        self._pending_reset = None
 
     def _save_debug_step(
         self,
@@ -293,7 +474,10 @@ class ModelClient:
                 with open(os.path.join(step_dir, f"{name}_missing.txt"), "w") as f:
                     f.write("client sent None for this camera\n")
             else:
-                cv.imwrite(os.path.join(step_dir, f"{name}.jpg"), cv.cvtColor(img, cv.COLOR_RGB2BGR))
+                cv.imwrite(
+                    os.path.join(step_dir, f"{name}.jpg"),
+                    cv.cvtColor(img, cv.COLOR_RGB2BGR),
+                )
 
         meta = {
             "episode": self._episode,
@@ -306,6 +490,33 @@ class ModelClient:
         }
         with open(os.path.join(step_dir, "meta.json"), "w") as f:
             json.dump(meta, f, indent=2)
+
+    def save_debug_terminal(self, cams: dict, state) -> None:
+        if not self._debug:
+            return
+        terminal_dir = os.path.join(
+            self._debug_dir, f"ep{self._episode:04d}", "terminal"
+        )
+        os.makedirs(terminal_dir, exist_ok=True)
+        for name in ("head", "left", "right"):
+            image = cams.get(name)
+            if image is None:
+                raise ValueError(f"terminal debug camera {name!r} is missing")
+            cv.imwrite(
+                os.path.join(terminal_dir, f"{name}.jpg"),
+                cv.cvtColor(image, cv.COLOR_RGB2BGR),
+            )
+        with open(os.path.join(terminal_dir, "meta.json"), "w") as stream:
+            json.dump(
+                {
+                    "episode": self._episode,
+                    "step": self._step,
+                    "state": np.asarray(state, dtype=np.float32).reshape(-1).tolist(),
+                    "success": True,
+                },
+                stream,
+                indent=2,
+            )
 
     def step(self, example: dict, step: int = 0) -> np.ndarray:
         """
@@ -328,9 +539,20 @@ class ModelClient:
         """
         cams = example["cams"]
         prompt = str(example.get("lang", self._task_description))
+        if self._episode_context.get(
+            "prompt_source"
+        ) == "manifest" and prompt != self._episode_context.get("prompt"):
+            raise RuntimeError(
+                "RoboTwin prompt changed during strict manifest replay: "
+                f"{prompt!r} != {self._episode_context.get('prompt')!r}"
+            )
 
         # Mirror the upstream pattern: reset if the task instruction changes.
-        if prompt and prompt != self._task_description:
+        if self._awaiting_first_prompt:
+            self._awaiting_first_prompt = False
+            if prompt != self._task_description:
+                self._task_description = prompt
+        elif prompt and prompt != self._task_description:
             self.reset(prompt)
 
         state_arr = example.get("state", None)
@@ -351,15 +573,27 @@ class ModelClient:
                 )
             state_list = [float(v) for v in state_np]
 
+        encoded_cams = {
+            "head": client.encode_numpy_b64(cams["head"]),
+            "left": client.encode_numpy_b64(cams["left"])
+            if cams.get("left") is not None
+            else None,
+            "right": client.encode_numpy_b64(cams["right"])
+            if cams.get("right") is not None
+            else None,
+        }
         payload = client.build_payload(
-            head=client.encode_numpy_b64(cams["head"]),
-            left_wrist=client.encode_numpy_b64(cams["left"]) if cams.get("left") is not None else None,
-            right_wrist=client.encode_numpy_b64(cams["right"]) if cams.get("right") is not None else None,
+            head=encoded_cams["head"],
+            left_wrist=encoded_cams["left"],
+            right_wrist=encoded_cams["right"],
             prompt=prompt,
             state=state_list,
         )
-        response = client.post(self._server, "/predict", payload, timeout=self._request_timeout)
+        response = client.post(
+            self._server, "/predict", payload, timeout=self._request_timeout
+        )
         action = np.array(response["action"], dtype=np.float32)
+        server_action = action.copy()
 
         self._step += 1
         if self._debug:
@@ -368,7 +602,44 @@ class ModelClient:
         if self._action_indices is not None:
             action = action[self._action_indices]
 
+        self._last_interaction = {
+            "env_step": int(step),
+            "prompt": prompt,
+            "pre_state": state_list,
+            "server_action": server_action,
+            "policy_action": action.copy(),
+            "response": dict(response),
+            "camera_jpegs": {
+                key: None if value is None else base64.b64decode(value, validate=True)
+                for key, value in encoded_cams.items()
+            },
+        }
+
         return action
+
+    def record_execution(
+        self,
+        *,
+        sent_action,
+        post_state,
+        success: bool,
+        post_state_error: str | None = None,
+    ) -> None:
+        if not self._telemetry.enabled:
+            return
+        interaction = self._last_interaction
+        self._telemetry.record_step(
+            env_step=interaction.get("env_step", self._step - 1),
+            prompt=interaction.get("prompt", self._task_description),
+            pre_state=interaction.get("pre_state"),
+            server_action=interaction.get("server_action"),
+            policy_action=interaction.get("policy_action"),
+            sent_action=sent_action,
+            post_state=post_state,
+            response=interaction.get("response", {}),
+            success=success,
+            post_state_error=post_state_error,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -387,6 +658,11 @@ def get_model(usr_args: dict) -> ModelClient:
         action_type=usr_args.get("action_type", "qpos"),
         debug=_parse_bool(usr_args.get("debug", False), default=False),
         debug_dir=usr_args.get("debug_dir", "./debug_images"),
+        telemetry_enabled=_parse_bool(
+            usr_args.get("telemetry_enabled", False), default=False
+        ),
+        telemetry_dir=usr_args.get("telemetry_dir", "./telemetry/client"),
+        telemetry_flush_every=int(usr_args.get("telemetry_flush_every", 32)),
         # Pass through everything else so legacy-field warnings can fire.
         **{k: v for k, v in usr_args.items() if k in _DEPRECATED_YAML_FIELDS},
     )
@@ -428,6 +704,22 @@ def _extract_proprio(model: ModelClient, observation: dict) -> np.ndarray:
         ) from exc
 
 
+def _extract_direct_proprio(model: ModelClient, task_env) -> np.ndarray:
+    """Read post-command robot state without rendering another camera observation."""
+    if model._action_type == "ee":
+        return action_conversion.robotwin_endpose_to_eef20d(
+            task_env.get_arm_pose("left"),
+            task_env.get_arm_pose("right"),
+            task_env.robot.get_left_gripper_val(),
+            task_env.robot.get_right_gripper_val(),
+        )
+    return np.asarray(
+        task_env.robot.get_left_arm_jointState()
+        + task_env.robot.get_right_arm_jointState(),
+        dtype=np.float32,
+    )
+
+
 def eval(TASK_ENV, model: ModelClient, observation: dict) -> None:
     """Per-step callback invoked by RoboTwin's eval_policy.py.
 
@@ -453,8 +745,64 @@ def eval(TASK_ENV, model: ModelClient, observation: dict) -> None:
 
     action = model.step(example, step=TASK_ENV.take_action_cnt)
 
+    dagger = getattr(model, "_dagger", None)
+    if dagger is not None and dagger.enabled:
+        interaction = model._last_interaction
+        outcome = dagger.process_step(
+            task_env=TASK_ENV,
+            env_step=TASK_ENV.take_action_cnt,
+            prompt=str(instruction),
+            camera_jpegs=interaction.get("camera_jpegs", {}),
+            pre_state=example["state"],
+            policy_action=action,
+            policy_info=interaction.get("response", {}).get("policy", {}),
+            extract_state=lambda env: _extract_direct_proprio(model, env),
+        )
+        if outcome is not None and outcome.consumed:
+            if model._telemetry.enabled:
+                post_state = None
+                post_state_error = None
+                try:
+                    post_state = _extract_direct_proprio(model, TASK_ENV)
+                except Exception as exc:
+                    post_state_error = f"{type(exc).__name__}: {exc}"
+                model.record_execution(
+                    sent_action=None,
+                    post_state=post_state,
+                    success=outcome.success,
+                    post_state_error=post_state_error,
+                )
+            return
+
     # EEF mode: convert 20D (xyz+rot6d+grip)×2 → 16D (xyz+quat+grip)×2.
     if model._action_type == "ee" and len(action) == 20:
         action = action_conversion.eef20d_to_ee16d(action)
 
     TASK_ENV.take_action(action, action_type=model._action_type)
+
+    success = bool(getattr(TASK_ENV, "eval_success", False))
+    post_state = None
+    post_state_error = None
+    debug_enabled = bool(getattr(model, "_debug", False))
+    if model._telemetry.enabled or (debug_enabled and success):
+        try:
+            post_state = _extract_direct_proprio(model, TASK_ENV)
+        except Exception as exc:  # diagnostics must never invalidate evaluation
+            post_state_error = f"{type(exc).__name__}: {exc}"
+    if debug_enabled and success:
+        terminal = TASK_ENV.get_obs()["observation"]
+        model.save_debug_terminal(
+            {
+                "head": terminal["head_camera"]["rgb"],
+                "left": terminal.get("left_camera", {}).get("rgb"),
+                "right": terminal.get("right_camera", {}).get("rgb"),
+            },
+            post_state,
+        )
+    if model._telemetry.enabled:
+        model.record_execution(
+            sent_action=action,
+            post_state=post_state,
+            success=success,
+            post_state_error=post_state_error,
+        )

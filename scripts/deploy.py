@@ -13,6 +13,8 @@ eval client connects over HTTP.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import logging
 import os
 import sys
@@ -32,9 +34,25 @@ sys.path.insert(0, str(_ROOT / "third_party" / "Sana"))
 from sana_wam.deploy.policy_server import build_server_from_config  # noqa: E402
 
 
+def _deployment_source_identity(config_path: str, overrides: list[str]) -> dict:
+    resolved = Path(config_path).expanduser().resolve()
+    raw = resolved.read_bytes()
+    override_bytes = json.dumps(
+        list(overrides), ensure_ascii=True, separators=(",", ":")
+    ).encode("utf-8")
+    return {
+        "deploy_config_path": str(resolved),
+        "deploy_config_size": len(raw),
+        "deploy_config_sha256": hashlib.sha256(raw).hexdigest(),
+        "deploy_overrides": list(overrides),
+        "deploy_overrides_sha256": hashlib.sha256(override_bytes).hexdigest(),
+    }
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt-dir", required=True)
+    ap.add_argument("--ckpt-name", default=None)
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--deploy-config", default=str(_ROOT / "configs" / "deploy_ar_sana.yaml"))
     ap.add_argument("--host", default=None)
@@ -46,7 +64,16 @@ def main():
 
     cfg = OmegaConf.merge(OmegaConf.load(args.deploy_config), OmegaConf.from_dotlist(overrides))
 
-    server = build_server_from_config(cfg, args.ckpt_dir, device=args.device)
+    ckpt_name = args.ckpt_name or OmegaConf.select(cfg, "checkpoint_name", default=None)
+    server = build_server_from_config(
+        cfg,
+        args.ckpt_dir,
+        device=args.device,
+        ckpt_name=ckpt_name,
+    )
+    server._deployment_identity.update(
+        _deployment_source_identity(args.deploy_config, overrides)
+    )
 
     host = args.host or OmegaConf.select(cfg, "server.host", default="0.0.0.0")
     ws_port = args.ws_port or OmegaConf.select(cfg, "server.ws_port", default=8850)

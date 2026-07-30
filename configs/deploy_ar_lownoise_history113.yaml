@@ -1,0 +1,32 @@
+# Experimental deploy config for the history-cadence A/B against the canonical
+# AR low-noise baseline. The only behavioral change is policy.history_len.
+checkpoint_path: null
+checkpoint_name: checkpoint_step_12000.safetensors
+device: cuda:0
+server:
+  host: "127.0.0.1"
+  ws_port: 8850
+  http_port: 8848
+
+inference:
+  video_steps: 10
+  action_steps: 10
+  seed: null
+  shift: 5.0
+  ar_obs_chunk_mode: rolling_buffer
+  ar_obs_latent_band: auto
+  ar_proprio_mode: per_step
+
+policy:
+  execute_horizon: null
+  # Kept identical to the canonical config; inactive while execution is greedy.
+  temporal_ensemble: true
+  # Match the checkpoint's raw num_frames=113 window before stride-4 sampling.
+  history_len: 113
+
+optimization:
+  decode_video: false
+  async_inference:
+    mode: none
+  prompt_embed_cache:
+    maxsize: 32

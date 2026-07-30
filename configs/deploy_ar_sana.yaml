@@ -23,7 +23,12 @@ server:
 inference:
   video_steps: 4              # flow-matching steps for each predicted video chunk
   action_steps: 4             # flow-matching steps for each predicted action chunk
-  seed: 0
+  # null matches training's ambient noise; set an int only for deterministic debugging.
+  seed: null
+  # Canonical-compatible default. ``paired`` derives a distinct stable RNG seed
+  # from each named /reset while matching that seed across A/B arms.
+  episode_noise_mode: ambient       # ambient | paired
+  episode_noise_base_seed: 0
   shift: 5.0
 
   # --- AR deploy-semantics knobs (eval-verification targets; handoff §2c) ---
@@ -34,6 +39,10 @@ inference:
   #   episode's first state for ALL chunks (off-distribution for the per-chunk deltas;
   #   only matches the clip-level context token — debug/ablation only).
   ar_proprio_mode: per_step
+  # Use model-predicted confirmed action cache by default. ``measured`` replaces
+  # the previous action frame with the achieved proprio trajectory at next chunk.
+  cache_feedback_mode: predicted    # predicted | measured
+  cache_feedback_fallback: predicted  # predicted | error
   # ar_action_tokens_per_chunk: 24    # optional override; else derived from num_frames / num_chunks
 
 # ---------------------------------------------------------------------------
@@ -58,3 +67,9 @@ optimization:
     mode: none                # MUST stay none for AR
   prompt_embed_cache:
     maxsize: 32
+
+telemetry:
+  enabled: false
+  output_dir: ./telemetry/server
+  include_chunks: true
+  flush_every: 32

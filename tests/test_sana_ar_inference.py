@@ -35,10 +35,15 @@ def _rand(N, B=2, H=2, d=8, seed=0):
     return tq, tk, v, pq, pk
 
 
-@pytest.mark.parametrize("num_chunks,vtok,atok,window", [(3, 2, 1, 99), (4, 2, 2, 2), (3, 3, 1, 1)])
+@pytest.mark.parametrize(
+    "num_chunks,vtok,atok,window", [(3, 2, 1, 99), (4, 2, 2, 2), (3, 3, 1, 1)]
+)
 def test_cache_inference_matches_training_kernel(num_chunks, vtok, atok, window):
     meta = build_ar_seq_meta(
-        num_chunks=num_chunks, video_tokens_per_chunk=vtok, action_tokens_per_chunk=atok, window=window
+        num_chunks=num_chunks,
+        video_tokens_per_chunk=vtok,
+        action_tokens_per_chunk=atok,
+        window=window,
     )
     N = meta.frame_ids.numel()
     tq, tk, v, pq, pk = _rand(N, seed=num_chunks * 13 + window)
@@ -59,7 +64,9 @@ def test_cache_inference_matches_training_kernel(num_chunks, vtok, atok, window)
         if not bool(sel.any()):
             continue
         idx = sel.nonzero(as_tuple=False).squeeze(-1)
-        S, z = clean_state_from_tokens(tk[:, :, idx, :], v[:, :, idx, :], pk[:, :, idx, :])
+        S, z = clean_state_from_tokens(
+            tk[:, :, idx, :], v[:, :, idx, :], pk[:, :, idx, :]
+        )
         cache.update(0, g, S, z, is_pred=False)
 
     # For each noisy frame, the cache-based inference must reproduce the kernel rows.
@@ -106,3 +113,33 @@ def test_window_evicts_old_frames():
     assert ws is not None
     # only frame 5 survives (0 and 1 are < 5 - window=3)
     torch.testing.assert_close(ws[0], S)
+
+
+def test_cache_frame_pop_restore_is_transactional():
+    cache = ARLinearStateCache(num_layers=2, window=99)
+    S = torch.ones(1, 1, 2, 2)
+    z = torch.ones(1, 1, 1, 2)
+    for layer in range(2):
+        cache.update(layer, 1, S * (layer + 1), z, is_pred=False)
+        cache.update(layer, 3, S * 10, z * 10, is_pred=True)
+
+    snapshot = cache.pop_frame(1)
+    assert [len(entries) for entries in snapshot] == [1, 1]
+    assert cache.info()["frame_ids"] == [3]
+    cache.restore_frame(snapshot)
+    assert cache.info()["frame_ids"] == [1, 3]
+    assert cache.info()["confirmed_entries"] == 2
+    assert cache.info()["predicted_entries"] == 2
+
+
+def test_cache_rejects_duplicate_layer_frame():
+    cache = ARLinearStateCache(num_layers=1, window=99)
+    S = torch.ones(1, 1, 2, 2)
+    z = torch.ones(1, 1, 1, 2)
+    cache.update(0, 1, S, z, is_pred=False)
+    with pytest.raises(ValueError, match="already contains"):
+        cache.update(0, 1, S * 2, z * 2, is_pred=False)
+
+    state = cache.windowed_state(0, 2, hi_inclusive=1)
+    assert state is not None
+    torch.testing.assert_close(state[0], S)

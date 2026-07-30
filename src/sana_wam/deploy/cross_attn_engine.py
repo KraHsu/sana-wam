@@ -78,7 +78,8 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         denoise_steps = int(_inf("denoise_steps", 4) or 4)
         self._video_steps = int(_inf("video_steps", denoise_steps) or denoise_steps)
         self._action_steps = int(_inf("action_steps", denoise_steps) or denoise_steps)
-        self._seed = int(_inf("seed", 0) or 0)
+        seed_cfg = _inf("seed", None)
+        self._seed: Optional[int] = None if seed_cfg is None else int(seed_cfg)
 
         self._action_dim = int(arch.action_dim)
         self._action_tokens = int(_inf("action_tokens", 0) or 0)  # 0 ⇒ infer from clip
@@ -113,7 +114,7 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
         self._delta_action = bool(OmegaConf.select(cfg, "dataloader.delta_action", default=False))
 
         self._prompt_ctx_cache: "OrderedDict[str, tuple[torch.Tensor, torch.Tensor]]" = OrderedDict()
-        self._gen = torch.Generator(device=self._device).manual_seed(self._seed)
+        self._gen = self._make_generator()
 
         logger.info(
             "CrossAttnInferenceEngine ready: video_steps=%d action_steps=%d action_dim=%d vnf=%d "
@@ -252,20 +253,26 @@ class CrossAttnInferenceEngine(BaseInferenceEngine):
             actions_np = normalizer.unnormalize(actions_np)
         return {"actions": actions_np, "video": None}
 
+    def _make_generator(self) -> Optional[torch.Generator]:
+        """Use ambient entropy by default; explicit seeds retain debug determinism."""
+        if self._seed is None:
+            return None
+        return torch.Generator(device=self._device).manual_seed(self._seed)
+
     def reset(self) -> None:
-        """Reseed the RNG + step counter at episode boundaries.
+        """Reset RNG policy + step counter at episode boundaries.
 
         Streaming sources its clean-prefix history from ``conditions['obs_history']``
         (owned by WAMPolicy) and re-encodes it each call, so the engine holds no
         rolling latent buffer that could bleed across episodes — ``_obs_latents`` is
         only the last pinned prefix kept for observability. We still reset it and the
-        step counter, and reseed the RNG for reproducible rollouts. WAMPolicy calls
-        this on episode reset (which also clears its own obs_history).
+        step counter. An explicit seed reproduces the rollout; the default null
+        seed continues from ambient entropy. WAMPolicy also clears obs_history.
         """
         self._obs_latents = None
         self._warned_overlong = False
         self._step_c = 0
-        self._gen = torch.Generator(device=self._device).manual_seed(self._seed)
+        self._gen = self._make_generator()
 
     # --------------------------------------------------------------- conditions
     def _encode_prompt(self, prompt: str):

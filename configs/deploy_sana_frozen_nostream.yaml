@@ -27,7 +27,7 @@ inference:
   video_steps: 4
   action_steps: 4
   action_tokens: 0            # 0 => infer from clip (num_frames - 1 = 128)
-  seed: 0
+  seed: null
   streaming: false            # <-- THE FLIP: single-frame TI2V, full-chunk output, no re-anchor
   predict_horizon_frames: 1   # unused when streaming=false (no prefix cap), kept for parity
 

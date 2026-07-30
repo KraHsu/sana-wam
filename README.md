@@ -29,7 +29,7 @@ tests/          AR unit tests (CPU mini-backbone; a few real-weight gated)
 
 ## Setup
 ```bash
-git submodule update --init third_party/Sana   # NVlabs/Sana @ 6554c8d
+git submodule update --init third_party/Sana   # NVlabs/Sana @ c1c48d8
 uv sync --extra dev
 ```
 Weights (H200 box): SANA-Video 2B at `/DATA/share/SANA-Video_2B_480p`, Gemma text
@@ -37,7 +37,7 @@ encoder at `/DATA/share/gemma-2-2b-it`, RoboTwin data at `/DATA/share/RoboTwin2.
 
 ## Test (CPU; needs the submodule, not the 2B weights)
 ```bash
-uv run pytest -m "not gpu and not data" tests/    # 98 passed
+uv run pytest -m "not gpu and not data" tests/
 ```
 
 ## Train
@@ -60,9 +60,20 @@ bash benchmarks/robotwin/single_eval.sh adjust_bottle demo_clean sana_wam <gpu> 
 Greedy policy is mandatory (the AR KV cache is stateful closed-loop; async /
 receding-horizon / temporal-ensemble break cache alignment).
 
+## Canonical reference baseline
+
+The seed-fixed AR low-noise reference, artifact hashes, exact recorded config,
+and reproduction boundary are tracked in
+`docs/baselines/AR_LOW_NOISE_SEEDFIXED.md`. The historical result is 8/86
+(9.3%); the complete native rerun is 8/100 (8.0%) on RoboTwin `adjust_bottle`.
+The exact 1741-key checkpoint passes strict CPU loading, a two-chunk H200 smoke,
+and a fixed-seed bitwise differential against the current external OpenWAM
+tree. Portable artifacts, exact July source reconstruction, and native
+training-loop parity remain open.
+
 ## Design notes
-- **No registry** — exactly one architecture / backbone / dataset, constructed
-  directly via `config.flatten_model_cfg`.
+- **Explicit dispatch** — four architecture variants are selected by
+  `architecture.variant`; AR is the canonical reference line.
 - **Slim base.py** — only the AR-needed slice: proprio, `prepare_inputs`
   collation, freeze, checkpoint I/O.
 - **Trainer** — a ~250-line torchrun DDP + bf16 loop with manual grad

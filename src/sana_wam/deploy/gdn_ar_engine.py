@@ -65,7 +65,8 @@ class GDNARInferenceEngine(BaseInferenceEngine):
         denoise_steps = int(_inf("denoise_steps", 4) or 4)
         self._video_steps = int(_inf("video_steps", denoise_steps) or denoise_steps)
         self._action_steps = int(_inf("action_steps", denoise_steps) or denoise_steps)
-        self._seed = int(_inf("seed", 0) or 0)
+        seed_cfg = _inf("seed", None)
+        self._seed: Optional[int] = None if seed_cfg is None else int(seed_cfg)
         # Delta actions (GDN-AR per-chunk): each generate predicts ONE chunk whose
         # tokens are displacements from the current proprio (matching training, where
         # chunk c's target is anchored to its per-chunk proprio_c). Reconstruct absolute
@@ -151,8 +152,14 @@ class GDNARInferenceEngine(BaseInferenceEngine):
         self._a_ts = ab.scheduler.timesteps
 
         self._cache = arch.empty_kv_cache()
-        self._gen = torch.Generator(device=self._device).manual_seed(self._seed)
+        self._gen = self._make_generator()
         self._step_c = 0
+
+    def _make_generator(self) -> Optional[torch.Generator]:
+        """Use ambient entropy by default; explicit seeds retain debug determinism."""
+        if self._seed is None:
+            return None
+        return torch.Generator(device=self._device).manual_seed(self._seed)
 
     # ------------------------------------------------------------- per-step core
     @torch.no_grad()
@@ -269,10 +276,10 @@ class GDNARInferenceEngine(BaseInferenceEngine):
         return {"actions": actions, "video": None}
 
     def reset(self) -> None:
-        """Clear the GDN cache + step counter + RNG at an episode boundary."""
+        """Clear GDN state and rebuild the configured optional RNG."""
         self._cache = self.architecture.empty_kv_cache()
         self._step_c = 0
-        self._gen = torch.Generator(device=self._device).manual_seed(self._seed)
+        self._gen = self._make_generator()
 
     # --------------------------------------------------------------- conditions
     def _encode_prompt(self, prompt: str):

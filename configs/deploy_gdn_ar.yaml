@@ -36,7 +36,7 @@ inference:
   action_steps: 4              # flow-matching steps for the predicted action chunk
   action_tokens_per_chunk: 0   # 0 ⇒ infer (= (num_frames-1)/num_chunks; 40 for the train cfg)
   ar_obs_latent_band: auto     # leading@step0 / trailing after — matches training
-  seed: 0
+  seed: null                    # ambient episode noise; integer = deterministic debug
 
 # ---------------------------------------------------------------------------
 # Policy execution. The model is autoregressive: each generate emits ONE chunk of

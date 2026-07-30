@@ -13,6 +13,7 @@ no parameters; ``forward`` delegates the per-layer loop to it.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import Optional, Tuple
 
 import torch
@@ -26,6 +27,36 @@ from sana_wam.model.compile_options import compile_mode, section_enabled, self_a
 from sana_wam.utils import resolve_bridge_layers
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_aligned_positive_rope_kernel(cfg) -> dict | None:
+    raw = cfg.get("aligned_positive_rope_kernel", None)
+    if raw is None:
+        return None
+    if not isinstance(raw, Mapping) and not hasattr(raw, "items"):
+        raise TypeError("aligned_positive_rope_kernel must be a beta/delta mapping")
+    values = dict(raw.items())
+    unknown = sorted(set(values) - {"beta", "delta", "mode"})
+    if unknown:
+        raise ValueError(
+            f"unknown aligned_positive_rope_kernel fields: {unknown}"
+        )
+    beta = float(values.get("beta", 16.0))
+    delta = float(values.get("delta", 1e-4))
+    mode = str(values.get("mode", "post_rope"))
+    if mode not in {"post_rope", "unrotated", "absolute_rope"}:
+        raise ValueError(
+            "aligned positive kernel mode must be 'post_rope', 'unrotated', "
+            "or 'absolute_rope', "
+            f"got {mode!r}"
+        )
+    if beta <= 0:
+        raise ValueError(f"aligned positive kernel beta must be positive, got {beta}")
+    if delta <= 0:
+        raise ValueError(
+            f"aligned positive kernel delta must be positive, got {delta}"
+        )
+    return {"beta": beta, "delta": delta, "mode": mode}
 
 
 def _mot_loop_compile_skip_reason(video_backbone) -> str | None:
@@ -65,6 +96,22 @@ class DualSystemSelfAttnArchitecture(BaseWAMArchitecture):
             # place. SanaMoTJointDriver requires both sides to match; this
             # avoids the user having to set the kernel twice.
             cfg.setdefault("attn_kernel", getattr(self.video_backbone, "attn_kernel", "softmax"))
+        aligned_kernel = _resolve_aligned_positive_rope_kernel(cfg)
+        if aligned_kernel is not None:
+            if self.video_backbone is None:
+                raise RuntimeError(
+                    "aligned_positive_rope_kernel requires a video backbone"
+                )
+            configured = self.video_backbone.configure_aligned_positive_rope_kernel(
+                **aligned_kernel
+            )
+            logger.info(
+                "Enabled aligned positive RoPE kernel on %d video layers: "
+                "beta=%s delta=%s",
+                configured,
+                aligned_kernel["beta"],
+                aligned_kernel["delta"],
+            )
         bl = resolve_bridge_layers(cfg)
         video_dim = self._resolve_video_dim(cfg)
         text_dim = self._resolve_text_dim(cfg)
@@ -89,6 +136,18 @@ class DualSystemSelfAttnArchitecture(BaseWAMArchitecture):
             attn_head_dim=attn_head_dim,
             text_dim=text_dim,
             attn_kernel=str(cfg.get("attn_kernel", "softmax")),
+            aligned_positive_rope_kernel=aligned_kernel is not None,
+            aligned_feature_beta=(
+                aligned_kernel["beta"] if aligned_kernel is not None else 16.0
+            ),
+            aligned_feature_delta=(
+                aligned_kernel["delta"] if aligned_kernel is not None else 1e-4
+            ),
+            aligned_positive_rope_mode=(
+                aligned_kernel["mode"]
+                if aligned_kernel is not None
+                else "post_rope"
+            ),
         )
 
         # MoT driver is built once both backbones are available. The video

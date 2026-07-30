@@ -57,6 +57,10 @@ class DualSystemGDNARArchitecture(DualSystemCrossAttnArchitecture):
         # predicting forward. Default 1 (one real obs); also keeps every denoised
         # chunk's cache non-empty, sidestepping the chunk-0-from-scratch edge.
         self._observed_prefix_chunks = int(c.get("ar_observed_prefix_chunks", 1) or 0)
+        # Proprio modality-dropout / noise (training-time): force a vision-grounded
+        # action pathway (see base._append_proprio_context_token). Default off.
+        self._proprio_dropout = float(c.get("proprio_dropout", 0.0) or 0.0)
+        self._proprio_noise_std = float(c.get("proprio_noise_std", 0.0) or 0.0)
 
     # ------------------------------------------------------------------
     # Streaming lifecycle helpers
@@ -334,8 +338,20 @@ class DualSystemGDNARArchitecture(DualSystemCrossAttnArchitecture):
                         )
                     clean_a_c = clean_a_c - proprio_c.unsqueeze(1)
 
-                # ---- video noising at a sampled per-chunk timestep ----
-                v_ids = torch.randint(0, num_ts_v, (1,))
+                # ---- coupled video+action timestep (Fix A: train/deploy bridge match) ----
+                # Deploy co-denoises video and action on the SAME schedule index (step i
+                # drives v_ts[i] AND a_ts[i]). Training previously sampled the two
+                # timesteps INDEPENDENTLY, so the action was frequently supervised while
+                # cross-attending a near-CLEAN GT-future video bridge it never sees at
+                # deploy (where the bridge is the still-noisy / degenerate dream). Sample
+                # ONE shared normalized position u and map it into each scheduler so the
+                # action always reads the video at the matching noise level (identical
+                # index when the two training schedules have equal length).
+                u = float(torch.rand(1).item())
+                v_ids = torch.tensor([min(num_ts_v - 1, int(u * num_ts_v))])
+                a_ids = torch.tensor([min(num_ts_a - 1, int(u * num_ts_a))])
+
+                # ---- video noising at the coupled per-chunk timestep ----
                 v_sigma = vb.scheduler.sigmas[v_ids].to(device=device, dtype=dtype).view(1, 1, 1, 1, 1)
                 v_ts_val = vb.scheduler.timesteps[v_ids].to(device=device, dtype=dtype)
                 v_noise = torch.randn_like(clean_c)
@@ -348,8 +364,7 @@ class DualSystemGDNARArchitecture(DualSystemCrossAttnArchitecture):
                     noisy_c = (1 - v_sigma) * clean_c + v_sigma * v_noise
                 v_target = vb.scheduler.training_target(clean_c, v_noise, v_ts_val)
 
-                # ---- action noising ----
-                a_ids = torch.randint(0, num_ts_a, (1,))
+                # ---- action noising (a_ids coupled to the video timestep above) ----
                 a_sigma = ab.scheduler.sigmas[a_ids].to(device=device, dtype=dtype).view(1, 1, 1)
                 a_ts_val = ab.scheduler.timesteps[a_ids].to(device=device, dtype=dtype)
                 a_noise = torch.randn_like(clean_a_c)

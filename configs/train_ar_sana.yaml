@@ -26,6 +26,12 @@ model:
     # F4 per-chunk proprio (additive zero-init AdaLN delta) + F3 chunk-0 bootstrap.
     proprio_per_chunk: true
     ar_bootstrap_clean_prefix: true
+    # Training only: independently hide proprio from the action branch while
+    # retaining it in the video/world-model branch. 0 preserves prior behavior.
+    proprio_action_dropout_prob: 0.0
+    # none preserves the historical AR loss; low_noise is the canonical
+    # min-SNR-style recipe that emphasizes near-clean action timesteps.
+    action_loss_weighting: none
 
   video_backbone:
     name: sana_video_2b

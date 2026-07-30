@@ -16,6 +16,7 @@ double-buffered closed-loop control that overlaps computation with execution.
 """
 
 from collections import deque
+import inspect
 from typing import Optional
 
 import numpy as np
@@ -27,12 +28,19 @@ def build_async_info(async_config, policy_cfg, async_executor=None) -> dict:
     """Return a stable async inference info payload for /info and policies."""
     info = async_config.as_dict()
     resolved_delay = info["inference_delay_steps"]
-    if info["enabled"] and resolved_delay is None and info["execution_horizon"] is not None:
+    if (
+        info["enabled"]
+        and resolved_delay is None
+        and info["execution_horizon"] is not None
+    ):
         resolved_delay = max(0, info["execution_horizon"] // 2)
     info["effective_temporal_ensemble"] = (
         False
         if info["enabled"]
-        else bool(getattr(policy_cfg, "temporal_ensemble", True) and getattr(policy_cfg, "execute_horizon", None) is not None)
+        else bool(
+            getattr(policy_cfg, "temporal_ensemble", True)
+            and getattr(policy_cfg, "execute_horizon", None) is not None
+        )
     )
     info.update(
         {
@@ -83,11 +91,15 @@ class WAMPolicy:
 
         history_len = getattr(cfg, "history_len", 10)
         self.obs_history: deque = deque(maxlen=history_len)
-        # Executed-action history (Design B clean action prefix): the actions actually
-        # sent to the env, oldest→newest. The cross-attn streaming engine pins these as
-        # a clean prefix so the policy conditions on the real executed past. Like
+        # Command history (Design B clean action prefix): actions returned for the
+        # controller to send, oldest→newest. Measured achieved states are tracked
+        # separately below. Like
         # obs_history, history_len must span the training window to reach episode start.
         self.action_history: deque = deque(maxlen=history_len)
+        feedback_history_len = max(
+            history_len, int(getattr(cfg, "feedback_history_len", 256) or 256)
+        )
+        self.achieved_state_history: deque = deque(maxlen=feedback_history_len)
 
         # Receding-horizon config
         self.execute_horizon: Optional[int] = getattr(cfg, "execute_horizon", None)
@@ -101,10 +113,19 @@ class WAMPolicy:
         self._ensemble_buffer: dict = {}  # timestep -> list of (weight, action)
         self._current_step: int = 0
         self._steps_since_generate: int = 0
+        self._generation_index: int = -1
+        self._active_chunk_offset: int = 0
+        self._active_generation_telemetry: dict = {}
+        self._last_step_info: dict = {}
 
-        from sana_wam.deploy.optimizations import AsyncInferenceExecutor, normalize_async_inference_config
+        from sana_wam.deploy.optimizations import (
+            AsyncInferenceExecutor,
+            normalize_async_inference_config,
+        )
 
-        self._async_config = normalize_async_inference_config(async_config, policy_cfg=cfg)
+        self._async_config = normalize_async_inference_config(
+            async_config, policy_cfg=cfg
+        )
         self._async = self._async_config.enabled
         self._async_executor = None
         if self._async:
@@ -121,6 +142,10 @@ class WAMPolicy:
         management. Otherwise uses receding-horizon or greedy mode.
         """
         self.obs_history.append(obs)
+        if obs.get("state") is not None:
+            self.achieved_state_history.append(
+                np.asarray(obs["state"], dtype=np.float32).reshape(-1).copy()
+            )
 
         if self._async:
             conditions = self._build_conditions(obs)
@@ -129,15 +154,29 @@ class WAMPolicy:
             return action
 
         need_generate = len(self._action_buffer) == 0 or (
-            self.execute_horizon is not None and self._steps_since_generate >= self.execute_horizon
+            self.execute_horizon is not None
+            and self._steps_since_generate >= self.execute_horizon
         )
 
         if need_generate:
             self._generate_and_enqueue(obs)
             self._steps_since_generate = 0
 
+        chunk_offset = self._active_chunk_offset
         action = self._action_buffer.popleft()
-        self.action_history.append(action)  # executed → clean action prefix next gen
+        self.action_history.append(
+            action
+        )  # commanded past; measured feedback is separate
+        self._last_step_info = {
+            "policy_step": self._current_step,
+            "generation_index": self._generation_index,
+            "chunk_offset": chunk_offset,
+            "buffer_remaining": len(self._action_buffer),
+            "generated": chunk_offset == 0,
+        }
+        if chunk_offset == 0:
+            self._last_step_info.update(self._active_generation_telemetry)
+        self._active_chunk_offset += 1
         self._current_step += 1
         self._steps_since_generate += 1
         return action
@@ -155,6 +194,12 @@ class WAMPolicy:
             actions = actions.cpu().numpy()
 
         chunk_len = len(actions)
+        self._generation_index += 1
+        self._active_chunk_offset = 0
+        self._active_generation_telemetry = dict(result.get("telemetry") or {})
+        self._active_generation_telemetry.update(
+            {"chunk_len": chunk_len, "generation_index": self._generation_index}
+        )
         t_start = self._current_step
 
         if self.temporal_ensemble and self.execute_horizon is not None:
@@ -205,21 +250,38 @@ class WAMPolicy:
         result = sum(w * a for w, a in entries) / total_w
         return result
 
-    def reset(self):
+    def reset(self, episode_context: Optional[dict] = None):
         """Clear state between episodes."""
         self._action_buffer.clear()
         self._ensemble_buffer.clear()
         self.obs_history.clear()
         self.action_history.clear()
+        self.achieved_state_history.clear()
         self._current_step = 0
         self._steps_since_generate = 0
+        self._generation_index = -1
+        self._active_chunk_offset = 0
+        self._active_generation_telemetry = {}
+        self._last_step_info = {}
         if self._async_executor is not None:
             self._async_executor.reset()
         # Propagate the episode boundary to stateful engines (e.g. the block-AR
         # engine clears its KV cache + step counter). No-op for stateless engines.
         engine_reset = getattr(self.engine, "reset", None)
         if callable(engine_reset):
-            engine_reset()
+            try:
+                parameters = inspect.signature(engine_reset).parameters.values()
+                accepts_context = any(
+                    parameter.name == "episode_context"
+                    or parameter.kind == inspect.Parameter.VAR_KEYWORD
+                    for parameter in parameters
+                )
+            except (TypeError, ValueError):
+                accepts_context = False
+            if accepts_context:
+                engine_reset(episode_context=episode_context)
+            else:
+                engine_reset()
 
     def shutdown(self):
         """Clean up async resources."""
@@ -231,6 +293,11 @@ class WAMPolicy:
         """Return normalized async mode and runtime stats."""
         return build_async_info(self._async_config, self.cfg, self._async_executor)
 
+    @property
+    def last_step_info(self) -> dict:
+        """Metadata for the action most recently returned by :meth:`predict_action`."""
+        return self._last_step_info.copy()
+
     def _build_conditions(self, obs: dict) -> dict:
         """Assemble inference conditions from current observation + history.
 
@@ -241,7 +308,10 @@ class WAMPolicy:
         conditions = {
             "observation": obs,
             "obs_history": list(self.obs_history),
-            "action_history": list(self.action_history),  # executed past → clean action prefix
+            "action_history": list(self.action_history),  # server-returned commands
+            "achieved_state_history": list(self.achieved_state_history),
+            "executed_steps_since_generate": self._steps_since_generate,
+            "policy_step": self._current_step,
         }
         img = obs.get("image")
         if img is not None:

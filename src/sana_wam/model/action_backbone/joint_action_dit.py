@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING, Dict, Optional, Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from einops import rearrange
 
 from sana_wam.model.action_backbone.backbone import ActionBackbone
@@ -418,6 +419,11 @@ class ActionDiT(ActionBackbone):
         eps: float = 1e-6,
         attn_kernel: str = "softmax",
         attn_eps: float = 1e-15,
+        loss_weighting: str = "bsmntw",
+        aligned_positive_rope_kernel: bool = False,
+        aligned_feature_beta: float = 16.0,
+        aligned_feature_delta: float = 1e-4,
+        aligned_positive_rope_mode: str = "post_rope",
     ):
         super().__init__()
         if variant not in ("joint_cross_attn", *_MOT_VARIANTS):
@@ -425,6 +431,27 @@ class ActionDiT(ActionBackbone):
         if attn_kernel not in _VALID_ATTN_KERNELS:
             raise ValueError(
                 f"Unknown attn_kernel '{attn_kernel}'. Choose from: {', '.join(_VALID_ATTN_KERNELS)}"
+            )
+        if aligned_positive_rope_kernel and attn_kernel != "linear_relu":
+            raise ValueError(
+                "aligned_positive_rope_kernel requires attn_kernel='linear_relu'"
+            )
+        if aligned_feature_beta <= 0:
+            raise ValueError(
+                f"aligned_feature_beta must be positive, got {aligned_feature_beta}"
+            )
+        if aligned_feature_delta <= 0:
+            raise ValueError(
+                f"aligned_feature_delta must be positive, got {aligned_feature_delta}"
+            )
+        if aligned_positive_rope_mode not in {
+            "post_rope",
+            "unrotated",
+            "absolute_rope",
+        }:
+            raise ValueError(
+                "aligned_positive_rope_mode must be 'post_rope', 'unrotated', "
+                f"or 'absolute_rope', got {aligned_positive_rope_mode!r}"
             )
         if len(bridge_layers) != num_layers:
             raise ValueError(
@@ -448,12 +475,17 @@ class ActionDiT(ActionBackbone):
         self._num_layers = num_layers
         self._attn_kernel = attn_kernel
         self._attn_eps = float(attn_eps)
+        self._aligned_positive_rope_kernel = bool(aligned_positive_rope_kernel)
+        self._aligned_feature_beta = float(aligned_feature_beta)
+        self._aligned_feature_delta = float(aligned_feature_delta)
+        self._aligned_positive_rope_mode = str(aligned_positive_rope_mode)
         self.freq_dim = freq_dim
         self.max_action_len = max_action_len
         self.bridge_layers = bridge_layers
         self.bridge_layers_set = set(bridge_layers)
         self.variant = variant
         self.text_dim = int(text_dim)
+        self.loss_weighting = str(loss_weighting)
 
         from sana_wam.model.action_backbone.components import (
             TimestepEmbedding,
@@ -559,6 +591,17 @@ class ActionDiT(ActionBackbone):
         can compute SANA's dual-track denominator.
         """
         return self._attn_kernel
+
+    @property
+    def aligned_positive_rope_kernel(self) -> bool:
+        """Whether RoPE precedes a positive map shared by both LA tracks."""
+        return self._aligned_positive_rope_kernel
+
+    @property
+    def aligned_positive_rope_mode(self) -> str | None:
+        if not self._aligned_positive_rope_kernel:
+            return None
+        return self._aligned_positive_rope_mode
 
     @property
     def attn_eps(self) -> float:
@@ -952,20 +995,52 @@ class ActionDiT(ActionBackbone):
         v = rearrange(v, "b s (n d) -> b n s d", n=self._num_heads)
 
         if self._attn_kernel == "linear_relu":
-            # SANA's LiteLAReLURope applies ReLU between qk_norm and RoPE, then
-            # uses the *un*-rotated ReLU'd Q/K for the denominator's row-sum.
-            # Mirror that here so cross-modality inner products
-            # (tilde_q_v · tilde_k_a, etc.) are kernel-aligned with the video side.
-            q = torch.relu(q)
-            k = torch.relu(k)
-            q_unrot = rearrange(q, "b n s d -> b s (n d)", n=self._num_heads)
-            k_unrot = rearrange(k, "b n s d -> b s (n d)", n=self._num_heads)
+            if (
+                self._aligned_positive_rope_kernel
+                and self._aligned_positive_rope_mode == "post_rope"
+            ):
+                # Use one non-negative positional kernel in both numerator and
+                # denominator. This makes normalized LA a convex value average.
+                q = rope_apply_1d(q, payload.action_freqs)
+                k = rope_apply_1d(k, payload.action_freqs)
+                q = F.softplus(q, beta=self._aligned_feature_beta)
+                k = F.softplus(k, beta=self._aligned_feature_beta)
+                q = q + self._aligned_feature_delta
+                k = k + self._aligned_feature_delta
+            elif not self._aligned_positive_rope_kernel:
+                # Published SANA order: ReLU first, then RoPE, with a separate
+                # unrotated denominator track.
+                q = torch.relu(q)
+                k = torch.relu(k)
+                q_denom, k_denom = q, k
+            elif self._aligned_positive_rope_mode == "absolute_rope":
+                q = rope_apply_1d(torch.relu(q), payload.action_freqs)
+                k = rope_apply_1d(torch.relu(k), payload.action_freqs)
+                q_denom, k_denom = q.abs(), k.abs()
+            else:
+                # Coherent position-free global kernel. Video retains its
+                # positional window-flash branch; both LA tracks use ReLU Q/K.
+                q = torch.relu(q)
+                k = torch.relu(k)
+                q_denom, k_denom = q, k
+            if self._aligned_positive_rope_mode == "post_rope":
+                q_denom, k_denom = q, k
+            q_unrot = rearrange(
+                q_denom, "b n s d -> b s (n d)", n=self._num_heads
+            )
+            k_unrot = rearrange(
+                k_denom, "b n s d -> b s (n d)", n=self._num_heads
+            )
         else:
             q_unrot = None  # type: ignore[assignment]
             k_unrot = None  # type: ignore[assignment]
 
-        q = rope_apply_1d(q, payload.action_freqs)
-        k = rope_apply_1d(k, payload.action_freqs)
+        if not (
+            self._attn_kernel == "linear_relu"
+            and self._aligned_positive_rope_kernel
+        ):
+            q = rope_apply_1d(q, payload.action_freqs)
+            k = rope_apply_1d(k, payload.action_freqs)
         # Driver consumes (B, S, H*D) — keep modality streams in matching layout.
         q_out = rearrange(q, "b n s d -> b s (n d)", n=self._num_heads)
         k_out = rearrange(k, "b n s d -> b s (n d)", n=self._num_heads)

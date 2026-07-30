@@ -46,6 +46,7 @@ class ActionScheduler:
         denoising_strength: float = 1.0,
         shift: float = 5.0,
         training: bool = False,
+        loss_weighting: str = "bsmntw",
     ) -> None:
         """Generate the sigma/timestep series for ``num_inference_steps`` steps.
 
@@ -57,6 +58,8 @@ class ActionScheduler:
             shift: Shifted-sigmoid shape parameter.
             training: If True, also computes ``linear_timesteps_weights``
                 used for per-timestep loss weighting.
+            loss_weighting: ``none``, ``bsmntw``, or ``low_noise``. Consulted
+                only when ``training`` is true.
         """
         sigma_start = 1.0 * denoising_strength
         sigmas = torch.linspace(sigma_start, 0.0, num_inference_steps + 1)[:-1]
@@ -64,27 +67,33 @@ class ActionScheduler:
         self.sigmas = sigmas
         self.timesteps = sigmas * self.num_train_timesteps
         if training:
-            self._set_training_weight()
+            self._set_training_weight(mode=loss_weighting)
             self.training = True
         else:
             self.training = False
 
-    def _set_training_weight(self) -> None:
-        """Compute BSMNTW loss weights over ``self.timesteps``.
-
-        Mirrors the legacy ``FlowMatchScheduler.set_training_weight``
-        used by Wan-family video schedulers, so action and video losses
-        share consistent timestep weighting.
-        """
+    def _set_training_weight(self, mode: str = "bsmntw") -> None:
+        """Compute flat, BSMNTW, or low-noise action-loss weights."""
         steps = self.num_train_timesteps
-        x = self.timesteps
-        y = torch.exp(-2 * ((x - steps / 2) / steps) ** 2)
-        y_shifted = y - y.min()
-        bsmntw = y_shifted * (steps / y_shifted.sum())
-        if len(self.timesteps) != steps:
-            bsmntw = bsmntw * (len(self.timesteps) / steps)
-            bsmntw = bsmntw + bsmntw[1]
-        self.linear_timesteps_weights = bsmntw
+        if mode == "none":
+            self.linear_timesteps_weights = torch.ones_like(self.timesteps, dtype=torch.float32)
+        elif mode == "bsmntw":
+            x = self.timesteps
+            y = torch.exp(-2 * ((x - steps / 2) / steps) ** 2)
+            y_shifted = y - y.min()
+            bsmntw = y_shifted * (steps / y_shifted.sum())
+            if len(self.timesteps) != steps:
+                bsmntw = bsmntw * (len(self.timesteps) / steps)
+                bsmntw = bsmntw + bsmntw[1]
+            self.linear_timesteps_weights = bsmntw
+        elif mode == "low_noise":
+            # The validated AR recipe uses a gamma=2 min-SNR-style clamp.
+            sigma = self.sigmas.clamp(min=1e-3, max=1.0)
+            snr = ((1.0 - sigma) / sigma) ** 2
+            weight = snr.clamp(max=2.0)
+            self.linear_timesteps_weights = weight * (len(weight) / weight.sum())
+        else:
+            raise ValueError(f"Unknown ActionScheduler loss_weighting mode: {mode!r}")
 
     # ------------------------------------------------------------------
     # Training-side math

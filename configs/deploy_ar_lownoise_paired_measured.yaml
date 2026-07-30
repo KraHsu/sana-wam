@@ -1,0 +1,41 @@
+# Treatment paired with deploy_ar_lownoise_paired_predicted.yaml. The only
+# behavioral difference is cache_feedback_mode.
+checkpoint_path: null
+checkpoint_name: checkpoint_step_12000.safetensors
+device: cuda:0
+server:
+  host: "127.0.0.1"
+  ws_port: 8850
+  http_port: 8848
+
+inference:
+  video_steps: 10
+  action_steps: 10
+  seed: null
+  episode_noise_mode: paired
+  episode_noise_base_seed: 20260715
+  cache_feedback_mode: measured
+  cache_feedback_fallback: error
+  shift: 5.0
+  ar_obs_chunk_mode: rolling_buffer
+  ar_obs_latent_band: auto
+  ar_proprio_mode: per_step
+
+policy:
+  execute_horizon: null
+  temporal_ensemble: true
+  history_len: 113
+  feedback_history_len: 256
+
+optimization:
+  decode_video: false
+  async_inference:
+    mode: none
+  prompt_embed_cache:
+    maxsize: 32
+
+telemetry:
+  enabled: true
+  output_dir: ./telemetry/server
+  include_chunks: true
+  flush_every: 32

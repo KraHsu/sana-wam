@@ -119,6 +119,9 @@ class SanaVideoBackbone(VideoBackbone):
         # num_clean_prefix_frames=1, and ``prepare`` switches the split-forward
         # to per-frame timestep modulation (frame-0 at t=0).
         self._use_first_frame_cond = bool(pipe.config.get("use_first_frame_cond", False))
+        self._continuous_timestep_conditioning = bool(
+            pipe.config.get("continuous_timestep_conditioning", False)
+        )
 
         # Self-attention family: "linear_relu" (SANA LiteLAReLURope, MoT joint
         # path) or "gdn" (Sana-wm ChunkCausalGDNTriton, native run_block +
@@ -126,6 +129,9 @@ class SanaVideoBackbone(VideoBackbone):
         # ``attn_kernel`` property below.
         self._attn_kernel = str(pipe.config.get("attn_kernel", "linear_relu"))
         self._chunk_size = int(pipe.config.get("chunk_size", 3))
+        self._aligned_positive_rope_kernel = False
+        self._aligned_positive_rope_mode: str | None = None
+        self._ar_temporal_chunk_frames: int | None = None
 
         # SanaPipe is @dataclass (not nn.Module), so `self._pipe = pipe`
         # doesn't auto-register its DiT/VAE/text_encoder as nn.Module
@@ -223,6 +229,24 @@ class SanaVideoBackbone(VideoBackbone):
         return int(self._dit.y_embedder.y_embedding.shape[-1])
 
     @property
+    def ar_temporal_chunk_frames(self) -> int | None:
+        """Physical AR chunk size used by non-cached temporal operators."""
+        return self._ar_temporal_chunk_frames
+
+    def configure_ar_chunkwise_temporal_ops(self, chunk_frames: int) -> None:
+        """Pin window-flash and temporal-MLP boundaries to one AR chunk.
+
+        The global linear branch owns cross-chunk state. SANA's parallel
+        window attention and symmetric temporal convolution have no cache, so
+        applying them to a full training clip would expose context unavailable
+        to chunk-at-a-time inference.
+        """
+        frames = int(chunk_frames)
+        if frames <= 0:
+            raise ValueError("AR temporal chunk size must be positive")
+        self._ar_temporal_chunk_frames = frames
+
+    @property
     def head_dim(self) -> int:
         attn = self._dit.blocks[0].attn
         for name in ("dim", "head_dim"):
@@ -315,6 +339,66 @@ class SanaVideoBackbone(VideoBackbone):
         """
         return self._attn_kernel
 
+    @property
+    def continuous_timestep_conditioning(self) -> bool:
+        """Whether video timesteps use the T1 FP32 continuous contract."""
+        return self._continuous_timestep_conditioning
+
+    @property
+    def aligned_positive_rope_kernel(self) -> bool:
+        """Whether split attention uses one positive kernel after RoPE."""
+        return self._aligned_positive_rope_kernel
+
+    @property
+    def aligned_positive_rope_mode(self) -> str | None:
+        return self._aligned_positive_rope_mode
+
+    def configure_aligned_positive_rope_kernel(
+        self, *, beta: float, delta: float, mode: str = "post_rope"
+    ) -> int:
+        """Enable the aligned kernel on every SANA linear-attention block.
+
+        The aligned path deliberately requires the checkpoint-compatible
+        strictly-positive learnable map. This fails closed rather than silently
+        mixing the new positional order with an unrelated feature map.
+        """
+        if self._attn_kernel != "linear_relu":
+            raise ValueError(
+                "aligned_positive_rope_kernel requires attn_kernel='linear_relu'"
+            )
+        if mode not in {"post_rope", "unrotated", "absolute_rope"}:
+            raise ValueError(
+                "aligned positive kernel mode must be 'post_rope', "
+                f"'unrotated', or 'absolute_rope', got {mode!r}"
+            )
+        from sana_wam.model.video_backbone.sana.strictly_positive_feature_map import (
+            StrictlyPositiveLearnableFeatureMap,
+        )
+
+        configured = 0
+        for block in self._dit.blocks:
+            attention = getattr(block, "attn", None)
+            feature_map = getattr(attention, "kernel_func", None)
+            if not isinstance(feature_map, StrictlyPositiveLearnableFeatureMap):
+                raise TypeError(
+                    "aligned_positive_rope_kernel requires every video block to "
+                    "use StrictlyPositiveLearnableFeatureMap"
+                )
+            if feature_map.beta != float(beta) or feature_map.delta != float(delta):
+                raise ValueError(
+                    "aligned_positive_rope_kernel beta/delta must match the "
+                    "video strictly_positive_feature_map configuration"
+                )
+            attention.aligned_positive_rope_kernel = mode
+            configured += 1
+        if configured != self.num_layers:
+            raise RuntimeError(
+                "aligned_positive_rope_kernel did not configure every video layer"
+            )
+        self._aligned_positive_rope_kernel = True
+        self._aligned_positive_rope_mode = mode
+        return configured
+
     # ----------------------------------------------------------------
     # ABC: three-step lifecycle
     # ----------------------------------------------------------------
@@ -352,6 +436,27 @@ class SanaVideoBackbone(VideoBackbone):
             )
 
         timestep = pipeline_inputs.pop("timestep")
+        frame_is_pad = pipeline_inputs.pop("frame_is_pad", None)
+        if frame_is_pad is not None:
+            if not isinstance(frame_is_pad, Tensor):
+                raise TypeError("frame_is_pad must be a tensor or None")
+            if frame_is_pad.dtype != torch.bool or frame_is_pad.layout != torch.strided:
+                raise TypeError("frame_is_pad must be a strided boolean tensor")
+            expected_frame_mask_shape = (x.shape[0], x.shape[2])
+            if tuple(frame_is_pad.shape) != expected_frame_mask_shape:
+                raise ValueError(
+                    "frame_is_pad must exactly match the video batch/frame shape "
+                    f"{expected_frame_mask_shape}, got {tuple(frame_is_pad.shape)}"
+                )
+            if frame_is_pad.device != x.device:
+                raise ValueError(
+                    f"frame_is_pad must be on {x.device}, got {frame_is_pad.device}"
+                )
+            if self._ar_temporal_chunk_frames is None:
+                raise ValueError(
+                    "frame_is_pad requires configured AR chunkwise temporal operators"
+                )
+            frame_is_pad = frame_is_pad.detach()
 
         # --- 2. caption embeddings → (B, 1, L, D) ---
         if "y" in pipeline_inputs:
@@ -426,6 +531,7 @@ class SanaVideoBackbone(VideoBackbone):
             x, timestep, y, mask,
             per_frame_t_mod=per_frame_t_mod,
             num_clean_prefix_frames=num_clean,
+            continuous_timestep_conditioning=self._continuous_timestep_conditioning,
             **pipeline_inputs,
         )
 
@@ -446,6 +552,8 @@ class SanaVideoBackbone(VideoBackbone):
                 "split": self._split,
                 "bs": prep["bs"],
                 "block_kwargs": prep["kwargs"],
+                "ar_temporal_chunk_frames": self._ar_temporal_chunk_frames,
+                "frame_is_pad": frame_is_pad,
             },
         )
 
@@ -456,6 +564,25 @@ class SanaVideoBackbone(VideoBackbone):
         :meth:`post_attn_at_layer` separately and skip this method.
         """
         split: SanaMSVideoSplit = state.extras["split"]
+        temporal_chunk_frames = state.extras.get("ar_temporal_chunk_frames")
+        if temporal_chunk_frames is not None:
+            *_, post_state = split.block_pre_attn(
+                block_id, state.x, state.t_mod, state.freqs
+            )
+            attn_out = split.native_attn(post_state)
+            state.x = split.block_post_attn(
+                block_id,
+                attn_out,
+                post_state,
+                y=state.context,
+                y_lens=state.context_mask,
+                f=state.f,
+                h=state.h,
+                w=state.w,
+                temporal_chunk_frames=temporal_chunk_frames,
+                frame_is_pad=state.extras.get("frame_is_pad"),
+            )
+            return state
         out = split.run_block(
             block_id,
             {
@@ -678,6 +805,8 @@ class SanaVideoBackbone(VideoBackbone):
             f=state.f,
             h=state.h,
             w=state.w,
+            temporal_chunk_frames=state.extras.get("ar_temporal_chunk_frames"),
+            frame_is_pad=state.extras.get("frame_is_pad"),
         )
         return state
 
