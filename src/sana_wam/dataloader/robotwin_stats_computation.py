@@ -471,8 +471,12 @@ def parse_tasks_file(tasks_file: str) -> list:
 
 def _load_yaml_config(path: str) -> dict:
     from omegaconf import OmegaConf
+    from sana_wam.train.cach_stage0_guard import reject_cach_stage0_base_config
 
     cfg = OmegaConf.load(path)
+    reject_cach_stage0_base_config(
+        cfg, entrypoint="sana_wam.dataloader.robotwin_stats_computation"
+    )
     return OmegaConf.to_container(cfg, resolve=True)
 
 

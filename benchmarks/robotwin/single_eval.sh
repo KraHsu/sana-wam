@@ -29,6 +29,7 @@ if [[ $# -lt 4 ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 ROBOTWIN_PATH="${ROBOTWIN_PATH:?ROBOTWIN_PATH must be set to the RoboTwin repository root}"
 [[ -d "${ROBOTWIN_PATH}" ]] || { echo "[ERROR] ROBOTWIN_PATH not found: ${ROBOTWIN_PATH}" >&2; exit 1; }
@@ -50,6 +51,12 @@ policy_config_template="${POLICY_CONFIG_PATH:-${SCRIPT_DIR}/policy_config.yml}"
 
 [[ -f "${policy_config_template}" ]] || {
     echo "[ERROR] policy_config.yml not found: ${policy_config_template}" >&2; exit 1; }
+
+PYTHONDONTWRITEBYTECODE=1 \
+"${SANA_WAM_GUARD_PYTHON:-${PROJECT_ROOT}/.venv/bin/python}" \
+    "${PROJECT_ROOT}/scripts/check_cach_stage0_reserved_config.py" \
+    "${policy_config_template}" \
+    --entrypoint "benchmarks/robotwin/single_eval.sh policy config"
 
 if ! [[ "${task_name}" =~ ^[A-Za-z0-9_]+$ ]]; then
     echo "[ERROR] Invalid task_name '${task_name}'. Expected [A-Za-z0-9_]+." >&2

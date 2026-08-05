@@ -17,18 +17,34 @@ import glob
 import logging
 import os
 import re
-from typing import Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional, Tuple
 
-import torch
 from omegaconf import DictConfig, OmegaConf
 
-from sana_wam.config import flatten_model_cfg
-from sana_wam.model import build_architecture
-from sana_wam.model.base import BaseWAMArchitecture
+from sana_wam.train.cach_stage0_guard import reject_cach_stage0_base_config
+
+if TYPE_CHECKING:
+    from sana_wam.model.base import BaseWAMArchitecture
+else:
+    BaseWAMArchitecture = Any
 
 logger = logging.getLogger(__name__)
 
-_DTYPE_MAP = {"bf16": torch.bfloat16, "fp16": torch.float16, "no": torch.float32}
+
+def flatten_model_cfg(cfg):
+    """Torch-free lazy compatibility seam; called only after the raw-config guard."""
+
+    from sana_wam.config import flatten_model_cfg as _flatten_model_cfg
+
+    return _flatten_model_cfg(cfg)
+
+
+def build_architecture(flat_cfg):
+    """Lazy public seam retained for tests/callers without pre-guard model import."""
+
+    from sana_wam.model import build_architecture as _build_architecture
+
+    return _build_architecture(flat_cfg)
 
 
 def _find_latest_checkpoint(ckpt_dir: str) -> str:
@@ -54,6 +70,24 @@ def load_from_checkpoint_dir(
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"config.yaml not found in {ckpt_dir}")
     cfg = OmegaConf.load(config_path)
+    reject_cach_stage0_base_config(
+        cfg, entrypoint="sana_wam.deploy.model_loader"
+    )
+    from sana_wam.cach.authority import reject_cach_deploy_before_runtime
+
+    # A marker-free CACH checkpoint config must still be rejected before torch
+    # import and before legacy latest-checkpoint discovery.
+    reject_cach_deploy_before_runtime(cfg)
+
+    # The checkpoint's raw config is a second source of deployment truth.
+    # Import torch/model code only after its reserved-marker denial.
+    import torch
+
+    dtype_map = {
+        "bf16": torch.bfloat16,
+        "fp16": torch.float16,
+        "no": torch.float32,
+    }
 
     ckpt_path = os.path.join(ckpt_dir, ckpt_name) if ckpt_name else _find_latest_checkpoint(ckpt_dir)
     logger.info("Loading checkpoint: %s", ckpt_path)
@@ -66,7 +100,7 @@ def load_from_checkpoint_dir(
     architecture = build_architecture(flat_cfg)
 
     mp = OmegaConf.select(cfg, "accelerate.mixed_precision", default="bf16")
-    model_dtype = _DTYPE_MAP.get(str(mp).strip().lower(), torch.bfloat16)
+    model_dtype = dtype_map.get(str(mp).strip().lower(), torch.bfloat16)
     architecture.set_dtype_device(model_dtype, torch.device(device))
     # ``cross_attn.norm_kv.*`` was added to the shared BridgeCrossAttention for the
     # frozen linear-attn SANA backbone; older GDN cross-attn / GDN-AR checkpoints

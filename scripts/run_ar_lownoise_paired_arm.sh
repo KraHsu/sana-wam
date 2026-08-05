@@ -68,6 +68,16 @@ EXPECTED_PROMPT_MANIFEST_SHA256="${EXPECTED_PROMPT_MANIFEST_SHA256:-}"
 EXPECTED_RANKER_SHA256="${EXPECTED_RANKER_SHA256:-c5af1d0d6c145e06c127b4f0d9292a5a05d523ed1a0317d24b482a3f6d5cc964}"
 RERANK_CANDIDATE_COUNT="${RERANK_CANDIDATE_COUNT:-5}"
 
+# Reject the reserved draft marker before creating a run lock or run root.
+GUARD_PYTHON="${SANA_WAM_GUARD_PYTHON:-${ROOT}/.venv/bin/python}"
+PYTHONDONTWRITEBYTECODE=1 "${GUARD_PYTHON}" \
+    "${ROOT}/scripts/check_cach_stage0_reserved_config.py" \
+    "${DEPLOY_CONFIG}" --entrypoint "scripts/run_ar_lownoise_paired_arm.sh deploy config"
+PYTHONDONTWRITEBYTECODE=1 "${GUARD_PYTHON}" \
+    "${ROOT}/scripts/check_cach_stage0_reserved_config.py" \
+    "${CHECKPOINT_DIR}/config.yaml" \
+    --entrypoint "scripts/run_ar_lownoise_paired_arm.sh checkpoint config"
+
 RUN_LOCK="${RUN_DIR}.run-lock"
 if ! mkdir "${RUN_LOCK}" 2>/dev/null; then
     echo "Run lock already exists; refusing a concurrent duplicate: ${RUN_LOCK}" >&2

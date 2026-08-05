@@ -1,0 +1,113 @@
+{
+  "schema": "cach.architecture_validation.cach_a4_state_conditioned_causal_stream_run_card.v1",
+  "state": "SOURCE_CPU_TEST_AND_ONE_IDLE_SINGLE_GPU_SYNTHETIC_EXECUTION_AUTHORIZED",
+  "card_id": "CACH-A4-STATE-CONDITIONED-CAUSAL-STREAM-200",
+  "architecture_id": "CACH-A4-STATE-CONDITIONED-CAUSAL-EXACT-ODD-DELTA-STREAM-v1",
+  "authority": {
+    "exact_utf8_text": "继续 A4",
+    "utf8_length": 9,
+    "sha256": "c3631ea159561fb7d13154c592e16e019384f111b798b3380c7bcf4a4e94350f"
+  },
+  "predecessor": {
+    "required_typed_verdict": "OPERATOR_GO_COMMON_STABLE",
+    "a3_decision_sha256": "ec99746eb5abbe6de29974d4fcf4e56a043fcbbf6df490264fe9fe4581b30979",
+    "a3_card_sha256": "674073b39c1964bbc9c955022437390445dbb2bddfe42403b2c495f5a900be19",
+    "a3_source_sha256": {
+      "bridge": "e1b5dba81880c0524d79222995111ab820b29901158309c58a5b4688adf68597",
+      "config": "8b3aa219826fedbe53e6aa33ffe7b357c7d6bf0ee4d334b116cb13a55037012f",
+      "runner": "3d6177472454681e74c25ddc347651512ba43a7ea298b32a126e89bb2f2d1adc",
+      "test": "2d484bdd6f13352c6388c6b36622d12d9ea187c503f4d57c7edfd2b1e8b4e98f"
+    },
+    "a3_root": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a3_orthogonal/06f5d09127f8/cach-a3-orthogonal-b2e55836da6fd5a51b568af613f74eef",
+    "a3_evidence_sha256": {
+      "result": "81345a1c9b6e03d60dd587cb439ebdd9c2d60fc92a7120d80042c6a9e4dc78c3",
+      "raw_evidence": "ee43f57d503a1db78bc26457efe048fbfe5c0a3be14ccaf79e6489b62363f9ef",
+      "raw_metrics": "19ab6c95d3aed8915a887506425a2de3fd4c6d1e3f500478144586415c0cca9f",
+      "freeze_receipt": "69b72fd730b316509548e4dab198e4dd7d84565ee9f1d05a6cccd1e8a673c63c"
+    },
+    "read_only": true
+  },
+  "source": {
+    "mode": "SIX_FILES_ADDITIVE_ONLY_EXCLUSIVE_CREATE",
+    "files": {
+      "decision": "docs/cach_sana_wam/architecture_validation/cach_a4_state_stream/CACH_A4_STATE_CONDITIONED_CAUSAL_STREAM_ARCHITECTURE_DECISION.md",
+      "card": "docs/cach_sana_wam/architecture_validation/cach_a4_state_stream/CACH_A4_STATE_CONDITIONED_CAUSAL_STREAM_RUN_CARD.json",
+      "bridge": "src/sana_wam/model/cach_av1b_a4_state_conditioned_causal_odd_stream.py",
+      "config": "configs/experiments/cach_av1b_a4_state_conditioned_causal_odd_stream.yaml",
+      "runner": "scripts/run_cach_av1b_a4_state_conditioned_causal_odd_stream.py",
+      "test": "tests/test_cach_av1b_a4_state_conditioned_causal_odd_stream.py"
+    },
+    "execution_must_bind_all_six_sha256": true,
+    "predecessor_or_a3_mutation": false
+  },
+  "architecture": {
+    "common_q": "DETACHED_PARAMETER_FREE_RMS_NORMALIZED_HIDDEN_DIM_64",
+    "raw_action_dim": 20,
+    "delta_state_dim": 64,
+    "odd_write": "U_T_EQUALS_HALF_G_Q_A_MINUS_G_Q_NEG_A_DIM_64",
+    "action_blind_decay": "LAMBDA_T_EQUALS_SIGMOID_W_DECAY_Q_T_DIM_64",
+    "decay_theta0": "W_DECAY_EXACT_ZERO_INITIALIZED_SO_LAMBDA_THETA0_EQUALS_0.5",
+    "recurrence": "D_T_EQUALS_LAMBDA_T_TIMES_D_PREV_PLUS_M_T_TIMES_W_WRITE_U_T",
+    "write_projection": "64_TO_64",
+    "output_projection": "64_TO_3_ZERO_INITIALIZED_FINAL_OUTPUT_ONLY",
+    "single_inactive": "NO_G_OR_WRITE_CALL_STATE_ACTION_BLIND_DECAY_OUTPUT_DIRECT_BYPASS",
+    "full_no_action_or_seam_disabled": "BYPASS_BEFORE_REDUCER_AND_STREAM",
+    "target": "PINNED_A3_BYTES_UNCHANGED_RAW_EFFECT_T_EQUALS_0.5_RAW_EFFECT_PREV_PLUS_TEACHER_A_T"
+  },
+  "experiment": {
+    "arms": ["REF-NORMALIZED-COMMON", "CACH-A4-STATE-CONDITIONED-CAUSAL-ODD-DELTA"],
+    "fresh_initialization": true,
+    "counterfactual_pairs": 4,
+    "macrosteps_per_arm": 200,
+    "losses": ["POSITIVE_COMMON_MSE", "POSITIVE_HALF_DELTA_MSE"],
+    "loss_subtraction": false,
+    "best_step_selection": false,
+    "old_total_relative_gaps": "REPORT_ONLY"
+  },
+  "execution": {
+    "authorized": true,
+    "authorized_capabilities": ["SOURCE_IMPLEMENTATION", "REDUCED_SYNTHETIC_CPU_TESTS", "ONE_IDLE_SINGLE_GPU_FRESH_ROOT_SYNTHETIC_RUN"],
+    "execution_envelope_must_bind": [
+      "SOURCE_SIX_SHA256",
+      "FRESH_NONCE_AND_UNIQUE_ROOT",
+      "PHYSICAL_GPU_INDEX_AND_UUID",
+      "EXACT_COMMAND_AND_CAPABILITIES"
+    ],
+    "root_template": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_state_stream/06f5d09127f8/cach-a4-state-stream-<fresh_nonce>",
+    "eexist_or_non_idle_gpu": "FAIL_CLOSED_NO_RERUN",
+    "review_token": "NONE"
+  },
+  "causal_jvp_diagnostics": {
+    "common_state_to_output_jvp_rms": "DETACHED_COMMON_Q_STATE_TANGENT_TO_DELTA_OR_OUTPUT_PROVES_STREAM_READS_Q",
+    "past_action_to_future_output_jvp_rms": "EARLY_ACTION_TANGENT_TO_LATER_OUTPUT_PROVES_ACTION_HISTORY",
+    "delta_state_to_future_output_jvp_rms": "INJECTED_D_CARRY_TANGENT_TO_LATER_OUTPUT_PROVES_RECURRENCE_CARRY",
+    "independent_not_aliases": true
+  },
+  "thresholds": {
+    "source_of_truth": "configs/experiments/cach_av1b_a4_state_conditioned_causal_odd_stream.yaml",
+    "a3_delta_energy_thresholds_unchanged": true,
+    "prefix_future_leakage_max_abs_and_rel": 0.000001,
+    "common_state_to_output_jvp_rms_gt": 0.00000001,
+    "past_action_to_future_output_jvp_rms_gt": 0.00000001,
+    "delta_state_to_future_output_jvp_rms_gt": 0.00000001
+  },
+  "verdict": {
+    "valid_go_common_stable": "OPERATOR_GO_CAUSAL_STREAM_COMMON_STABLE",
+    "valid_go_common_blocked": "OPERATOR_GO_CAUSAL_STREAM_COMMON_BLOCKED",
+    "valid_all_weak_stop": "OPERATOR_STOP_CAUSAL_STREAM_WEAK",
+    "valid_other": "OPERATOR_INCONCLUSIVE",
+    "invalid": "INVALID_RUN",
+    "automatic_av2_training_or_rerun": false
+  },
+  "forbidden": [
+    "REAL_DATA",
+    "CHECKPOINT_LOAD_OR_SAVE",
+    "FORMAL_TRAINING_OR_EVALUATION",
+    "ADMISSION",
+    "AV2",
+    "GLOBAL_STAGE3",
+    "TOKEN_OPERATION",
+    "AUTOMATIC_RERUN",
+    "PREDECESSOR_OR_A3_MUTATION"
+  ]
+}

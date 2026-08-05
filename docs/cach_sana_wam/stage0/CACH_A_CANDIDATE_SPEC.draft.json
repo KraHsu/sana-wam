@@ -1,0 +1,193 @@
+{
+  "afcc_isolation": {
+    "allow_afcc_reference": false,
+    "allow_afcc_weight": false,
+    "candidate_F": 0,
+    "reference_F": 0,
+    "required_before_trainer_construction": true
+  },
+  "architecture": {
+    "action_conditioning": {
+      "candidate": "zero_init_action_to_video_adapter",
+      "reference": "disabled_identity_bypass",
+      "seam": "post_self_attention_use_delta_pose_additive_internal_only"
+    },
+    "anchors": {
+      "enabled": false
+    },
+    "attnres": {
+      "enabled": false
+    },
+    "bootstrap": {
+      "episode_bootstrap": "first_frame_pinned",
+      "episode_origin_only": true,
+      "observed_prefix_chunks": 0,
+      "reject_ar_observed_prefix_chunks": true,
+      "reject_nonzero_clean_prefix": true,
+      "reject_nonzero_row_start": true
+    },
+    "cache": {
+      "attnres_depth_state": "forward_local",
+      "commit_source_policy": {
+        "commanded_action_only_commit_allowed": false,
+        "deploy_applied_ack_enabled": false,
+        "offline_training": "teacher_forcing_dataset_pair",
+        "self_forcing_generated_pair_enabled": false
+      },
+      "expected_gdn_layer_count": 20,
+      "expected_softmax_layer_count": 0,
+      "gdn_temporal_state": "full_history",
+      "softmax_policy_if_instantiated": "exactly_one_previous_committed_chunk",
+      "softmax_temporal_state": "not_instantiated_in_cach_a"
+    },
+    "frame_chunk_size": 3,
+    "layout_spec": {
+      "action_rate_source": null,
+      "causal_vae_temporal_compression": 8,
+      "path": "docs/cach_sana_wam/stage0/CHUNK_ACTION_LAYOUT_AND_BOOTSTRAP_DESIGN.md",
+      "sha256": "54998d1e290be71fae10dca38859e19d7c17830ddf6bc58e631414a4c5ea4596",
+      "video_stride": 1
+    },
+    "proprio_boundary": {
+      "chunk0_raw_index": 0,
+      "continuation": "latest_observed_state_after_previous_committed_action_span",
+      "equal_rate_raw_index": "action_span_start",
+      "model_input": "exact_selected_per_chunk_states_only",
+      "reject_clip_level_state_for_multichunk": true
+    },
+    "self_forcing": {
+      "enabled": false
+    },
+    "variant": "cach_sana_wam_v0"
+  },
+  "artifact_role": "cach_a_candidate_spec_draft",
+  "blockers": [
+    "Stage 0 designs have not completed independent review",
+    "RoboTwin action/video rate provenance is missing",
+    "Canonical episode/data-order manifest is missing",
+    "CACH architecture and exact checkpoint key allowlist are not implemented",
+    "Episode-origin/no-clean-prefix sampler and layout-derived per-chunk proprio selector are not implemented",
+    "Typed hybrid cache and transactional paired commit are not implemented",
+    "Reserved-marker guards do not yet cover every legacy checkpoint probe, AFCC/Phase-6 launcher, or direct Trainer construction surface",
+    "Deployment/G5 executed-action science lacks APPLIED_ACTION_ACK; this does not block offline teacher-forcing G1-G4",
+    "Machine-readable REF-GDN-CORRECTED commissioning spec/config and authority are absent",
+    "G0/G1/G2/G3 thresholds and receipts are not registered",
+    "Unique immutable campaign root and endpoint are unset",
+    "No user authorization exists for Stage 1 or training"
+  ],
+  "campaign": {
+    "campaign_id": null,
+    "candidate": "CACH-A",
+    "candidate_revision": null,
+    "purpose": "action_conditioned_dynamics_increment",
+    "reference": "REF-GDN-CORRECTED",
+    "scope": "future_reduced_mechanism_campaign",
+    "unique_delta": "candidate video dynamics reads registered noisy/current and committed/past action conditioning; reference uses identity bypass"
+  },
+  "checkpoint": {
+    "final_endpoint": null,
+    "init_dit_from": null,
+    "initial_checkpoint": null,
+    "load_missing_keys_allowlist": [],
+    "load_unexpected_keys_allowlist": [],
+    "model_path": null,
+    "pretrained_video_dit_allowed": false,
+    "resume_allowed_only_same_revision_exact_schema": true
+  },
+  "data": {
+    "action_dim": 20,
+    "action_mode": "eef",
+    "action_order": [
+      "left_xyz_x",
+      "left_xyz_y",
+      "left_xyz_z",
+      "left_rot6d_0",
+      "left_rot6d_1",
+      "left_rot6d_2",
+      "left_rot6d_3",
+      "left_rot6d_4",
+      "left_rot6d_5",
+      "left_gripper",
+      "right_xyz_x",
+      "right_xyz_y",
+      "right_xyz_z",
+      "right_rot6d_0",
+      "right_rot6d_1",
+      "right_rot6d_2",
+      "right_rot6d_3",
+      "right_rot6d_4",
+      "right_rot6d_5",
+      "right_gripper"
+    ],
+    "action_representation": "absolute_eef_target_xyz_rot6d_gripper",
+    "data_order_manifest": null,
+    "dataset_manifest": null,
+    "delta_action": false,
+    "normalization_stats": null,
+    "row_rate_manifest": null,
+    "task_weights": null
+  },
+  "execution_authorized": false,
+  "gates": {
+    "G0_static": "blocked",
+    "G1_unit": "not_run",
+    "G2_numeric": "not_run",
+    "G3_update_free": "not_run",
+    "G4_registered_train": "not_authorized",
+    "threshold_manifest": null
+  },
+  "initialization": {
+    "candidate_operator_specific_seed": null,
+    "complete_hybrid_from_step_0": true,
+    "frozen_components": [
+      "video_backbone.vae",
+      "video_backbone.text_encoder"
+    ],
+    "initialization_mode": "complete_random_v1",
+    "reference_operator_specific_seed": null,
+    "shared_tensor_init_digest": null,
+    "shared_tensor_seed": null,
+    "trainable_components": [
+      "video_dit",
+      "gdn",
+      "action_backbone",
+      "proprio_encoder",
+      "action_conditioner"
+    ]
+  },
+  "plan": {
+    "path": "docs/CAUSAL_ACTION_CONDITIONED_HYBRID_SANA_WAM_DEVELOPMENT_PLAN_20260731.md",
+    "sha256": "969d9668ffed07176844fcbd84062825f9d5f0af0325959b0068c38fe481f0dd"
+  },
+  "prohibited": [
+    "checkpoint_selection",
+    "task_selection",
+    "seed_selection",
+    "anchor_or_ratio_sweep",
+    "rerank",
+    "best_of_n",
+    "temporal_ensemble",
+    "dagger_or_recovery",
+    "approximate_replay",
+    "loss_subtraction"
+  ],
+  "root": {
+    "candidate_root": null,
+    "reference_root": null,
+    "root_nonce": null
+  },
+  "schema_version": "cach-candidate-spec-draft-v1",
+  "scientific_eligible": false,
+  "source_manifest": {
+    "path": "docs/cach_sana_wam/stage0/SOURCE_MANIFEST.draft.json",
+    "sha256": "71f3ed9b0ab431f73742ba9bb6ceb21a74b6379f84e288a1e2178432e47e9277"
+  },
+  "status": "draft_blocked",
+  "training": {
+    "data_order": null,
+    "optimizer": null,
+    "reduced_mechanism_only": true,
+    "seed": null,
+    "step_budget": null
+  }
+}

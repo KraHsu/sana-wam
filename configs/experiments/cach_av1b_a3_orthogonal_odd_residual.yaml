@@ -1,0 +1,130 @@
+{
+  "schema": "cach.cach_a3.normalized_common_exact_odd_output_residual.config.v1",
+  "architecture_id": "CACH-A3-NORMALIZED-COMMON-EXACT-ODD-OUTPUT-RESIDUAL-v1",
+  "operator_level": "VENDOR_KERNEL",
+  "integration_path": "EXPERIMENTAL_PATH",
+  "task": {
+    "recipe_sha256": "9d2a749d722775324ee233862772def530fbffe0ea9e55aeea87c160b87a51e4",
+    "batch_size": 8,
+    "counterfactual_pairs": 4,
+    "frame_count": 5,
+    "scored_horizons": [1, 2, 3, 4],
+    "primary_horizons": [1, 2, 4],
+    "chunk_boundaries": [0, 3, 5],
+    "action_dim": 20,
+    "latent_channels": 3,
+    "hidden_dim": 64,
+    "depth": 20,
+    "dtype": "torch.float32",
+    "device": "cuda:0"
+  },
+  "architecture": {
+    "common_trunk_action_blind": true,
+    "common_final_normalization": "PARAMETER_FREE_RMS_NORM_EPS_1E-6",
+    "treatment_delta": "EXACT_ODD_OUTPUT_SPACE_ACTION_RESIDUAL_ONLY",
+    "conditioner": "BIAS_FREE_20_TO_64_SILU_BIAS_FREE_64_TO_20",
+    "odd_operator": "HALF_G_OF_A_MINUS_G_OF_NEG_A",
+    "output_projection": "BIAS_FREE_20_TO_3_ZERO_INITIALIZED",
+    "action_addition_location": "AFTER_COMMON_VIDEO_OUTPUT_NO_LATER_OPERATOR",
+    "typed_active_mask": [false, true, true, true, true],
+    "inactive_mode": "DIRECT_BYPASS_WITH_ZERO_CALLS",
+    "target_visible_to_forward": false
+  },
+  "training": {
+    "macrosteps": 200,
+    "final_step_only": true,
+    "best_step_selection": false,
+    "losses": {
+      "action": "POSITIVE_MSE_ACTION_DELTA_ONLY",
+      "common": "POSITIVE_MSE_PAIRED_COMMON_ONLY",
+      "loss_subtraction": false
+    },
+    "optimizer": "AdamW",
+    "lr_schedule": "COSINE",
+    "lr_start": 0.003,
+    "lr_end": 0.00003,
+    "betas": [0.9, 0.99],
+    "eps": 1e-08,
+    "weight_decay": 0.0,
+    "gradient_clip_norm": 1.0,
+    "common_action_optimizer_scopes_disjoint": true,
+    "reference_candidate_common_recipes_identical": true
+  },
+  "thresholds": {
+    "validity": {
+      "oddness_max_abs": 0.000001,
+      "zero_origin_max_abs": 0.0,
+      "inactive_delta_max_abs": 0.0,
+      "common_mode_prediction_difference_max_abs": 0.000001,
+      "theta0_common_bytes_equal": true,
+      "common_action_parameter_scopes_disjoint": true,
+      "finite_all": true,
+      "exact_macrosteps_each_common_arm": 200,
+      "exact_macrosteps_candidate_action": 200,
+      "seam_gradient_rms_step0_strictly_greater_than": 1e-08,
+      "seam_update_rms_final_strictly_greater_than": 0.000001,
+      "action_jvp_rms_final_strictly_greater_than": 1e-08,
+      "no_action_jvp_rms": 0.0
+    },
+    "operator_go": {
+      "delta_nmse_max": 0.1,
+      "delta_nmse_primary_horizon_max_each": 0.2,
+      "delta_energy_ratio_min": 0.8,
+      "delta_energy_ratio_max": 1.2,
+      "delta_energy_ratio_primary_horizon_min_each": 0.6,
+      "delta_energy_ratio_primary_horizon_max_each": 1.4,
+      "delta_alignment_cosine_min": 0.95,
+      "delta_alignment_cosine_primary_horizon_min_each": 0.85,
+      "action_explained_fraction_min": 0.8,
+      "action_explained_fraction_primary_horizon_min_each": 0.6,
+      "no_action_recovery_min": 0.8,
+      "no_action_recovery_primary_horizon_min_each": 0.6,
+      "shuffle_penalty_min": 3.0,
+      "shuffle_penalty_primary_horizon_min_each": 2.0
+    },
+    "action_weak_stop": {
+      "delta_nmse_min": 0.8,
+      "delta_alignment_cosine_max": 0.3,
+      "action_explained_fraction_max": 0.2,
+      "shuffle_penalty_max": 0.8,
+      "all_required": true
+    },
+    "common_stability": {
+      "final_over_last50_min_max": 2.0,
+      "final_common_mse_max": 0.1
+    },
+    "legacy_total_relative_gaps_are_report_only": true
+  },
+  "verdict": {
+    "valid_go_common_stable": "OPERATOR_GO_COMMON_STABLE",
+    "valid_go_common_blocked": "OPERATOR_GO_COMMON_BLOCKED",
+    "valid_action_weak_stop": "OPERATOR_STOP_ACTION_WEAK",
+    "valid_other": "OPERATOR_INCONCLUSIVE",
+    "invalid": "INVALID_RUN",
+    "automatic_av2_or_rerun": false,
+    "formal_admission_effect": "NONE",
+    "global_stage3_effect": "NONE"
+  },
+  "runtime": {
+    "python": "3.12.3",
+    "torch": "2.7.1+cu128",
+    "triton": "3.3.1",
+    "single_visible_gpu": true,
+    "max_wall_seconds": 600,
+    "max_root_bytes": 134217728,
+    "minimum_free_bytes": 1073741824
+  },
+  "forbidden": [
+    "REAL_DATA",
+    "CHECKPOINT_LOAD",
+    "CHECKPOINT_SAVE",
+    "FULL_2B",
+    "FORMAL_EVALUATION",
+    "AV2",
+    "GLOBAL_STAGE3",
+    "DEPLOY",
+    "REVIEW_TOKEN_CREATE_DERIVE_RESET_OR_CONSUME",
+    "AUTOMATIC_RERUN",
+    "BEST_STEP_SELECTION"
+  ]
+}

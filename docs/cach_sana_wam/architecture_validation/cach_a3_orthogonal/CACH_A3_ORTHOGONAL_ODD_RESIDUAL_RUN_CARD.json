@@ -1,0 +1,125 @@
+{
+  "schema": "cach.architecture_validation.cach_a3_orthogonal_odd_residual_run_card.v1",
+  "card_id": "cach-a3-normalized-common-exact-odd-output-residual-v1",
+  "state": "ADDITIVE_SOURCE_AND_SINGLE_SYNTHETIC_EXECUTION_AUTHORIZED",
+  "architecture_id": "CACH-A3-NORMALIZED-COMMON-EXACT-ODD-OUTPUT-RESIDUAL-v1",
+  "authority": {
+    "exact_utf8_text": "继续",
+    "sha256": "7c9691192f1b73408bbe4c0cb6d00db94375ca9d8fce0a0d5985e7a5178f083f",
+    "interpretation": "ONE_ADDITIVE_A3_SOURCE_IMPLEMENTATION_CPU_CHECK_AND_FRESH_ROOT_SINGLE_GPU_SYNTHETIC_SCREEN"
+  },
+  "predecessor": {
+    "a2_r1_card_path": "docs/cach_sana_wam/architecture_validation/cach_a2_r1/CACH_A2_R1_RUN_CARD.json",
+    "a2_r1_card_sha256": "c7b710177defda6d44066c7b7b25c4b32d11ec106a92662b0701ca5f87f3401e",
+    "a2_r1_root": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a2_r1/06f5d09127f8/cach-a2-r1-launcher-fix-dc17cb7bdbd70955ea4b91212f0d4ac3",
+    "a2_r1_result_sha256": "a7767e47d718deda41762db4e250dbca0602f78fcff1651ef06a0d6da508c2ef",
+    "a2_r1_raw_metrics_sha256": "557cb38344b81c0d6d3ab9a366d78f9d21807cff1d7214f6d36aa981cb50146c",
+    "a2_r1_raw_evidence_sha256": "c12f89bb808aeb4762ce9a377f67dc733616fe543018d3413e53c23d277bceae",
+    "a2_r1_freeze_receipt_sha256": "5e96575d2057d395e283924c7519e7cfcc51c560bf846d070547c1a26484cb97",
+    "required_terminal_state": "OPERATOR_INCONCLUSIVE_REVIEW_EXHAUSTED",
+    "required_subclassification": "A2_DELTA_LIVE_COMMON_MODE_BLOCKED",
+    "read_only": true
+  },
+  "source": {
+    "architecture_decision": "docs/cach_sana_wam/architecture_validation/cach_a3_orthogonal/CACH_A3_ORTHOGONAL_ODD_RESIDUAL_ARCHITECTURE_DECISION.md",
+    "run_card": "docs/cach_sana_wam/architecture_validation/cach_a3_orthogonal/CACH_A3_ORTHOGONAL_ODD_RESIDUAL_RUN_CARD.json",
+    "bridge": "src/sana_wam/model/cach_av1b_a3_orthogonal_odd_residual.py",
+    "config": "configs/experiments/cach_av1b_a3_orthogonal_odd_residual.yaml",
+    "runner": "scripts/run_cach_av1b_a3_orthogonal_odd_residual.py",
+    "test": "tests/test_cach_av1b_a3_orthogonal_odd_residual.py",
+    "execution_authority_must_bind_all_six_materialized_sha256": true,
+    "existing_files_may_be_modified": false
+  },
+  "experiment": {
+    "operator_level": "VENDOR_KERNEL",
+    "integration_path": "EXPERIMENTAL_PATH",
+    "arms": [
+      "REF_NORMALIZED_ACTION_BLIND_COMMON",
+      "CACH_A3_SAME_COMMON_PLUS_EXACT_ODD_OUTPUT_ACTION_RESIDUAL"
+    ],
+    "candidate_only_delta": "EXACT_ODD_OUTPUT_SPACE_ACTION_RESIDUAL",
+    "common_stabilizer_shared_by_both_arms": "FINAL_PARAMETER_FREE_RMS_NORM",
+    "task_recipe_sha256": "9d2a749d722775324ee233862772def530fbffe0ea9e55aeea87c160b87a51e4",
+    "synthetic_counterfactual_pairs": 4,
+    "macrosteps": 200,
+    "final_step_only": true,
+    "best_step_selection": false,
+    "loss_subtraction": false,
+    "separated_positive_losses": true,
+    "fresh_initialization": true,
+    "checkpoint_load_or_save": false
+  },
+  "metrics": {
+    "primary": [
+      "counterfactual_delta_nmse",
+      "delta_energy_ratio",
+      "delta_alignment_cosine",
+      "action_explained_fraction",
+      "no_action_recovery",
+      "shuffle_penalty"
+    ],
+    "validity": [
+      "exact_oddness",
+      "zero_origin",
+      "typed_inactive_direct_bypass",
+      "common_prediction_and_parameter_parity",
+      "common_action_optimizer_scope_disjointness",
+      "finite_outputs_losses_gradients_updates_and_metrics",
+      "exact_200_macrosteps",
+      "nonzero_action_gradient_update_and_jvp"
+    ],
+    "diagnostic_only": [
+      "legacy_total_relative_gain",
+      "legacy_shuffle_gap_rel",
+      "legacy_no_action_gap_rel",
+      "common_mse_and_loss_stability"
+    ]
+  },
+  "thresholds": {
+    "source_of_truth": "configs/experiments/cach_av1b_a3_orthogonal_odd_residual.yaml",
+    "operator_go_requires_all_primary_thresholds": true,
+    "action_weak_stop_requires_all_stop_thresholds": true,
+    "legacy_total_relative_gap_is_not_a_gate": true
+  },
+  "execution": {
+    "automatic_av2_or_rerun": false,
+    "single_execution_only": true,
+    "fresh_128bit_nonce_required": true,
+    "root_template": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a3_orthogonal/06f5d09127f8/cach-a3-orthogonal-<nonce>",
+    "exclusive_root_create": true,
+    "terminal_root_directory_mode": "0555",
+    "terminal_file_mode": "0444",
+    "single_visible_idle_gpu_required": true,
+    "gpu_index_and_uuid_bound_at_launch": true,
+    "max_wall_seconds": 600,
+    "max_root_bytes": 134217728,
+    "new_review_token": false,
+    "formal_admission_effect": "NONE",
+    "global_stage3_effect": "NONE"
+  },
+  "required_artifacts": [
+    "RUN_CONTEXT.json",
+    "PROGRESS_EVENTS.json",
+    "THETA0_MANIFESTS.json",
+    "LOSS_TRACE.json",
+    "RAW_METRICS.json",
+    "RAW_EVIDENCE.json",
+    "FINAL_PARAMETER_DIGESTS.json",
+    "JIT_INVENTORY.json",
+    "RESULT.json",
+    "FREEZE_RECEIPT.json"
+  ],
+  "forbidden": [
+    "REAL_DATA",
+    "CHECKPOINT_LOAD_OR_SAVE",
+    "FULL_2B",
+    "FORMAL_EVALUATION_OR_ADMISSION",
+    "AV2",
+    "GLOBAL_STAGE3",
+    "DEPLOY",
+    "REVIEW_TOKEN_CREATE_DERIVE_RESET_OR_CONSUME",
+    "AUTOMATIC_RERUN",
+    "ROOT_REUSE_OR_POST_FREEZE_MUTATION",
+    "MODIFY_PREDECESSOR_OR_EXISTING_SOURCE"
+  ]
+}

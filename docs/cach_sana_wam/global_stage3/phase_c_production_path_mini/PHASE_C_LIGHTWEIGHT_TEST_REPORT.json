@@ -1,0 +1,172 @@
+{
+  "authority": {
+    "allowed": [
+      "update_development_documentation_and_source_manifest",
+      "implement_production_shaped_mini_harness",
+      "run_cpu_synthetic_lightweight_tests"
+    ],
+    "authorization": {
+      "capture": false,
+      "checkpoint": false,
+      "complete_2b": false,
+      "deployment": false,
+      "evaluation": false,
+      "formal_admission_root": false,
+      "gpu": false,
+      "optimizer": false,
+      "production_builder_enablement": false,
+      "real_data": false,
+      "scientific_claim": false,
+      "stage3": false,
+      "training": false
+    }
+  },
+  "authorized_on": "2026-08-02",
+  "canonical_host": "H200",
+  "canonical_worktree": "/home/zch/workspace/sana-wam",
+  "contracts": {
+    "C0": {
+      "evidence": "distinct clean/noisy tensors, nonzero readonly timesteps, prefix output/gradient/JVP invariance, and non-vacuous future sensitivity on full and dispatcher seams",
+      "global_contract_closed": false,
+      "status": "phase_c_interface_proxy_evidence_passed_global_contract_open"
+    },
+    "C1": {
+      "evidence": "REF/CACH theta0 raw identity, structural REF bypass, 40 finite nonzero adapter gradients, parameter JVP, and all-tensor immutability",
+      "global_contract_closed": false,
+      "status": "phase_c_interface_proxy_evidence_passed_global_contract_open"
+    },
+    "C2": {
+      "evidence": "independent clean-prefix/current-noisy full oracle equals readonly-noisy then paired-clean chunk orchestration for both arms",
+      "global_contract_closed": false,
+      "status": "phase_c_interface_proxy_evidence_passed_global_contract_open"
+    },
+    "C3": {
+      "evidence": "runtime video interval, Action RoPE and reducer traces plus pre-operator forged episode/epoch/layout/mask rejection",
+      "global_contract_closed": false,
+      "status": "phase_c_interface_proxy_evidence_passed_global_contract_open"
+    },
+    "C4": {
+      "evidence": "fixed bootstrap/NO_ACTION plus pre-allocation drift refusal and sealed inherited checkpoint/device/state/train interfaces",
+      "global_contract_closed": false,
+      "status": "phase_c_interface_proxy_evidence_passed_global_contract_open"
+    },
+    "C5": {
+      "evidence": "caller-pinned Phase-C source delta, selected dependency pins, verified 126-path predecessor and zero-collision overlay",
+      "global_c5_closed": false,
+      "global_contract_closed": false,
+      "status": "phase_c_source_delta_verified_global_contract_open",
+      "transitive_runtime_closure": false
+    },
+    "C6": {
+      "evidence": "bootstrap, exact-K, continuation and partial-tail arithmetic with runtime exact action/RoPE consumption traces",
+      "global_contract_closed": false,
+      "status": "phase_c_interface_proxy_evidence_passed_global_contract_open"
+    },
+    "C7": {
+      "evidence": "update-free denoise, single pending callback, one CAS, three staging failure points, stale/duplicate rejection and executable post-reset recommit",
+      "global_contract_closed": false,
+      "status": "phase_c_interface_proxy_evidence_passed_global_contract_open"
+    },
+    "C8": {
+      "evidence": "20-layer all-GDN typed codec traversal with pinned small-shape cache rank/axis/window contracts and clean-state growth",
+      "global_contract_closed": false,
+      "status": "phase_c_interface_proxy_evidence_passed_global_contract_open"
+    }
+  },
+  "environment": {
+    "CUDA_VISIBLE_DEVICES": "",
+    "cuda_initialized": false,
+    "device": "cpu",
+    "dtype": "float32",
+    "gpu_used": false,
+    "python": "3.12.13",
+    "torch": "2.7.1+cu128"
+  },
+  "gate_state": {
+    "global_gate_s0": "NOT_CLAIMED",
+    "global_gate_s1": "NOT_CLAIMED",
+    "global_gate_s2": "BLOCKED_NOT_CLAIMED",
+    "global_stage3": "NOT_AUTHORIZED"
+  },
+  "hard_suite": {
+    "collected": 11,
+    "command_scope": "CUDA_VISIBLE_DEVICES empty, bytecode disabled, external pytest plugins disabled, pytest cache disabled, fresh exclusive /tmp parent",
+    "deselected": 0,
+    "duration_seconds": 20.32,
+    "failed": 0,
+    "node_ids": [
+      "test_phase_c_c4_builder_rejects_drift_before_model_allocation",
+      "test_phase_c_c1_c4_c8_graph_inventory_and_named_init",
+      "test_phase_c_c1_exact_reference_bypass_and_zero_candidate_identity",
+      "test_phase_c_c0_future_and_target_separation_reverse_grad_and_jvp",
+      "test_phase_c_c1_zero_adapter_reverse_grad_and_parameter_jvp",
+      "test_phase_c_c2_c7_c8_full_vs_chunk_and_atomic_growth",
+      "test_phase_c_c3_one_layout_binding_and_pre_operator_rejections",
+      "test_phase_c_c4_c6_bootstrap_continuation_tail_exact_action_coverage",
+      "test_phase_c_c7_failure_duplicate_reset_and_stale_view",
+      "test_phase_c_failure_receipt_is_exclusive_immutable_tmp_only",
+      "test_phase_c_cpu_only_and_no_prohibited_runtime_side_effects"
+    ],
+    "passed": 11,
+    "pytest_cache_disabled": true,
+    "readonly_repetition_verified": true,
+    "retained_raw_execution_evidence": false,
+    "skipped": 0,
+    "xfailed": 0,
+    "xpassed": 0
+  },
+  "implementation": {
+    "action_dim": 20,
+    "backend": "pure_torch_transition_proxy_not_vendor_numerical_parity",
+    "candidate_only_tensor_count": 44,
+    "clean_noisy_inputs_distinct": true,
+    "complete_2b": false,
+    "depth": 20,
+    "durable_publication": false,
+    "exact_future_g3_dispatcher_reused": false,
+    "graph_evidence_scope": "registered_inventory_not_transitive_reachability",
+    "layer_registry_digest": "3995f5120ebc499f44aae7d651ce30e387f29a5e91024e7912b644f6739bd3ed",
+    "pair_digest": "30edd874743599bb7e810d942d58c5b162428f5c4611a38ad03a647801e704fe",
+    "readonly_timesteps_nonzero": true,
+    "synthetic_dataset_ground_truth_schema_shim": true,
+    "vendor_gdn_numerical_parity": false,
+    "zero_adapter_tensor_count": 40
+  },
+  "limitations": {
+    "complete_2b": false,
+    "dynamic_import_closure": false,
+    "exact_future_g3_dispatcher_reused": false,
+    "formal_admission_root": false,
+    "global_c0_c8_closed": false,
+    "native_library_closure": false,
+    "production_timebase_verified": false,
+    "real_data_source_proof": false,
+    "retained_execution_evidence": false,
+    "synthetic_dataset_ground_truth_schema_shim": true,
+    "transitive_runtime_closure": false,
+    "vendor_gdn_numerical_parity": false
+  },
+  "recorded_at_utc": "2026-08-02T17:18:46Z",
+  "recorded_on": "2026-08-03",
+  "recorded_timezone": "Asia/Shanghai",
+  "regressions": {
+    "collected": 48,
+    "deselected": 0,
+    "duration_seconds": 9.83,
+    "failed": 0,
+    "files": [
+      "tests/test_cach_minimal_cpu.py",
+      "tests/test_cach_stage2b_production_core.py",
+      "tests/test_cach_action_chunk_layout.py",
+      "tests/test_cach_stage2_failure_evidence.py"
+    ],
+    "gpu_used": false,
+    "passed": 48,
+    "skipped": 0,
+    "warnings": 14,
+    "xfailed": 0,
+    "xpassed": 0
+  },
+  "schema": "cach.global_stage3.phase_c.production_path_mini_report.v1",
+  "status": "phase_c_scoped_interface_proxy_suite_passed_section11_blocked_not_global_admission"
+}

@@ -1,0 +1,190 @@
+{
+  "base_lineage": {
+    "sana_afcc_handoff_head": "9586486f2a9f5172d57b325e32093a3e018d34c0",
+    "sana_head": "16b9cec673e3335724ba2d8db25de7f9ed229292",
+    "sana_wam_head": "605f1c134b4c983ff80f8489c4bc8847036329e2",
+    "stage0_source_bundle": {
+      "mode": "0444",
+      "path": "/DATA/share/sana_cach_source_bundles/cach_stage0_85d16ee5_20260731.tar",
+      "sha256": "bd427ef6a604abef49c75b20d14a21d9412f5c21b539a1240fb052187f8889fd",
+      "size_bytes": 645120
+    }
+  },
+  "canonical_host": "H200",
+  "canonical_worktree": "/home/zch/workspace/sana-wam",
+  "created_at": "2026-07-31T09:21:22+00:00",
+  "files": [
+    {
+      "path": "benchmarks/robotwin/eval_policy_wrapper.py",
+      "sha256": "4576708fb96cf36c24cda2448cede33effc85153f0a01ff4f2dff809b400a98a"
+    },
+    {
+      "path": "configs/experiments/cach_sana_wam_stage1.yaml",
+      "sha256": "4d81b07cc825ef33415b4fd8851b198581c652b184f28bad5bc76bd961364c3b"
+    },
+    {
+      "path": "docs/CAUSAL_ACTION_CONDITIONED_HYBRID_SANA_WAM_DEVELOPMENT_PLAN_20260731.md",
+      "sha256": "969d9668ffed07176844fcbd84062825f9d5f0af0325959b0068c38fe481f0dd"
+    },
+    {
+      "path": "docs/cach_sana_wam/stage1/README.md",
+      "sha256": "0a7c1fe0cddc94a462f3749782f0087ec65a9c47ded720ffa6c932f8fd8a96b3"
+    },
+    {
+      "path": "docs/cach_sana_wam/stage1/STAGE1_LIGHTWEIGHT_TEST_REPORT.json",
+      "sha256": "71c03f132895ee46705cadcf8629dfc2d9de94003a2fda8b35a8fa4bf030ef05"
+    },
+    {
+      "path": "docs/cach_sana_wam/stage1/STAGE1_SOURCE_FILES.txt",
+      "sha256": "dff404d7db4a02eac741869e74f1e7b57ee97c005d6f72597f6510b63256bb6a"
+    },
+    {
+      "path": "scripts/verify_cach_stage1.py",
+      "sha256": "2a537b94d017d9ece3f231aa13e226c14a621fd8a07704fd428a0627511f4bb0"
+    },
+    {
+      "path": "src/sana_wam/cach/__init__.py",
+      "sha256": "0daf40668bd7042ff0de6d2c33a045e13d32f17722df3d915aa255268091c75b"
+    },
+    {
+      "path": "src/sana_wam/cach/action_conditioning.py",
+      "sha256": "8323efa1544d5c0520e13192b55ed5f2e85490d03ac21c558d6009db38ee11c6"
+    },
+    {
+      "path": "src/sana_wam/cach/authority.py",
+      "sha256": "3f729d61fe47fddc864ba4cd831e1b358e50444a338e7221fc60b42db5934f22"
+    },
+    {
+      "path": "src/sana_wam/cach/checkpoint_schema.py",
+      "sha256": "8f6ded704476a798d13bb32e7cd3e716a9bd30c80d6909c1fa179159929efe8e"
+    },
+    {
+      "path": "src/sana_wam/cach/config.py",
+      "sha256": "9f3ef7ff0e135843eeb1a91ab19385b88033d464aa190148f87424f981e76e4b"
+    },
+    {
+      "path": "src/sana_wam/cach/initialization.py",
+      "sha256": "e70c94d5720d24ce7663b8eba6d0d3cf0f5d4920fb64c5348e5f0a98e41b5e86"
+    },
+    {
+      "path": "src/sana_wam/cach/launcher.py",
+      "sha256": "5fe5130b729f7b575d4d4cc033019076243bd106a5ad13bbeaef0211082e5d98"
+    },
+    {
+      "path": "src/sana_wam/cach/model_inventory.py",
+      "sha256": "dac740ed2ca2ce6dc393492b8a719b1126e29a02cb90caa43a61ee8c9eaa1b7a"
+    },
+    {
+      "path": "src/sana_wam/cach/verifier.py",
+      "sha256": "ed118dad55af2acdd54aeb08c90422f227dd49ff793a3360bf893a4706a20852"
+    },
+    {
+      "path": "src/sana_wam/dataloader/cach_episode_origin.py",
+      "sha256": "df9296dd57babf6a1cac5b490f334346ddd9cd7cbe94dcc44155b0dabf87b187"
+    },
+    {
+      "path": "src/sana_wam/deploy/__init__.py",
+      "sha256": "2b8965d656cd7f866c37c62362f99c0fa0c779d26011fbe0ea7e286188239675"
+    },
+    {
+      "path": "src/sana_wam/deploy/cach_model_loader.py",
+      "sha256": "903276ec05aa0beaa434cc1d6d0da9a8d6256b6836618e17b40003312fd0eff5"
+    },
+    {
+      "path": "src/sana_wam/deploy/model_loader.py",
+      "sha256": "24321a9e005f19c646936057eb092af055695eb31414eccf5e0def0a066a48d6"
+    },
+    {
+      "path": "src/sana_wam/deploy/policy_server.py",
+      "sha256": "813c8dccc5472ceea8d6d3f8608e6ccf678762e49ea5c5303f84d88e1106cda0"
+    },
+    {
+      "path": "src/sana_wam/model/__init__.py",
+      "sha256": "78e9e9403c02e3af004d18b2a8026647fc0e5e873a8684b4f96251b9cc530f0d"
+    },
+    {
+      "path": "src/sana_wam/model/action_chunk_layout.py",
+      "sha256": "8e6521a93614b4ce7e43ba51d2af4f67d2650b03cc60e7d7a152e36dfa3c8e39"
+    },
+    {
+      "path": "src/sana_wam/model/causal_action_hybrid.py",
+      "sha256": "e714ea6ade41223ed1b93e643cbd179fa63ff7ab48d568f36dc95e5eaab17560"
+    },
+    {
+      "path": "src/sana_wam/model/gdn_ar.py",
+      "sha256": "292835ad4c619eb175b0a9e78cbfb519043ea33b3561cb6342637d490a593a7e"
+    },
+    {
+      "path": "src/sana_wam/model/video_backbone/sana/adapter.py",
+      "sha256": "1f4d687ba6fc589d80db7906695a23e2d8458c35007cf18a2c8a095f50c2af56"
+    },
+    {
+      "path": "src/sana_wam/model/video_backbone/sana/hybrid_cache.py",
+      "sha256": "5b61ab6492670e8021b3603f965e9f3e8921e9d7f0ea77b49e40d92a77f78a74"
+    },
+    {
+      "path": "src/sana_wam/model/video_backbone/sana/pipeline_builder.py",
+      "sha256": "2a7e4f8688b1bec04a4290b6a5deb1a51064d9477ac34c9de3135d618acaba20"
+    },
+    {
+      "path": "src/sana_wam/train/trainer.py",
+      "sha256": "de582335ce1c1363aac1a5ecef4b3278f99637f3016fa35adf135496edfbc6f8"
+    },
+    {
+      "path": "tests/test_cach_action_chunk_layout.py",
+      "sha256": "88465a873b7745a5bb18db51a2a8ff97aa435a336dacb7a993276f1940631b19"
+    },
+    {
+      "path": "tests/test_cach_action_to_video_conditioning.py",
+      "sha256": "e27d977b829d978f8edd33410fa26b0548b466cc55f2f1d40ff28decfa0d9be7"
+    },
+    {
+      "path": "tests/test_cach_afcc_isolation.py",
+      "sha256": "cb2f3eb338eba514c63913152a54d801e0e028d2fc18a2f5e6904670953fe73c"
+    },
+    {
+      "path": "tests/test_cach_cache_content_time.py",
+      "sha256": "814d4a2a5db39928ede0bd4c56f5a9fd936e66192481d37b6cc895724da37963"
+    },
+    {
+      "path": "tests/test_cach_checkpoint_key_allowlist.py",
+      "sha256": "620d2d4ca45b3d2dbebb356b178a00a523b79f19d662bfc9b05fe96ffa1d5701"
+    },
+    {
+      "path": "tests/test_cach_config_schema.py",
+      "sha256": "bd3f8badb01f556369a5d2620ce8d83c26a26c8d00baac748b5a98cbe1551a13"
+    },
+    {
+      "path": "tests/test_cach_hybrid_cache_contract.py",
+      "sha256": "ec47fc62152d146af70b07a4bcd312df967d0edd5cee80b4cff3c69081719c49"
+    },
+    {
+      "path": "tests/test_cach_trainable_parameter_allowlist.py",
+      "sha256": "0a8688abb5c4dbb2357b9d8362aaf900260630c439e30551cbdcaf187d6d5ef4"
+    },
+    {
+      "path": "tests/test_gdn_ar_observed_prefix_contract.py",
+      "sha256": "dafe233d6c5b5e87558e7f30428965e642f2c39ff89d7e7875bd4a8f6ba63f12"
+    }
+  ],
+  "protected_worktree_state": {
+    "phase6_candidate_eligibility_binary_diff_sha256": "283414a3ac1e49bcec916431cc948b3a15f61ca7961fed819abc9c7abc45fbac",
+    "phase6_candidate_eligibility_worktree_sha256": "a784d31886d361f135b8ed59b23610c69c2b71aed96f8131b27f934817d0992f",
+    "stage0_config_guard_cli_sha256": "2b45bbb5c0b2fd0eb9ba99c938e7f81c8175b17f55546c8a3cf7277cc6ebd42a",
+    "stage0_config_guard_sha256": "7a2b4a89a5dec3a7c11970bd3a3f68140ac35f7150fc7feb2bd8547acdbe8748"
+  },
+  "schema": "cach.stage1.source_manifest.draft.v1",
+  "scope": {
+    "file_count": 38,
+    "kind": "stage1_delta_subset_over_stage0_bundle",
+    "stage1_authority_and_this_manifest_excluded_to_avoid_self_reference": true,
+    "transitive_runtime_closure": false
+  },
+  "stage1_source_bundle": {
+    "mode": "0444",
+    "path": "/DATA/share/sana_cach_source_bundles/cach_stage1_a6e7849b91464b6e939db6ac676ca8e0d139a8e889e2b6fedb730457d3ee31dc_20260731.tar",
+    "sha256": "a6e7849b91464b6e939db6ac676ca8e0d139a8e889e2b6fedb730457d3ee31dc",
+    "size_bytes": 870400
+  },
+  "status": "draft_non_execution_source_evidence"
+}

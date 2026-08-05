@@ -71,6 +71,11 @@ class Trainer:
         launch_context=None,
         post_primary_afcc_authorized: bool = False,
     ):
+        # This is the direct-construction guard.  It must remain before CUDA,
+        # datasets, model construction, checkpoint selection, and root writes.
+        from sana_wam.cach.authority import reject_cach_training_before_runtime
+
+        reject_cach_training_before_runtime(cfg, launch_context)
         self.cfg = cfg
         self.t = cfg.training
         if type(post_primary_afcc_authorized) is not bool:

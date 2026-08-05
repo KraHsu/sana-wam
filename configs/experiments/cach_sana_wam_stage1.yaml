@@ -1,0 +1,170 @@
+# CACH-SANA-WAM v0 Stage-1 implementation-only contract.
+#
+# This file is loadable by the torch-free schema validator and is deliberately
+# rejected by every training/deploy entry point.  Null source/runtime/training
+# coordinates are blockers, not defaults.
+
+# Compatibility denial latch for the immutable Stage-0 train/deploy entrypoint
+# guards.  Its presence is intentional: Stage 1 must stay non-executable
+# without rewriting the Stage-0 authority-pinned guard bytes.
+cach_stage0:
+  compatibility_denial_latch: cach_stage1_nonexecutable_v1
+
+cach_stage1:
+  schema_version: cach-sana-wam-config-stage1-v1
+  status: implementation_only
+  execution_enabled: false
+  scientific_eligible: false
+  allowed_actions: [static_review, pure_contract_tests]
+
+model:
+  architecture:
+    framework: dual_system
+    variant: cach_sana_wam_v0
+    action_dim: 20
+    state_dim: 20
+    use_proprioception: true
+    proprio_per_chunk: true
+    proprio_boundary: layout_committed_boundary_v1
+    proprio_value_binding: semantic_float32_sha256_v1
+    frame_chunk_size: 3
+    episode_bootstrap: first_frame_pinned
+    observed_prefix_chunks: 0
+    action_condition:
+      enabled: true
+      public_name: action_condition
+      internal_vendor_seam: use_delta_pose_additive
+      input_dim: 20
+      reducer: end_of_latent_bin_command_v1
+      initialization: post_factory_exact_zero_v1
+      condition_shape: fixed_b_k_a_v1
+      partial_tail_mask: explicit_boolean_b_k_v1
+      padded_condition_value: exact_zero
+      action_input_slots: fixed_chunk_capacity_with_prefix_mask_v1
+    causal_softmax_anchors:
+      enabled: false
+      indices: []
+    block_attn_res:
+      enabled: false
+    self_forcing:
+      enabled: false
+    hybrid_cache:
+      expected_gdn_layer_count: 20
+      expected_softmax_layer_count: 0
+      gdn_temporal_state: full_history
+      softmax_temporal_state: not_instantiated_in_cach_a
+      attnres_depth_state: forward_local
+      layout_binding: exact_chunk_action_layout_instance_v1
+      offline_commit_source: teacher_forcing_dataset_pair
+      self_forcing_generated_pair_enabled: false
+      deploy_applied_ack_enabled: false
+    initialization_mode: complete_random_v1
+  video_backbone:
+    name: sana_video_2b
+    model_path: null
+    init_dit_from: null
+    vae_type: ltx2
+    vae_path: /DATA/share/SANA-WM_streaming/ltx2_causal_vae
+    text_encoder_name: /DATA/share/gemma-2-2b-it
+    freeze: false
+    attn_kernel: gdn
+    chunk_size: 3
+    fp32_attention: true
+    use_first_frame_cond: true
+    gdn_streaming: true
+    use_delta_pose_additive: true
+    delta_pose_additive_dim: 20
+    flow_shift: null
+  action_backbone:
+    dim: 1152
+    ffn_dim: 4608
+
+dataloader:
+  type: cach_episode_origin
+  source_type: robotwin
+  dataset_dir: /DATA/share/RoboTwin2.0/dataset
+  dataset_manifest: null
+  row_rate_manifest: null
+  real_data_admission: false
+  robot: aloha-agilex
+  variant: null
+  task_name: null
+  train_tasks: null
+  action_mode: eef
+  action_representation: absolute_eef_target_xyz_rot6d_gripper
+  action_dim: 20
+  action_order:
+    - left_xyz_x
+    - left_xyz_y
+    - left_xyz_z
+    - left_rot6d_0
+    - left_rot6d_1
+    - left_rot6d_2
+    - left_rot6d_3
+    - left_rot6d_4
+    - left_rot6d_5
+    - left_gripper
+    - right_xyz_x
+    - right_xyz_y
+    - right_xyz_z
+    - right_rot6d_0
+    - right_rot6d_1
+    - right_rot6d_2
+    - right_rot6d_3
+    - right_rot6d_4
+    - right_rot6d_5
+    - right_gripper
+  delta_action: false
+  vae_type: ltx2
+  temporal_compression: 8
+  causal_temporal: true
+  video_stride: 1
+  num_frames: 33
+  height: 384
+  width: 320
+  camera_layout: [head_camera, left_camera, right_camera]
+  growing_history: false
+  episode_origin_only: true
+  reject_nonzero_row_start: true
+  repeat: 1
+  seed: null
+  val_ratio: 0.0
+  window_stride: 1
+  normalize_mode: null
+  action_stats_path: null
+  filter_static_segments: false
+  allow_random_row_substitution: false
+  text_embedding_cache_dir: null
+  vae_cache_dir: null
+
+training:
+  output_dir: null
+  init_checkpoint: null
+  init_checkpoint_sha256: null
+  max_steps: null
+  save_steps: null
+  keep_last_k: null
+  batch_size: null
+  gradient_accumulation_steps: null
+  num_workers: null
+  video_lr: null
+  action_lr: null
+  weight_decay: null
+  grad_clip: null
+  warmup_steps: null
+  lambda_video: 1.0
+  lambda_action: 1.0
+  freeze:
+    - video_backbone.vae
+    - video_backbone.text_encoder
+  seed: null
+
+admission:
+  authority: docs/cach_sana_wam/stage1/CACH_STAGE1_AUTHORITY.draft.json
+  allow_contract_tests: true
+  allow_model_execution: false
+  allow_training: false
+  allow_evaluation: false
+  allow_capture: false
+  allow_gpu: false
+  allow_run_root_creation: false

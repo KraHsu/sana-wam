@@ -1,0 +1,276 @@
+{
+  "schema": "cach.architecture_validation.cach_a4_av2_execution_run_card.v1",
+  "state": "AUTHORIZED_ONE_SHOT_AV2_EXECUTION",
+  "card_id": "CACH-A4-AV2-TINY-REAL-DATA-OVERFIT-EXECUTION-v1",
+  "identity": {
+    "canonical_ssh_alias": "H200",
+    "canonical_worktree": "/home/zch/workspace/sana-wam",
+    "repository_head": "605f1c134b4c983ff80f8489c4bc8847036329e2",
+    "sana_gitlink": "16b9cec673e3335724ba2d8db25de7f9ed229292",
+    "handoff_head": "9586486f2a9f5172d57b325e32093a3e018d34c0",
+    "architecture_id": "CACH-A4-STATE-CONDITIONED-CAUSAL-EXACT-ODD-DELTA-STREAM-v1",
+    "operator_class": "VENDOR_KERNEL",
+    "integration_path": "EXPERIMENTAL_PATH",
+    "artifact_class": "NON_FORMAL_ARCHITECTURE_SCREEN_NOT_ADMISSION_EVIDENCE"
+  },
+  "authority": {
+    "statement": "授权 AV2 tiny real-data 单GPU运行",
+    "statement_utf8_bytes": 38,
+    "statement_sha256": "7a2c2957f794de03fb46715d2446fc8780d09e237d70e6ac4051f69bf284aef2",
+    "interpretation": "ONE_AV2_TINY_REAL_DATA_SINGLE_GPU_FRESH_ROOT_RUN",
+    "real_data": true,
+    "single_gpu_vendor": true,
+    "optimizer_updates": true,
+    "immutable_root": true,
+    "checkpoint_load_or_save": false,
+    "formal_training_or_evaluation": false
+  },
+  "successor_contract": {
+    "additive_only": true,
+    "predecessor_mutation": false,
+    "accepted_deviation_from_original_single_cach_a": true,
+    "preserved_architecture": "CACH-A4-STATE-CONDITIONED-CAUSAL-EXACT-ODD-DELTA-STREAM-v1",
+    "target_in_forward": false,
+    "loss_subtraction": false,
+    "checkpoint": false,
+    "production_path_or_full_2b": false
+  },
+  "materialized_pins": {
+    "data_manifest": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_av2_execution/CACH_A4_AV2_DATA_SELECTION.json",
+      "sha256": "1ba80bb146cca937e9dae5e2e8057bd797482bda2d44889c32441d202ebada87"
+    },
+    "source": {
+      "path": "src/sana_wam/model/cach_av2_tiny_real_data_overfit_execution.py",
+      "sha256": "673f24369b40f0bf255c57da1d3d5bee15a17a6c25ba5a8f52c1f9ff31ebc72f"
+    },
+    "config": {
+      "path": "configs/experiments/cach_av2_tiny_real_data_overfit_execution.yaml",
+      "sha256": "c2aeb839b711318c7c10c06a93adff3d3de036d93f2ec061748e27e06b04b62e"
+    },
+    "runner": {
+      "path": "scripts/run_cach_av2_tiny_real_data_overfit_execution.py",
+      "sha256": "05784548328bfa9f242948b52444a4a39f028d2ac15a303eb89476057e790d60"
+    },
+    "test": {
+      "path": "tests/test_cach_av2_tiny_real_data_overfit_execution.py",
+      "sha256": "7f45d47eef8e21abcc1c15772cebc0543f8fc9ccf99c9d71cc4e7cf34515ec09"
+    }
+  },
+  "predecessor_pins": {
+    "governing_plan": {
+      "path": "docs/cach_sana_wam/global_stage3/post_phase_c_planning/ARCHITECTURE_VALIDATION_FIRST_PLAN_20260803_v1.md",
+      "sha256": "06f5d09127f8bc2a945cdbdc095054f40b1fe8d9757a90eccbdf0604ea89e079"
+    },
+    "phase_c_source_manifest_reference_only": {
+      "path": "docs/cach_sana_wam/global_stage3/phase_c_production_path_mini/SOURCE_MANIFEST.json",
+      "sha256": "0b88a76c5d2bf73a72a830fb58d9faac091af77e738f341f843664eaced3ffff"
+    },
+    "av2_scaffold_decision": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_av2/CACH_A4_AV2_TINY_REAL_DATA_OVERFIT_DECISION.md",
+      "sha256": "b28ccdc0648c8f6105d507bdb714d0f15293285a5eefc37900052d3b11dc0d79"
+    },
+    "av2_scaffold_card": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_av2/CACH_A4_AV2_TINY_REAL_DATA_OVERFIT_RUN_CARD.json",
+      "sha256": "22939aa707a73ec40e37838d08dcb0b57eaa2169f3f5e64615096db61ee99f58"
+    },
+    "av2_scaffold_source": {
+      "path": "src/sana_wam/model/cach_av2_tiny_real_data_overfit.py",
+      "sha256": "510e85e9c060cefae9db04bd4b64916994b9ae0dd733af21473d3f97d6a5c1cf"
+    },
+    "av2_scaffold_config": {
+      "path": "configs/experiments/cach_av2_tiny_real_data_overfit.yaml",
+      "sha256": "de97f6a2b214c95be0de5999f5b5451d7d7ce5308eaa5f7d0e8b87a378ab7642"
+    },
+    "av2_scaffold_runner": {
+      "path": "scripts/run_cach_av2_tiny_real_data_overfit.py",
+      "sha256": "ef29db48c3303cd0cfb4bb3f542eca727a60c7f035dc94ecc4fc1e5e5168d245"
+    },
+    "av2_scaffold_test": {
+      "path": "tests/test_cach_av2_tiny_real_data_overfit.py",
+      "sha256": "e99756aac296e3562e6024c06c08e7d024dbbf96435d08e57a5e013fa68dfbe5"
+    },
+    "a4_r2_decision": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_r2/CACH_A4_R2_DIAGNOSTIC_MASK_SHAPE_FIX_DECISION.md",
+      "sha256": "74257915c15f4d8c4471470ed1aa265e8797e321f97f615cb5ea98e435c19dfe"
+    },
+    "a4_r2_card": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_r2/CACH_A4_R2_RUN_CARD.json",
+      "sha256": "a45b55ffea796aa1edbcb46fae77654aa850965c312ed72b26797dffa4b1e6c6"
+    },
+    "a4_r2_bridge": {
+      "path": "src/sana_wam/model/cach_av1b_a4_state_conditioned_causal_odd_stream_r2.py",
+      "sha256": "848d45c973de7c17995265f53d95ad92a357dad09bfabe76c8e58731b665e122"
+    },
+    "a4_r2_config": {
+      "path": "configs/experiments/cach_av1b_a4_state_conditioned_causal_odd_stream_r2.yaml",
+      "sha256": "9acf0425fa8370be546686e7ee23e5c764a23a804b70dc125ee25c772e3317ae"
+    },
+    "a4_r2_runner": {
+      "path": "scripts/run_cach_av1b_a4_state_conditioned_causal_odd_stream_r2.py",
+      "sha256": "33683be12276acf359ec0442bc7fb5e839c5b96b253c7fc1cfeccf74c522676a"
+    },
+    "a4_r2_test": {
+      "path": "tests/test_cach_av1b_a4_state_conditioned_causal_odd_stream_r2.py",
+      "sha256": "83f4fcaf27ce0bd9925591c3a8812991571cfa2768595bc0977b620cf50d4f0b"
+    },
+    "a4_r2_result": {
+      "path": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_state_stream_r2/06f5d09127f8/cach-a4-state-stream-r2-f294a23c285082ae61b1685accec416e/RESULT.json",
+      "sha256": "fabce5d1ac38294f79a6313c35041a723f4cb1055045ce9825a6f24d4202babd"
+    },
+    "a4_r2_freeze_receipt": {
+      "path": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_state_stream_r2/06f5d09127f8/cach-a4-state-stream-r2-f294a23c285082ae61b1685accec416e/FREEZE_RECEIPT.json",
+      "sha256": "ec70c0c409625b0d6d0d3c3e33d841e75313eb10ccea2b30f725be1fd0094a03"
+    },
+    "a3_decision": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a3_orthogonal/CACH_A3_ORTHOGONAL_ODD_RESIDUAL_ARCHITECTURE_DECISION.md",
+      "sha256": "ec99746eb5abbe6de29974d4fcf4e56a043fcbbf6df490264fe9fe4581b30979"
+    },
+    "a3_card": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a3_orthogonal/CACH_A3_ORTHOGONAL_ODD_RESIDUAL_RUN_CARD.json",
+      "sha256": "674073b39c1964bbc9c955022437390445dbb2bddfe42403b2c495f5a900be19"
+    },
+    "a3_bridge": {
+      "path": "src/sana_wam/model/cach_av1b_a3_orthogonal_odd_residual.py",
+      "sha256": "e1b5dba81880c0524d79222995111ab820b29901158309c58a5b4688adf68597"
+    },
+    "a3_config": {
+      "path": "configs/experiments/cach_av1b_a3_orthogonal_odd_residual.yaml",
+      "sha256": "8b3aa219826fedbe53e6aa33ffe7b357c7d6bf0ee4d334b116cb13a55037012f"
+    },
+    "a3_runner": {
+      "path": "scripts/run_cach_av1b_a3_orthogonal_odd_residual.py",
+      "sha256": "3d6177472454681e74c25ddc347651512ba43a7ea298b32a126e89bb2f2d1adc"
+    },
+    "a3_test": {
+      "path": "tests/test_cach_av1b_a3_orthogonal_odd_residual.py",
+      "sha256": "2d484bdd6f13352c6388c6b36622d12d9ea187c503f4d57c7edfd2b1e8b4e98f"
+    },
+    "a4_decision": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_state_stream/CACH_A4_STATE_CONDITIONED_CAUSAL_STREAM_ARCHITECTURE_DECISION.md",
+      "sha256": "2a2efb3bda76dd36d2d1b98c0d26703de40704bc0744098a93b9820eac0b3a92"
+    },
+    "a4_card": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_state_stream/CACH_A4_STATE_CONDITIONED_CAUSAL_STREAM_RUN_CARD.json",
+      "sha256": "b069c5fcbfde49e1f2e7a7ae0feb47067910ed680d09b28eb8459deb22ef618d"
+    },
+    "a4_bridge": {
+      "path": "src/sana_wam/model/cach_av1b_a4_state_conditioned_causal_odd_stream.py",
+      "sha256": "54924361009668a5c1cd113799812cc0f3d758b83528bf0aa917efba55a5fa6a"
+    },
+    "a4_config": {
+      "path": "configs/experiments/cach_av1b_a4_state_conditioned_causal_odd_stream.yaml",
+      "sha256": "c49e03ad22a3ed8f79160817309714a674e0c8aa9766a1beb0eb5c8a7dabf835"
+    },
+    "a4_runner": {
+      "path": "scripts/run_cach_av1b_a4_state_conditioned_causal_odd_stream.py",
+      "sha256": "8c106c23b579c8ab0742a9d66a99b886223c063bf876fe3f368067251dcd9cce"
+    },
+    "a4_test": {
+      "path": "tests/test_cach_av1b_a4_state_conditioned_causal_odd_stream.py",
+      "sha256": "892b6e8d673a180a377b74d44a6fdd2818ced8a8b27dfbd64d628569baab0977"
+    },
+    "a4_r1_decision": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_r1/CACH_A4_R1_LAUNCHER_ENV_FIX_DECISION.md",
+      "sha256": "aa06060c40ea2fe1abad1041dd8ebfb236619ce51cc36ac1718cca9e4d5e67f6"
+    },
+    "a4_r1_card": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_r1/CACH_A4_R1_RUN_CARD.json",
+      "sha256": "faddcddcb7a1a6a69f013f615f39e99e78b128b50fe7d4a6f67fe3b8a335c0a7"
+    },
+    "a4_r1_bridge": {
+      "path": "src/sana_wam/model/cach_av1b_a4_state_conditioned_causal_odd_stream_r1.py",
+      "sha256": "abd8a4f1d671cc7d0af735724a4034f86b85f05b5c0448dcfb2fc4ba2af31d1c"
+    },
+    "a4_r1_config": {
+      "path": "configs/experiments/cach_av1b_a4_state_conditioned_causal_odd_stream_r1.yaml",
+      "sha256": "9acf0425fa8370be546686e7ee23e5c764a23a804b70dc125ee25c772e3317ae"
+    },
+    "a4_r1_runner": {
+      "path": "scripts/run_cach_av1b_a4_state_conditioned_causal_odd_stream_r1.py",
+      "sha256": "4c273186ebc0ff61902f25b3a38b5e59fad51a701d59e7fc0b4351bac3bdf600"
+    },
+    "a4_r1_test": {
+      "path": "tests/test_cach_av1b_a4_state_conditioned_causal_odd_stream_r1.py",
+      "sha256": "b4b386d439344b0c6c041544a5c79b0d016113d4f1e030c88e77cc5f6c27f606"
+    },
+    "robotwin_dataset_source": {
+      "path": "src/sana_wam/dataloader/robotwin_dataset.py",
+      "sha256": "a7db73364f260b693e376f16783576d383ad88c3ee9f8258135acd91e81c1445"
+    },
+    "rotation_source": {
+      "path": "src/sana_wam/dataloader/transforms/rotation.py",
+      "sha256": "f928676154ba81d760074e586e853e7e59e91ba6ad58637bcd4970e1d42c624b"
+    },
+    "cach_stage1_config": {
+      "path": "configs/experiments/cach_sana_wam_stage1.yaml",
+      "sha256": "4d81b07cc825ef33415b4fd8851b198581c652b184f28bad5bc76bd961364c3b"
+    },
+    "consumed_review_claim": {
+      "path": "/DATA/share/sana_cach_wam_nonformal_screens/token_ledgers/c73a943047295338cd9de14e6e53199b463ea66ae92b99d4b0b3393f5ec34030/cadfd92f1c72ebd9cc9aa8bfad029ddc6f0e72d9f7942f34e74629ca1ae37252.claim.json",
+      "sha256": "e7c355d3c4e8bfb942f8baa8a5511fb5964c2c7f2d6c975ef5aec0daa458a91f"
+    }
+  },
+  "data_contract": {
+    "selection_manifest_sha256": "1ba80bb146cca937e9dae5e2e8057bd797482bda2d44889c32441d202ebada87",
+    "task": "adjust_bottle",
+    "train_episodes": [0, 1, 2, 3, 4, 5, 6, 7],
+    "heldout_episodes": [8, 9, 10, 11, 12, 13, 14, 15],
+    "raw_interval": [0, 33],
+    "action": "ABSOLUTE_EEF20_ROWS_1_TO_32_NORMALIZATION_NONE",
+    "target": "ANCHOR_CENTERED_HEAD_CAMERA_CHANNEL_MEAN",
+    "forward_observation": "ABSOLUTE_ANCHOR_CHANNEL_MEAN_REPEATED_FIVE_TIMES",
+    "fallback_or_reselection": false,
+    "real_target_in_forward_task": false
+  },
+  "execution": {
+    "gpu_index": 0,
+    "gpu_uuid": "GPU-1ec28cfb-f501-23f3-f865-275a744ca053",
+    "namespace": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_av2_tiny_real_data",
+    "namespace_leaf": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_av2_tiny_real_data/06f5d09127f8",
+    "root": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_av2_tiny_real_data/06f5d09127f8/cach-a4-av2-96c7c972d34733dd37475b183c136ee0",
+    "nonce": "96c7c972d34733dd37475b183c136ee0",
+    "python": "/home/zch/workspace/sana-wam/.venv/bin/python",
+    "max_steps_per_arm": 1000,
+    "max_wall_clock_minutes": 60,
+    "serial_arms": true,
+    "fresh_initialization": true,
+    "checkpoint_load": false,
+    "checkpoint_save": false,
+    "root_reuse": false,
+    "automatic_rerun": false
+  },
+  "thresholds": {
+    "candidate_heldout_decrease_min": 0.05,
+    "correct_vs_shuffle_improvement_min": 0.05,
+    "correct_vs_no_action_improvement_min": 0.05,
+    "candidate_vs_reference_noninferiority_ratio_max": 1.0,
+    "min_action_variance": 1e-08,
+    "min_shuffle_mse": 1e-08,
+    "min_motion_mse": 1e-08
+  },
+  "verdict_contract": {
+    "go": "AV2_GO",
+    "stop": "REDUCED_ARCH_STOP",
+    "review_band": "REDUCED_ARCH_INCONCLUSIVE_REVIEW_EXHAUSTED",
+    "invalid": "AV2_INVALID_FAIL_CLOSED",
+    "go_unlocks_only": "AV3_ELIGIBILITY",
+    "review_token_state": "CONSUMED_NO_NEW_TOKEN_ALLOWED"
+  },
+  "forbidden": [
+    "AUTOMATIC_RERUN_OR_ROOT_REUSE",
+    "CHECKPOINT_LOAD_OR_SAVE",
+    "REAL_DATA_OUTSIDE_FROZEN_SELECTION",
+    "MODEL_RESULT_DEPENDENT_DATA_SELECTION",
+    "GPU_OTHER_THAN_FIXED_SINGLE_GPU",
+    "FULL_2B",
+    "FORMAL_TRAINING_EVALUATION_OR_ADMISSION",
+    "PRODUCTION_INTEGRATION",
+    "DEPLOY",
+    "AV3_EXECUTION",
+    "GLOBAL_STAGE3",
+    "TOKEN_CREATE_DERIVE_RESET_OR_CONSUME",
+    "FROZEN_PREDECESSOR_MUTATION",
+    "POST_FREEZE_ROOT_MUTATION"
+  ]
+}

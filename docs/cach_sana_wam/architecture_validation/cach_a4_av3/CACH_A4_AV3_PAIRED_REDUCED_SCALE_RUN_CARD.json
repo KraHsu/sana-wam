@@ -1,0 +1,455 @@
+{
+  "schema": "cach.architecture_validation.cach_a4_av3_paired_reduced_scale_run_card.v1",
+  "state": "CARD_ONLY_AV3_SOURCE_DATA_AND_EXECUTION_NOT_AUTHORIZED",
+  "card_id": "CACH-A4-AV3-PAIRED-REDUCED-SCALE-SEED0-v1",
+  "identity": {
+    "canonical_ssh_alias": "H200",
+    "canonical_worktree": "/home/zch/workspace/sana-wam",
+    "created_on": "2026-08-05",
+    "self_path": "docs/cach_sana_wam/architecture_validation/cach_a4_av3/CACH_A4_AV3_PAIRED_REDUCED_SCALE_RUN_CARD.json",
+    "self_pin_policy": "OUT_OF_BAND_FULL_SHA256_AFTER_H200_SERIALIZATION",
+    "architecture_id": "CACH-A4-STATE-CONDITIONED-CAUSAL-EXACT-ODD-DELTA-STREAM-v1",
+    "decision": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_av3/CACH_A4_AV3_PAIRED_REDUCED_SCALE_DECISION.md",
+      "sha256": "a0a211915704b3230747021a566e06ff47478b20f3acb2681973e6ac9e3ebd30"
+    }
+  },
+  "authority": {
+    "statement": "继续 AV3",
+    "statement_utf8_bytes": 10,
+    "statement_sha256": "c2e58d4f4d351b71e2e8e2dfb93c3e9741b71c9eda92011c420eff4aa8381fb1",
+    "interpretation": "CREATE_AND_FREEZE_AV3_DECISION_AND_RUN_CARD_ONLY",
+    "basis": "THE_PREVIOUS_ASSISTANT_TURN_EXPLICITLY_DEFINED_THIS_SHORT_REPLY_AS_AUTHORITY_FOR_AV3_DECISION_AND_RUN_CARD_CREATION",
+    "inheritance": "NONE",
+    "unlisted_capability_default": "DENIED",
+    "allowed_writes": [
+      "docs/cach_sana_wam/architecture_validation/cach_a4_av3/CACH_A4_AV3_PAIRED_REDUCED_SCALE_DECISION.md",
+      "docs/cach_sana_wam/architecture_validation/cach_a4_av3/CACH_A4_AV3_PAIRED_REDUCED_SCALE_RUN_CARD.json"
+    ],
+    "allowed_validation": [
+      "READ_ONLY_PREDECESSOR_REFERENCES",
+      "STATIC_MARKDOWN_JSON_PATH_AND_SHA_VALIDATION"
+    ]
+  },
+  "governing_pins": {
+    "architecture_validation_first_plan": {
+      "path": "docs/cach_sana_wam/global_stage3/post_phase_c_planning/ARCHITECTURE_VALIDATION_FIRST_PLAN_20260803_v1.md",
+      "sha256": "06f5d09127f8bc2a945cdbdc095054f40b1fe8d9757a90eccbdf0604ea89e079"
+    },
+    "av0_card": {
+      "path": "docs/cach_sana_wam/architecture_validation/av1/AV0_RUN_CARD.json",
+      "sha256": "c73a943047295338cd9de14e6e53199b463ea66ae92b99d4b0b3393f5ec34030"
+    }
+  },
+  "eligibility": {
+    "required_predecessor_state": "AV2_GO",
+    "observed_predecessor_state": "AV2_GO",
+    "valid_result": true,
+    "av3_unlocked": true,
+    "effect": "AV3_ELIGIBILITY_ONLY_NO_AUTOMATIC_SOURCE_DATA_OR_EXECUTION_AUTHORITY",
+    "predecessor_root": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_av2_tiny_real_data_r2/06f5d09127f8/cach-a4-av2-r2-b795b1b6edba6aeb584c06db1d166bf7"
+  },
+  "architecture_contract": {
+    "reference": "REF-GDN-CORRECTED-ACTION-BLIND-COMMON-TRUNK",
+    "candidate": "REFERENCE_PLUS_CACH_A4_STATE_CONDITIONED_CAUSAL_EXACT_ODD_DELTA_STREAM",
+    "only_semantic_delta": "CANDIDATE_ONLY_POST_COMMON_VIDEO_OUTPUT_ACTION_STATE_DELTA_STREAM",
+    "operator_level": "VENDOR_KERNEL",
+    "integration_path": "EXPERIMENTAL_PATH",
+    "target_forward_access": false,
+    "loss_subtraction": false,
+    "afcc": false,
+    "anchors": false,
+    "attnres": false,
+    "self_forcing": false,
+    "dagger": false,
+    "rerank_or_best_of_n": false,
+    "full_2b": false,
+    "common_state_input": "DETACHED_PARAMETER_FREE_RMS_NORMALIZED_COMMON_HIDDEN_STATE",
+    "odd_injection": "0.5*(g(s,a)-g(s,-a))",
+    "decay_input": "COMMON_STATE_ONLY_ACTION_BLIND",
+    "bias_free_action_state_write_output_projections": true,
+    "direct_exact_zero_delta_paths": [
+      "ANCHOR",
+      "NO_ACTION",
+      "SEAM_DISABLED",
+      "TYPED_INACTIVE"
+    ],
+    "theta0_relation": "REFERENCE_AND_CANDIDATE_COMMON_PARAMETER_AND_BUFFER_BYTES_EQUAL_AND_CANDIDATE_OUTPUT_IDENTITY",
+    "continuation_from_av2_state": false,
+    "checkpoint_load": false,
+    "checkpoint_save": false,
+    "reduced_topology": {
+      "batch_size": 8,
+      "latent_shape": [5, 3, 1, 1],
+      "hidden_dim": 64,
+      "heads": 2,
+      "head_dim": 32,
+      "depth": 20,
+      "ffn_hidden_dim": 128,
+      "action_dim": 20,
+      "chunk_boundaries": [0, 3, 5],
+      "temporal_compression": 8,
+      "reference_trainable_parameter_count": 752439,
+      "candidate_trainable_parameter_count": 766199
+    }
+  },
+  "prospective_data_contract": {
+    "state": "FROZEN_SELECTOR_DATA_NOT_ACCESSED_MANIFEST_NOT_MATERIALIZED",
+    "dataset_root": "/DATA/share/RoboTwin2.0/dataset",
+    "task": "adjust_bottle",
+    "variant": "aloha-agilex_clean_50",
+    "camera": "head_camera",
+    "train_episode_ids": [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31],
+    "heldout_episode_ids": [32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47],
+    "av2_episode_ids_excluded": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    "selector_rule": "NEXT_32_NUMERIC_EPISODES_AFTER_FROZEN_AV2_0_15_FIRST_16_TRAIN_NEXT_16_HELDOUT",
+    "model_result_dependent": false,
+    "selection_or_reordering_by_motion_loss_adequacy_or_model_output": false,
+    "one_window_per_episode": true,
+    "raw_rows": [0, 33],
+    "action_rows": [1, 33],
+    "action_mode": "ABSOLUTE_EEF20",
+    "action_normalization": null,
+    "frame_indices": [0, 8, 16, 24, 32],
+    "observation_decoder": "CV2_IMDECODE_COLOR_NATIVE_BGR_NO_EXTRA_CONVERSION",
+    "observation_projection": "SPATIAL_CHANNEL_MEAN_DIV_255",
+    "target_recipe": "ABSOLUTE_VIDEO_MINUS_FRAME0_ANCHOR",
+    "noisy_video_recipe": "FRAME0_PROJECTION_REPEAT_5",
+    "proprio_recipe": "ABSOLUTE_EEF20_RAW_ROW0_REPEAT_2",
+    "train_microbatches_in_order": [
+      [16, 17, 18, 19, 20, 21, 22, 23],
+      [24, 25, 26, 27, 28, 29, 30, 31]
+    ],
+    "heldout_microbatches_in_order": [
+      [32, 33, 34, 35, 36, 37, 38, 39],
+      [40, 41, 42, 43, 44, 45, 46, 47]
+    ],
+    "train_batch_schedule": "ALTERNATE_THE_TWO_LISTED_MICROBATCHES_BY_STEP_INDEX_MODULO_2_NO_RANDOM_SHUFFLE",
+    "heldout_aggregation": "STEP0_DIAGNOSTIC_AND_EXACT_FINAL_STEP_SUM_FLOAT64_NUMERATORS_AND_DENOMINATORS_ACROSS_BOTH_LISTED_MICROBATCHES_ONLY_FINAL_ENTERS_VERDICT",
+    "within_microbatch_action_shuffle_permutation": [1, 0, 3, 2, 5, 4, 7, 6],
+    "missing_or_inadequate_file_fallback": "FORBIDDEN_NO_EPISODE_WINDOW_TASK_OR_RECIPE_SUBSTITUTION",
+    "materialized_manifest_path": "docs/cach_sana_wam/architecture_validation/cach_a4_av3/CACH_A4_AV3_DATA_SELECTION.json",
+    "manifest_before_model_cuda_optimizer_or_root": true,
+    "adequacy_thresholds": {
+      "min_action_variance": 1e-8,
+      "min_target_motion_energy_each_horizon_1_2_4": 1e-8,
+      "target_motion_scope": "FULL_HELDOUT_AGGREGATE_AND_EACH_OF_THE_TWO_HELDOUT_MICROBATCHES",
+      "min_shuffle_mismatch_mse": 1e-8
+    },
+    "inadequate_typed_state": "DATA_INADEQUATE"
+  },
+  "rollout_contract": {
+    "mode": "ACTION_CLAMPED_SINGLE_CALL_CAUSAL_SEQUENCE",
+    "anchor_observation_only": true,
+    "teacher_future_video": false,
+    "prediction_feedback": false,
+    "teacher_prefix": false,
+    "joint_generated": false,
+    "scored_latent_horizons": [1, 2, 4],
+    "end_of_bin_action_indices": [7, 15, 31],
+    "conclusion_scope": "ANCHOR_CONDITIONED_ACTION_CLAMPED_SHORT_DYNAMICS_ONLY",
+    "mode_order": ["correct", "shuffle", "no_action"],
+    "mode_only_delta": "REAL_ACTION_TO_VIDEO_SEAM_TENSOR",
+    "all_non_seam_inputs_and_initial_state_bitwise_equal": true,
+    "reference_modes_bitwise_equal": true,
+    "live_state_reuse_between_modes_batches_arms_or_optimizer_steps": false
+  },
+  "metric_contract": {
+    "prediction_dtype": "float32",
+    "accumulator_dtype": "float64",
+    "epsilon": 1e-12,
+    "heldout_batch_total": 16,
+    "channels": 3,
+    "horizon_weights": {
+      "1": 0.2,
+      "2": 0.3,
+      "4": 0.5
+    },
+    "video_error_h": "V[a,m,h]=sum_b,c((pred[a,m,b,h,c]-target[b,h,c])^2)/(B*C)",
+    "anchor_delta_error_h": "D[a,m,h]=sum_b,c((((pred[a,m,b,h,c]-pred[a,m,b,0,c])-(target[b,h,c]-target[b,0,c]))^2))/(B*C)",
+    "motion_energy_h": "Q[h]=sum_b,c(((target[b,h,c]-target[b,0,c])^2))/(B*C)",
+    "video_124": "V124=0.20*V[h1]+0.30*V[h2]+0.50*V[h4]",
+    "delta_124": "D124=0.20*D[h1]+0.30*D[h2]+0.50*D[h4]",
+    "motion_energy_124": "Q124=0.20*Q[h1]+0.30*Q[h2]+0.50*Q[h4]",
+    "video_nmse": "V124/max(Q124,epsilon)",
+    "delta_nmse": "D124/max(Q124,epsilon)",
+    "primary": "0.50*video_nmse+0.50*delta_nmse",
+    "candidate_gain_vs_reference": "1-PRIMARY[candidate,correct]/max(PRIMARY[reference,correct],epsilon)",
+    "correct_vs_shuffle_improvement": "1-PRIMARY[candidate,correct]/max(PRIMARY[candidate,shuffle],epsilon)",
+    "correct_vs_no_action_improvement": "1-PRIMARY[candidate,correct]/max(PRIMARY[candidate,no_action],epsilon)",
+    "h1_candidate_vs_reference_ratio": "V[candidate,correct,1]/max(V[reference,correct,1],epsilon)",
+    "candidate_to_reference_primary_ratio": "PRIMARY[candidate,correct]/max(PRIMARY[reference,correct],epsilon)",
+    "required_raw_reports": [
+      "ALL_V_D_Q_PER_HORIZON",
+      "V124_D124_Q124",
+      "VIDEO_AND_DELTA_NMSE",
+      "PRIMARY_FOR_EACH_ARM_AND_MODE",
+      "CANDIDATE_GAIN_VS_REFERENCE",
+      "CORRECT_VS_SHUFFLE_IMPROVEMENT",
+      "CORRECT_VS_NO_ACTION_IMPROVEMENT",
+      "H1_CANDIDATE_VS_REFERENCE_RATIO",
+      "CANDIDATE_TO_REFERENCE_PRIMARY_RATIO"
+    ],
+    "no_action_is_required_report_but_not_an_extra_go_threshold": true,
+    "dream_minus_copy": "NOT_CONSTRUCTED",
+    "action_prediction": "NOT_CONSTRUCTED",
+    "training_loss": "EQUAL_WEIGHT_POSITIVE_MASKED_VIDEO_MSE_OVER_HORIZONS_1_2_3_4_NO_SUBTRACTION",
+    "train_action_mode": "CORRECT_ONLY",
+    "shuffle_and_no_action_use": "STEP0_DIAGNOSTIC_AND_FINAL_HELDOUT_COUNTERFACTUAL_EVALUATION_ONLY",
+    "metric_steps": [0, 1000],
+    "theta0_metrics_are_diagnostic_only": true,
+    "verdict_uses_final_step_only": true,
+    "best_step_or_checkpoint_selection": false
+  },
+  "initialization_and_training_contract": {
+    "screen_seed": 202608030,
+    "shared_initialization_seed": 2026080331,
+    "candidate_only_initialization_seed": 2026080522,
+    "initialization_source": "FROZEN_A4_R2_BUILDER_AND_A4_STREAM_NAMED_SEEDS",
+    "fresh_pair_construction": "FRESH_RECONSTRUCTION_FROM_FROZEN_NAMED_SEEDS_NO_AV2_STATE_CONTINUATION",
+    "theta0_manifest_before_first_forward": true,
+    "arm_order": ["reference", "candidate"],
+    "serial_arms": true,
+    "optimizer": "AdamW",
+    "betas": [0.9, 0.99],
+    "optimizer_epsilon": 1e-8,
+    "weight_decay": 0.0,
+    "lr_schedule": "COSINE",
+    "lr_start": 0.003,
+    "lr_end": 0.00003,
+    "gradient_clip_global_l2": 1.0,
+    "batch_size": 8,
+    "optimizer_steps_per_arm": 1000,
+    "both_arms_exact_steps_required": true,
+    "checkpoint_load": false,
+    "checkpoint_save": false,
+    "final_model_state_save": false,
+    "seed1_or_seed2_execution": false
+  },
+  "resource_contract": {
+    "single_process": true,
+    "gpu_count": 1,
+    "physical_gpu_index": 0,
+    "gpu_uuid": "GPU-1ec28cfb-f501-23f3-f865-275a744ca053",
+    "logical_device": "cuda:0",
+    "pre_root_observation_seconds": 120,
+    "pre_root_observation_evidence": [
+      "FIXED_GPU_MEMORY_UTILIZATION_AND_COMPUTE_APP_SNAPSHOTS",
+      "RELATED_PROCESS_SNAPSHOT",
+      "TARGET_FILESYSTEM_FREE_BYTES_FREE_INODES_OWNER_AND_GROUP",
+      "ALL_TARGET_ANCESTORS_LSTAT_NON_SYMLINK_DIRECTORIES"
+    ],
+    "exclusive_reservation_and_immediate_idle_recheck": true,
+    "resource_or_owner_failure_before_root": "ENV_BLOCKED_OR_HARNESS_REJECTED_NO_ROOT_CREATE_NO_PROCESS_INTERFERENCE",
+    "future_execution_card_must_bind_observation_schema_and_artifact_path": true,
+    "max_total_wall_minutes": 60,
+    "max_process_rss_bytes": 8589934592,
+    "max_root_bytes": 67108864,
+    "max_gpu_allocated_memory_bytes": 8589934592
+  },
+  "validity_contract": {
+    "all_required": [
+      "PREDECESSOR_SOURCE_DATA_AND_AUTHORITY_PINS_MATCH",
+      "FRESH_COMMON_THETA0_AND_CANDIDATE_IDENTITY",
+      "REFERENCE_AND_CANDIDATE_DATA_ORDER_STEP_OPTIMIZER_EQUAL",
+      "BOTH_ARMS_COMPLETE_EXACTLY_1000_STEPS",
+      "FINITE_OUTPUT_LOSS_GRADIENT_UPDATE_AND_METRICS",
+      "ACTION_SEAM_GRADIENT_UPDATE_AND_JVP_POSITIVE",
+      "FUTURE_TO_PREFIX_EXACT_ZERO",
+      "ZERO_ORIGIN_AND_ODDNESS_EXACT_ZERO",
+      "NO_ACTION_AND_SEAM_DISABLED_DIRECT_BYPASS_EXACT",
+      "TARGET_SENTINEL_PERTURBATION_BITWISE_INVARIANT",
+      "TARGET_SHA_ABSENT_FROM_FORWARD_TASK",
+      "ACTION_AND_TIME_ALIGNMENT_MATCHES_CARD",
+      "DATA_ADEQUATE",
+      "DEADLINE_AND_RESOURCE_CEILINGS_RESPECTED"
+    ],
+    "invalid_is_architecture_negative_evidence": false
+  },
+  "verdict_contract": {
+    "go_state": "GO",
+    "go_checks_all_required": {
+      "candidate_gain_vs_reference_min": 0.05,
+      "correct_vs_shuffle_improvement_min": 0.05,
+      "h1_candidate_vs_reference_ratio_max": 1.05
+    },
+    "go_effect": "AV4_ELIGIBILITY_ONLY",
+    "strong_stop_state": "REDUCED_ARCH_STOP",
+    "strong_stop_any_required": [
+      {
+        "all": {
+          "candidate_gain_vs_reference_max": 0.0,
+          "correct_vs_shuffle_improvement_max": 0.0
+        }
+      },
+      {
+        "candidate_to_reference_primary_ratio_min": 1.25
+      }
+    ],
+    "review_band_state": "REDUCED_ARCH_INCONCLUSIVE_REVIEW_EXHAUSTED",
+    "review_band_if": "VALID_NON_GO_NOT_STRONG_STOP",
+    "review_token_state": "CONSUMED_NO_NEW_TOKEN_OR_RERUN_ALLOWED",
+    "invalid_states": [
+      "AUTH_BLOCKED",
+      "ENV_BLOCKED",
+      "DATA_INADEQUATE",
+      "HARNESS_REJECTED",
+      "IMPLEMENTATION_INVALID",
+      "NUMERICAL_INVALID",
+      "INVALID_RUN"
+    ],
+    "automatic_rerun": false
+  },
+  "future_additive_files": {
+    "state": "ABSENT_NOT_AUTHORIZED_NOT_MATERIALIZED",
+    "exact_paths_in_creation_order": [
+      "docs/cach_sana_wam/architecture_validation/cach_a4_av3/CACH_A4_AV3_DATA_SELECTION.json",
+      "src/sana_wam/model/cach_a4_av3_paired_reduced_scale.py",
+      "configs/experiments/cach_a4_av3_paired_reduced_scale.yaml",
+      "scripts/run_cach_a4_av3_paired_reduced_scale.py",
+      "tests/test_cach_a4_av3_paired_reduced_scale.py",
+      "docs/cach_sana_wam/architecture_validation/cach_a4_av3/CACH_A4_AV3_EXECUTION_RUN_CARD.json"
+    ],
+    "all_predecessor_mutation": false,
+    "future_execution_card_created_last_and_pins_all_materialized_sha256": true,
+    "future_authority_required": true
+  },
+  "future_run_contract": {
+    "artifact_class": "NON_FORMAL_ARCHITECTURE_SCREEN_IMMUTABLE_NOT_ADMISSION_EVIDENCE",
+    "namespace": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_av3_paired_reduced_scale",
+    "namespace_leaf": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_av3_paired_reduced_scale/06f5d09127f8",
+    "root": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_av3_paired_reduced_scale/06f5d09127f8/cach-a4-av3-97a25a9e1d614340697fbee523e19559",
+    "nonce": "97a25a9e1d614340697fbee523e19559",
+    "created": false,
+    "creation_authorized": false,
+    "exclusive_create": true,
+    "failure_trap_before_first_root_mutation": true,
+    "terminal_freeze_success_failure_or_partial": true,
+    "terminal_directory_mode": "0555",
+    "terminal_file_mode": "0444",
+    "reuse": false,
+    "post_freeze_mutation": false,
+    "formal_promotion": false
+  },
+  "predecessor_pins": {
+    "av2_scaffold_decision": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_av2/CACH_A4_AV2_TINY_REAL_DATA_OVERFIT_DECISION.md",
+      "sha256": "b28ccdc0648c8f6105d507bdb714d0f15293285a5eefc37900052d3b11dc0d79"
+    },
+    "av2_scaffold_card": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_av2/CACH_A4_AV2_TINY_REAL_DATA_OVERFIT_RUN_CARD.json",
+      "sha256": "22939aa707a73ec40e37838d08dcb0b57eaa2169f3f5e64615096db61ee99f58"
+    },
+    "a4_r2_card": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_r2/CACH_A4_R2_RUN_CARD.json",
+      "sha256": "a45b55ffea796aa1edbcb46fae77654aa850965c312ed72b26797dffa4b1e6c6"
+    },
+    "a4_r2_bridge": {
+      "path": "src/sana_wam/model/cach_av1b_a4_state_conditioned_causal_odd_stream_r2.py",
+      "sha256": "848d45c973de7c17995265f53d95ad92a357dad09bfabe76c8e58731b665e122"
+    },
+    "av2_data_selection": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_av2_execution/CACH_A4_AV2_DATA_SELECTION.json",
+      "sha256": "1ba80bb146cca937e9dae5e2e8057bd797482bda2d44889c32441d202ebada87"
+    },
+    "av2_execution_card": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_av2_execution/CACH_A4_AV2_EXECUTION_RUN_CARD.json",
+      "sha256": "5fec6ea1497548b19272deedc142caa05b715e3b130dad6bd3dc32e0ba19a376"
+    },
+    "av2_r1_card": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_av2_execution/CACH_A4_AV2_EXECUTION_R1_RUN_CARD.json",
+      "sha256": "975747b212bd41f29f18ebb35f8cc05be076939ac13e393fd907b853c521e7ac"
+    },
+    "av2_r2_card": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_av2_execution/CACH_A4_AV2_EXECUTION_R2_RUN_CARD.json",
+      "sha256": "5941abf3886e6b385d1b95d0b06dc2c72f718b8610e71d5502f42d82be12d882"
+    },
+    "av2_model_source": {
+      "path": "src/sana_wam/model/cach_av2_tiny_real_data_overfit_execution.py",
+      "sha256": "673f24369b40f0bf255c57da1d3d5bee15a17a6c25ba5a8f52c1f9ff31ebc72f"
+    },
+    "av2_config": {
+      "path": "configs/experiments/cach_av2_tiny_real_data_overfit_execution.yaml",
+      "sha256": "c2aeb839b711318c7c10c06a93adff3d3de036d93f2ec061748e27e06b04b62e"
+    },
+    "av2_base_runner": {
+      "path": "scripts/run_cach_av2_tiny_real_data_overfit_execution.py",
+      "sha256": "05784548328bfa9f242948b52444a4a39f028d2ac15a303eb89476057e790d60"
+    },
+    "av2_r1_runner": {
+      "path": "scripts/run_cach_av2_tiny_real_data_overfit_execution_r1.py",
+      "sha256": "6c5832dede5f35ca23e8f07615fdccfab5096a876a5fd11dcf4bbbb81bdccbfc"
+    },
+    "av2_r2_runner": {
+      "path": "scripts/run_cach_av2_tiny_real_data_overfit_execution_r2.py",
+      "sha256": "48da11c462a162f9f89db060337c6e4e9bf638b5aab41c22933d195cf68f7b58"
+    },
+    "av2_test": {
+      "path": "tests/test_cach_av2_tiny_real_data_overfit_execution.py",
+      "sha256": "7f45d47eef8e21abcc1c15772cebc0543f8fc9ccf99c9d71cc4e7cf34515ec09"
+    },
+    "review_token_claim": {
+      "path": "/DATA/share/sana_cach_wam_nonformal_screens/token_ledgers/c73a943047295338cd9de14e6e53199b463ea66ae92b99d4b0b3393f5ec34030/cadfd92f1c72ebd9cc9aa8bfad029ddc6f0e72d9f7942f34e74629ca1ae37252.claim.json",
+      "sha256": "e7c355d3c4e8bfb942f8baa8a5511fb5964c2c7f2d6c975ef5aec0daa458a91f"
+    },
+    "av2_r2_result": {
+      "path": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_av2_tiny_real_data_r2/06f5d09127f8/cach-a4-av2-r2-b795b1b6edba6aeb584c06db1d166bf7/RESULT.json",
+      "sha256": "3d1ae1b81347efd258dba1d05f93f4218bb7fd7706f8b2c5a3cc3419ae2230a6"
+    },
+    "av2_r2_screen": {
+      "path": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_av2_tiny_real_data_r2/06f5d09127f8/cach-a4-av2-r2-b795b1b6edba6aeb584c06db1d166bf7/SCREEN_RESULT.json",
+      "sha256": "3073ffa1cf2eb2f1a2d82a86d6b595f12d761f26b274a1e4b5e010a412af5a4c"
+    },
+    "av2_r2_data_evidence": {
+      "path": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_av2_tiny_real_data_r2/06f5d09127f8/cach-a4-av2-r2-b795b1b6edba6aeb584c06db1d166bf7/DATA_EVIDENCE.json",
+      "sha256": "6edf58dc2919b9eba6bfde7cc5565c3b8d05326076ebd906f1f6ce0c9b562892"
+    },
+    "av2_r2_run_context": {
+      "path": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_av2_tiny_real_data_r2/06f5d09127f8/cach-a4-av2-r2-b795b1b6edba6aeb584c06db1d166bf7/RUN_CONTEXT.json",
+      "sha256": "f2d4b8d5a37e7dee2d6f6d34232f2aebc1b1ce3ce7bd472b771f9478e1bcae67"
+    },
+    "av2_r2_jit_inventory": {
+      "path": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_av2_tiny_real_data_r2/06f5d09127f8/cach-a4-av2-r2-b795b1b6edba6aeb584c06db1d166bf7/JIT_INVENTORY.json",
+      "sha256": "860fb5cec0c66f0e460e349b4621a9e55cf514a27eabbda9862c1799afc2c20f"
+    },
+    "av2_r2_freeze_receipt": {
+      "path": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_av2_tiny_real_data_r2/06f5d09127f8/cach-a4-av2-r2-b795b1b6edba6aeb584c06db1d166bf7/FREEZE_RECEIPT.json",
+      "sha256": "58d4ba15d800efc051ad4e92d3a948f2cb6f5d109c60ce683d0ac13aaf809ddc"
+    }
+  },
+  "predecessor_verification_contract": {
+    "dirty_worktree_head_alone_is_identity": false,
+    "verify_every_direct_path_and_sha_before_any_data_model_cuda_optimizer_or_root": true,
+    "reexecute_full_transitive_predecessor_map_from_av2_base_execution_card": true,
+    "av2_base_execution_card_sha256": "5fec6ea1497548b19272deedc142caa05b715e3b130dad6bd3dc32e0ba19a376",
+    "failure_state": "IMPLEMENTATION_INVALID_NO_ROOT_OR_ARCHITECTURE_VERDICT"
+  },
+  "current_execution_permissions": {
+    "decision_and_card_write": true,
+    "static_json_path_sha_validation": true,
+    "future_additive_file_write": false,
+    "real_data_read_or_manifest_materialization": false,
+    "cpu_model_or_test_execution": false,
+    "run_namespace_or_root_create": false,
+    "gpu_cuda_triton_jit": false,
+    "optimizer_parameter_update_or_training": false,
+    "checkpoint_load_or_save": false,
+    "av4": false,
+    "formal_evaluation_or_admission": false,
+    "global_stage3": false,
+    "deploy": false
+  },
+  "forbidden": [
+    "CREATE_ANY_FUTURE_ADDITIVE_FILE_THIS_TURN",
+    "READ_REAL_DATA_OR_MATERIALIZE_DATA_SELECTION_THIS_TURN",
+    "CREATE_RUN_OR_TOKEN_NAMESPACE_OR_ROOT",
+    "RUN_CPU_MODEL_TEST_FORWARD_BACKWARD_OR_JVP",
+    "USE_GPU_CUDA_TRITON_OR_JIT",
+    "CREATE_OPTIMIZER_UPDATE_PARAMETERS_OR_TRAIN",
+    "LOAD_OR_SAVE_CHECKPOINT",
+    "RUN_SEED1_SEED2_AV4_FULL2B_FORMAL_ADMISSION_GLOBAL_STAGE3_OR_DEPLOY",
+    "CREATE_DERIVE_RESET_OR_CONSUME_REVIEW_TOKEN",
+    "MUTATE_REUSE_DELETE_OR_OVERWRITE_PREDECESSOR_OR_FROZEN_ROOT",
+    "AUTOMATIC_EXECUTION_OR_RERUN"
+  ]
+}

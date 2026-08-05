@@ -1,0 +1,7 @@
+docs/cach_sana_wam/stage2b_l3/README.md
+docs/cach_sana_wam/stage2b_l3/STAGE2B_L3_LIGHTWEIGHT_TEST_REPORT.json
+docs/cach_sana_wam/stage2b_l3/STAGE2B_L3_SOURCE_FILES.txt
+docs/cach_sana_wam/stage2b_l3/STAGE2B_L3_DETERMINISTIC_RECOVERY_IMPLEMENTATION_PLAN_20260731.md
+scripts/verify_cach_stage2b_l3.py
+src/sana_wam/model/video_backbone/sana/hybrid_cache_stage2b_recovery.py
+tests/test_cach_stage2b_recovery.py

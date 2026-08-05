@@ -25,6 +25,7 @@ _VARIANT_AUTOREGRESSIVE = "autoregressive"
 _VARIANT_CROSS_ATTN = "joint_cross_attn"
 _VARIANT_GDN_AR = "gdn_autoregressive"
 _VARIANT_SELF_ATTN = "joint_self_attn"
+_VARIANT_CACH = "cach_sana_wam_v0"
 
 
 def _cfg_get(cfg: Any, key: str, default=None):
@@ -40,7 +41,7 @@ def _cfg_get(cfg: Any, key: str, default=None):
     return default
 
 
-def build_architecture(flat_cfg: Any):
+def build_architecture(flat_cfg: Any, *, cach_build_capability: Any = None):
     """Construct the architecture for ``flat_cfg`` (a flattened model cfg).
 
     ``flat_cfg`` is the output of ``flatten_model_cfg`` — it carries ``variant``
@@ -65,9 +66,22 @@ def build_architecture(flat_cfg: Any):
         from sana_wam.model.joint_self_attn import DualSystemSelfAttnArchitecture
 
         return DualSystemSelfAttnArchitecture(flat_cfg)
+    if variant == _VARIANT_CACH:
+        from sana_wam.cach.authority import reject_cach_model_build
+
+        # Stage 1 intentionally cannot issue an accepted model-build
+        # capability.  Keep the explicit dispatch branch so CACH can never
+        # fall back to a legacy architecture when Stage 2 later supplies one.
+        reject_cach_model_build(flat_cfg, cach_build_capability)
+        from sana_wam.model.causal_action_hybrid import (
+            CausalActionHybridArchitecture,
+        )
+
+        return CausalActionHybridArchitecture(flat_cfg)
     raise ValueError(
         f"Unknown architecture.variant={variant!r}. Choose from: "
-        f"{_VARIANT_AUTOREGRESSIVE}, {_VARIANT_CROSS_ATTN}, {_VARIANT_GDN_AR}, {_VARIANT_SELF_ATTN}."
+        f"{_VARIANT_AUTOREGRESSIVE}, {_VARIANT_CROSS_ATTN}, "
+        f"{_VARIANT_GDN_AR}, {_VARIANT_SELF_ATTN}, {_VARIANT_CACH}."
     )
 
 

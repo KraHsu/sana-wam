@@ -19,6 +19,61 @@ import types
 PROMPT_MANIFEST_SCHEMA_VERSION = 1
 
 
+def _reject_reserved_stage0_cli_config() -> None:
+    """Reject reserved CACH markers before root creation or CUDA prewarm."""
+
+    config_paths = []
+    index = 1
+    while index < len(sys.argv):
+        value = sys.argv[index]
+        if value == "--config":
+            if index + 1 >= len(sys.argv) or sys.argv[index + 1].startswith("--"):
+                raise RuntimeError("--config requires exactly one path")
+            config_paths.append(sys.argv[index + 1])
+            index += 2
+            continue
+        if value.startswith("--config="):
+            config_paths.append(value.split("=", 1)[1])
+        index += 1
+    if len(config_paths) != 1 or not config_paths[0]:
+        raise RuntimeError(
+            "eval_policy_wrapper requires exactly one unambiguous --config path"
+        )
+    config_path = config_paths[0]
+    import yaml
+
+    with open(config_path, "r", encoding="utf-8") as stream:
+        base_config = yaml.safe_load(stream)
+    if not isinstance(base_config, dict):
+        raise RuntimeError("RoboTwin policy config must be a mapping")
+    reserved = tuple(
+        marker
+        for marker in ("cach_stage0", "cach_stage1")
+        if marker in base_config
+    )
+    if reserved:
+        raise RuntimeError(
+            "benchmarks/robotwin/eval_policy_wrapper.py: CACH configs "
+            f"{reserved!r} are non-executable"
+        )
+    model = base_config.get("model", {})
+    architecture = model.get("architecture", {}) if isinstance(model, dict) else {}
+    direct_variant = base_config.get("variant")
+    nested_variant = (
+        architecture.get("variant")
+        if isinstance(architecture, dict)
+        else None
+    )
+    if (
+        direct_variant == "cach_sana_wam_v0"
+        or nested_variant == "cach_sana_wam_v0"
+    ):
+        raise RuntimeError(
+            "benchmarks/robotwin/eval_policy_wrapper.py: CACH evaluation "
+            "is not authorized"
+        )
+
+
 class _ManifestSeedReplayState:
     """Advance RoboTwin only after one fixed scene reaches policy rollout."""
 
@@ -973,6 +1028,7 @@ def _install_robot_planner_fallbacks(robotwin_path: str) -> None:
 
 
 def main() -> int:
+    _reject_reserved_stage0_cli_config()
     robotwin_path = os.environ.get("ROBOTWIN_PATH")
     if not robotwin_path:
         raise SystemExit("ROBOTWIN_PATH must be set")

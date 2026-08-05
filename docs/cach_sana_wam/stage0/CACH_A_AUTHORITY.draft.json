@@ -1,0 +1,146 @@
+{
+  "allowed_actions": [
+    "read_only_review",
+    "static_diff_review"
+  ],
+  "artifact_role": "cach_stage0_authority_draft",
+  "blockers": [
+    "Stage 0 source is an uncommitted draft with no reviewed immutable recovery bundle",
+    "The declared denial-review file set is not a reviewed transitive executable import closure",
+    "The self-check runs after Python startup and uses an unpinned git binary, so it is not an independent trust root",
+    "The runtime package inventory, driver/CUDA bytes, and package_inventory_sha256 are not frozen",
+    "RoboTwin episode content, timestamp/rate provenance, split, order, and normalization manifests are absent",
+    "Episode-origin/no-clean-prefix sampling and layout-derived per-chunk proprio selection are not implemented",
+    "Legacy probes, AFCC/Phase-6 launchers, and direct Trainer construction remain outside reserved-marker guard coverage",
+    "The CACH architecture, typed transactional cache, exact checkpoint schema, and executable five-piece launcher are not implemented",
+    "Machine-readable REF-GDN-CORRECTED spec, config, authority, root, and endpoint are absent",
+    "Stage 0 tests and all G0-G3 admission checks are not run",
+    "No user authorization exists for Stage 1, tests, model execution, training, evaluation, capture, GPU reservation, or run-root creation"
+  ],
+  "candidate_spec": {
+    "path": "docs/cach_sana_wam/stage0/CACH_A_CANDIDATE_SPEC.draft.json",
+    "sha256": "cae80e2e280ed58571dc0e35a3ff24a4c147692a2c0d26304c65a6075aba464a"
+  },
+  "config": {
+    "path": "configs/experiments/cach_sana_wam_v0.yaml",
+    "sha256": "8ff4d6ca94305b6aecfbf229d494faa92309ff75a5eaec8f369bb75aab6d14c3"
+  },
+  "decision": "deny_execution",
+  "designs": {
+    "auxiliary_guard_tests": {
+      "path": "tests/test_cach_stage0_auxiliary_guards.py",
+      "sha256": "2a526d0d484d93fbb0ae2802c53d12d6e1d022fc00f9a202f9e3e74edcf59a07"
+    },
+    "cache_commit": {
+      "path": "docs/cach_sana_wam/stage0/HYBRID_CACHE_COMMIT_AND_APPLIED_ACTION_DESIGN.md",
+      "sha256": "4af9a209315da2c51851a59361fe44204887a544a48fac10f3da7d30cbf57ebb"
+    },
+    "candidate_launcher": {
+      "path": "scripts/launch_cach_sana_wam.py",
+      "sha256": "fdd04667a75e2bf44d6005ba5daa7d7041c68e94c5706bb6b1906ffb2f044f17"
+    },
+    "checkpoint_config_guard_tests": {
+      "path": "tests/test_cach_stage0_checkpoint_config_guard.py",
+      "sha256": "c715591b02e36aa2e9a9b07fa05a78f7b29aef23ff76d9a94afa6115e68c2513"
+    },
+    "config_guard_cli": {
+      "path": "scripts/check_cach_stage0_reserved_config.py",
+      "sha256": "2b45bbb5c0b2fd0eb9ba99c938e7f81c8175b17f55546c8a3cf7277cc6ebd42a"
+    },
+    "contract_tests": {
+      "path": "tests/test_cach_stage0_contract.py",
+      "sha256": "d60ee905690aa12ea35099b4587761b2058b3f53746695cf366a20fe37986852"
+    },
+    "data_scale": {
+      "path": "docs/cach_sana_wam/stage0/DATA_AND_SCALE_DESIGN.md",
+      "sha256": "6593419afe752bdbfc2f06287e6594be0ce07847177869fb3d2fd44e8f04a959"
+    },
+    "deploy_entrypoint_guard": {
+      "path": "scripts/deploy.py",
+      "sha256": "57fad8d2ff660237116d2d9151f8270bc22facb8a37caa805a01cbf396d25d5d"
+    },
+    "deploy_guard_tests": {
+      "path": "tests/test_cach_stage0_deploy_guard.py",
+      "sha256": "ec46c1d32d1f575fe6c6d5c6e30bd0365f6a0cec1fe71451b1b1a53440d25608"
+    },
+    "execution_surface_guard_tests": {
+      "path": "tests/test_cach_stage0_execution_surface_guards.py",
+      "sha256": "c89365da74737499285c11386b6c33c006b6e2271e192ff892d7a3d4bb3f14e2"
+    },
+    "governance_agents": {
+      "path": "docs/cach_sana_wam/stage0/governance/AGENTS.md",
+      "sha256": "646ea39906ea3bc75af3b360187eb2c5aebac4c04c62ec5df108c0ec35e006ae"
+    },
+    "governance_start_here": {
+      "path": "docs/cach_sana_wam/stage0/governance/START_HERE_20260730.md",
+      "sha256": "e85fa5be9f0d1941725cd356298493b9003ed2339d1a5cc00d5688ed8e51c061"
+    },
+    "gpu_smoke_entrypoint_guard": {
+      "path": "scripts/smoke_ar_lownoise_gpu.py",
+      "sha256": "dec851922e5f02714ec1aee06f612660ecfce94263ee45045eebd0d29fee1cd8"
+    },
+    "layout_bootstrap": {
+      "path": "docs/cach_sana_wam/stage0/CHUNK_ACTION_LAYOUT_AND_BOOTSTRAP_DESIGN.md",
+      "sha256": "54998d1e290be71fae10dca38859e19d7c17830ddf6bc58e631414a4c5ea4596"
+    },
+    "source_initialization_launcher": {
+      "path": "docs/cach_sana_wam/stage0/SOURCE_INITIALIZATION_AND_LAUNCHER_DESIGN.md",
+      "sha256": "1431ef382a1d50d33c5d111e9be192a97ceef96b9e3fecddf634ce2e886a178e"
+    },
+    "stage0_config_guard": {
+      "path": "src/sana_wam/train/cach_stage0_guard.py",
+      "sha256": "7a2b4a89a5dec3a7c11970bd3a3f68140ac35f7150fc7feb2bd8547acdbe8748"
+    },
+    "stage0_contract": {
+      "path": "src/sana_wam/train/cach_stage0_contract.py",
+      "sha256": "5879451048d943d5498d9b8d3bc3c71670560ee1359fad613391507765cbf290"
+    },
+    "stage0_readme": {
+      "path": "docs/cach_sana_wam/stage0/README.md",
+      "sha256": "a5aee121105b4cd70eb9f73975b11f48566771275bbeff0878d62d2d400515e7"
+    },
+    "static_verifier": {
+      "path": "scripts/verify_cach_stage0.py",
+      "sha256": "29e079e441de8967a6bde1351915f2ddba7bbf9efad46eb22c04a3ea4f2c0d1f"
+    },
+    "test_plan": {
+      "path": "docs/cach_sana_wam/stage0/TEST_PLAN.md",
+      "sha256": "8bdc5e42ae4968b9d6fabad7eca4ffb514df04294320811c28fff71b5a024d90"
+    },
+    "train_entrypoint_guard": {
+      "path": "scripts/train.py",
+      "sha256": "a7c1288e10c8a6c98fc8bc8b62e09e5088d3d8414dfbb729ecfd76e42d3bd813"
+    },
+    "train_entrypoint_guard_tests": {
+      "path": "tests/test_cach_stage0_train_guard.py",
+      "sha256": "b91e8147d314e3f8dd8062deed8f13bffa36743a33988f2b774b5a220a957ee5"
+    },
+    "vae_cache_entrypoint_guard": {
+      "path": "scripts/precompute_vae_latents.py",
+      "sha256": "21039267b5e65d68750c39a8288b87ffbf3286b766421af3185dc5c9a839d459"
+    }
+  },
+  "execution_authorized": false,
+  "plan": {
+    "path": "docs/CAUSAL_ACTION_CONDITIONED_HYBRID_SANA_WAM_DEVELOPMENT_PLAN_20260731.md",
+    "sha256": "969d9668ffed07176844fcbd84062825f9d5f0af0325959b0068c38fe481f0dd"
+  },
+  "prohibited_actions": [
+    "tests",
+    "model_execution",
+    "training",
+    "evaluation",
+    "capture",
+    "run_root_creation",
+    "gpu_reservation",
+    "stage1_implementation"
+  ],
+  "registered": false,
+  "schema_version": "cach-stage0-authority-draft-v1",
+  "scientific_eligible": false,
+  "source_manifest": {
+    "path": "docs/cach_sana_wam/stage0/SOURCE_MANIFEST.draft.json",
+    "sha256": "71f3ed9b0ab431f73742ba9bb6ceb21a74b6379f84e288a1e2178432e47e9277"
+  },
+  "status": "draft_blocked"
+}

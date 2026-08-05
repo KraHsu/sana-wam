@@ -1,0 +1,106 @@
+{
+  "canonical_host": "H200",
+  "canonical_worktree": "/home/zch/workspace/sana-wam",
+  "environment": {
+    "cuda_visible_devices": "",
+    "gpu_used": false,
+    "kernel": "Linux 5.15.0-176-generic x86_64 GNU/Linux",
+    "pytest": "9.1.0",
+    "python": "3.12.13",
+    "torch": "2.7.1+cu128"
+  },
+  "generated_at": "2026-07-31T09:21:22+00:00",
+  "gate_status": {
+    "authorized_stage1_lightweight_suite": "passed",
+    "gate_s1": "not_claimed",
+    "reason": "The written GATE-S1 sentence also names mini-model contract tests. Model construction and numerical execution were outside this authorization and remain fail-closed."
+  },
+  "initial_run": {
+    "failed": 3,
+    "passed": 154,
+    "remediation": [
+      "Restored the two Stage-0 authority-pinned guard files to their exact frozen SHA256 values.",
+      "Added an explicit cach_stage0 compatibility denial latch to the Stage-1 YAML instead of rewriting the frozen guard.",
+      "Replaced two substring-based static assertions with exact AST-semantic assertions."
+    ]
+  },
+  "post_audit_hardening": [
+    "Bound cache content-time to exact ChunkActionLayout members, including latent/raw/action/Action-RoPE intervals.",
+    "Changed partial-tail conditioning to fixed [B,K,A] with explicit latent and action prefix masks and exact-zero condition padding.",
+    "Removed the live HybridTemporalState object from DenoiseReadView.",
+    "Changed the dataset boundary to an explicit model-facing allowlist and bound first-frame and selected-proprio values by digest.",
+    "Compared complete shared inventory metadata and bound checkpoint basenames to endpoint_step.",
+    "Added marker-aware direct guards and pre-checkpoint policy-server plus nested-variant evaluation guards.",
+    "Added a strict artifact-set verifier that checks repository pins and the immutable Stage-1 source bundle while keeping external trust-anchor status false.",
+    "Unified typed-cache teacher pairs with the fixed-K model seam: exact frame/action prefix masks, fixed action-slot capacity, exact-zero padding, mask-digest receipts, and synthetic-layout provenance isolation."
+  ],
+  "prohibited_actions_attestation": {
+    "capture_started": false,
+    "checkpoint_loaded": false,
+    "dataset_scanned": false,
+    "evaluation_started": false,
+    "formal_root_created": false,
+    "gpu_reserved_or_used": false,
+    "model_constructed": false,
+    "training_started": false
+  },
+  "protected_state": {
+    "phase6_candidate_eligibility_binary_diff_sha256": "283414a3ac1e49bcec916431cc948b3a15f61ca7961fed819abc9c7abc45fbac",
+    "phase6_candidate_eligibility_worktree_sha256": "a784d31886d361f135b8ed59b23610c69c2b71aed96f8131b27f934817d0992f",
+    "stage0_config_guard_cli_sha256": "2b45bbb5c0b2fd0eb9ba99c938e7f81c8175b17f55546c8a3cf7277cc6ebd42a",
+    "stage0_config_guard_sha256": "7a2b4a89a5dec3a7c11970bd3a3f68140ac35f7150fc7feb2bd8547acdbe8748"
+  },
+  "repository_lineage": {
+    "sana_afcc_handoff_head": "9586486f2a9f5172d57b325e32093a3e018d34c0",
+    "sana_head": "16b9cec673e3335724ba2d8db25de7f9ed229292",
+    "sana_wam_head": "605f1c134b4c983ff80f8489c4bc8847036329e2",
+    "stage0_source_bundle": {
+      "path": "/DATA/share/sana_cach_source_bundles/cach_stage0_85d16ee5_20260731.tar",
+      "sha256": "bd427ef6a604abef49c75b20d14a21d9412f5c21b539a1240fb052187f8889fd"
+    }
+  },
+  "schema": "cach.stage1.lightweight_test_report.v1",
+  "status": "passed",
+  "verification": [
+    {
+      "command_class": "read-only AST parse",
+      "files": 15,
+      "result": "AST_OK 15"
+    },
+    {
+      "command": "CUDA_VISIBLE_DEVICES='' .venv/bin/python scripts/verify_cach_stage1.py",
+      "result": {
+        "execution_admission_valid": false,
+        "mode": "review_only",
+        "model_build_authorized": false,
+        "run_root_creation_authorized": false,
+        "scientific_eligible": false,
+        "training_authorized": false
+      }
+    },
+    {
+      "command_prefix": "CUDA_VISIBLE_DEVICES='' .venv/bin/python -m pytest -q",
+      "duration_seconds": null,
+      "failed": 0,
+      "passed": 209,
+      "result": "passed",
+      "test_files": [
+        "tests/test_cach_stage0_contract.py",
+        "tests/test_cach_stage0_train_guard.py",
+        "tests/test_cach_stage0_deploy_guard.py",
+        "tests/test_cach_stage0_auxiliary_guards.py",
+        "tests/test_cach_stage0_checkpoint_config_guard.py",
+        "tests/test_cach_stage0_execution_surface_guards.py",
+        "tests/test_cach_config_schema.py",
+        "tests/test_cach_action_chunk_layout.py",
+        "tests/test_gdn_ar_observed_prefix_contract.py",
+        "tests/test_cach_action_to_video_conditioning.py",
+        "tests/test_cach_checkpoint_key_allowlist.py",
+        "tests/test_cach_trainable_parameter_allowlist.py",
+        "tests/test_cach_afcc_isolation.py",
+        "tests/test_cach_cache_content_time.py",
+        "tests/test_cach_hybrid_cache_contract.py"
+      ]
+    }
+  ]
+}

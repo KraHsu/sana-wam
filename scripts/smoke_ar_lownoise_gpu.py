@@ -13,7 +13,6 @@ from pathlib import Path
 import cv2
 import h5py
 import numpy as np
-import torch
 from omegaconf import OmegaConf
 from PIL import Image
 
@@ -25,7 +24,9 @@ sys.path.insert(0, str(ROOT / "third_party" / "Sana"))
 os.environ.setdefault("GDN_DISABLE_COMPILE", "1")
 
 from benchmarks.utils.action_conversion import robotwin_endpose_to_eef20d  # noqa: E402
-from sana_wam.deploy.policy_server import build_server_from_config  # noqa: E402
+from sana_wam.train.cach_stage0_guard import (  # noqa: E402
+    reject_cach_stage0_base_config,
+)
 
 
 DEFAULT_RUN = Path(
@@ -111,6 +112,23 @@ class _RecordingRanker:
 
 def main() -> None:
     args = parse_args()
+    base_cfg = OmegaConf.load(args.deploy_config)
+    reject_cach_stage0_base_config(
+        base_cfg, entrypoint="scripts/smoke_ar_lownoise_gpu.py"
+    )
+    checkpoint_config_path = args.ckpt_dir / "config.yaml"
+    if not checkpoint_config_path.is_file():
+        raise FileNotFoundError(checkpoint_config_path)
+    checkpoint_cfg = OmegaConf.load(checkpoint_config_path)
+    reject_cach_stage0_base_config(
+        checkpoint_cfg,
+        entrypoint="scripts/smoke_ar_lownoise_gpu.py checkpoint config",
+    )
+
+    # Keep GPU/model imports after the unmerged Stage-0 marker denial.
+    import torch
+    from sana_wam.deploy.policy_server import build_server_from_config
+
     checkpoint = args.ckpt_dir / args.ckpt_name
     if not checkpoint.is_file():
         raise FileNotFoundError(checkpoint)
@@ -135,7 +153,7 @@ def main() -> None:
     torch.cuda.reset_peak_memory_stats(device)
     started = time.perf_counter()
     server = build_server_from_config(
-        OmegaConf.load(args.deploy_config),
+        base_cfg,
         str(args.ckpt_dir),
         device=str(device),
         ckpt_name=args.ckpt_name,

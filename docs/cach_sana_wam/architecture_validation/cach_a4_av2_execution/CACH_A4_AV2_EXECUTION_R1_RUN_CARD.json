@@ -1,0 +1,72 @@
+{
+  "schema": "cach.architecture_validation.cach_a4_av2_execution_r1_run_card.v1",
+  "state": "AUTHORIZED_PRE_ROOT_IDLE_PROBE_REPAIR",
+  "card_id": "CACH-A4-AV2-EXECUTION-R1-PRE-ROOT-IDLE-PROBE-REPAIR-v1",
+  "authority": {
+    "statement": "授权 AV2 tiny real-data 单GPU运行",
+    "statement_sha256": "7a2c2957f794de03fb46715d2446fc8780d09e237d70e6ac4051f69bf284aef2",
+    "interpretation": "CONTINUE_AUTHORIZED_AV2_AFTER_PRE_ROOT_NO_MODEL_LAUNCHER_FAILURE",
+    "scope_expansion": false,
+    "new_data_model_optimizer_budget_or_root": false
+  },
+  "predecessor_attempt": {
+    "failure_phase": "AFTER_CPU_DATA_REVALIDATION_BEFORE_ROOT_BEFORE_CUDA_MODEL",
+    "observed_memory_used_mib": 4,
+    "observed_gpu_utilization_percent": 0,
+    "observed_compute_apps": [],
+    "root_created": false,
+    "namespace_created": false,
+    "cuda_model_constructed": false,
+    "optimizer_steps": 0,
+    "model_result_observed": false,
+    "target_root_remains_fresh": true,
+    "automatic_model_rerun": false
+  },
+  "repair_scope": {
+    "only_change": "GPU_IDLE_MEMORY_PREDICATE_EQ_0_TO_LE_8_MIB",
+    "still_require_zero_utilization": true,
+    "still_require_no_compute_apps": true,
+    "reason": "PYTORCH_IMPORT_SELF_DRIVER_BOOKKEEPING_WITHOUT_CUDA_MODEL",
+    "data_bytes_unchanged": true,
+    "source_config_test_unchanged": true,
+    "architecture_optimizer_seed_steps_thresholds_unchanged": true,
+    "root_nonce_gpu_unchanged": true,
+    "checkpoint_or_token_capability_added": false
+  },
+  "materialized_pins": {
+    "predecessor_card": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_av2_execution/CACH_A4_AV2_EXECUTION_RUN_CARD.json",
+      "sha256": "5fec6ea1497548b19272deedc142caa05b715e3b130dad6bd3dc32e0ba19a376"
+    },
+    "predecessor_runner": {
+      "path": "scripts/run_cach_av2_tiny_real_data_overfit_execution.py",
+      "sha256": "05784548328bfa9f242948b52444a4a39f028d2ac15a303eb89476057e790d60"
+    },
+    "r1_runner": {
+      "path": "scripts/run_cach_av2_tiny_real_data_overfit_execution_r1.py",
+      "sha256": "6c5832dede5f35ca23e8f07615fdccfab5096a876a5fd11dcf4bbbb81bdccbfc"
+    }
+  },
+  "execution": {
+    "gpu_index": 0,
+    "gpu_uuid": "GPU-1ec28cfb-f501-23f3-f865-275a744ca053",
+    "root": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_av2_tiny_real_data/06f5d09127f8/cach-a4-av2-96c7c972d34733dd37475b183c136ee0",
+    "nonce": "96c7c972d34733dd37475b183c136ee0",
+    "max_idle_driver_memory_mib": 8,
+    "max_steps_per_arm": 1000,
+    "max_wall_clock_minutes": 60,
+    "checkpoint_load": false,
+    "checkpoint_save": false,
+    "automatic_model_rerun": false,
+    "root_reuse": false
+  },
+  "forbidden": [
+    "CHANGE_DATA_SELECTION_OR_DERIVED_TENSOR_BYTES",
+    "CHANGE_ARCHITECTURE_MODEL_SOURCE_CONFIG_OPTIMIZER_SEED_STEPS_OR_THRESHOLDS",
+    "USE_ANOTHER_GPU_ROOT_OR_NONCE",
+    "CHECKPOINT_LOAD_OR_SAVE",
+    "TOKEN_OR_CLAIM_OPERATION",
+    "FULL_2B_FORMAL_ADMISSION_AV3_GLOBAL_STAGE3_OR_DEPLOY",
+    "ROOT_REUSE_OR_POST_FREEZE_MUTATION"
+  ]
+}

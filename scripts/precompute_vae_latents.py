@@ -25,12 +25,15 @@ import os
 import sys
 from pathlib import Path
 
-import torch
 from omegaconf import OmegaConf
 
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
 sys.path.insert(0, str(_ROOT / "third_party" / "Sana"))
+
+from sana_wam.train.cach_stage0_guard import (  # noqa: E402
+    reject_cach_stage0_base_config,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("precompute_vae_latents")
@@ -46,9 +49,14 @@ def main():
     args = ap.parse_args()
 
     cfg = OmegaConf.load(args.config)
+    reject_cach_stage0_base_config(
+        cfg, entrypoint="scripts/precompute_vae_latents.py"
+    )
     if args.overrides:
         cfg = OmegaConf.merge(cfg, OmegaConf.from_dotlist(args.overrides))
 
+    # Keep torch/model imports after the unmerged Stage-0 marker denial.
+    import torch
     from sana_wam.dataloader.robotwin_dataset import MultiTaskRoboTwinDataset
     from sana_wam.dataloader.transforms.vae_latent_cache import latent_cache_key, save_latent
     from sana_wam.model.video_backbone.sana.adapter import SanaVideoBackbone, _pil_video_to_tensor

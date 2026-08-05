@@ -1,0 +1,17 @@
+docs/cach_sana_wam/stage2b/README.md
+docs/cach_sana_wam/stage2b/STAGE2B_DURABLE_LEDGER_AND_REPLAY_DESIGN_20260731.md
+docs/cach_sana_wam/stage2b/STAGE2B_LIGHTWEIGHT_TEST_REPORT.json
+docs/cach_sana_wam/stage2b/STAGE2B_OFFLINE_PRODUCTION_INTEGRATION_PLAN_20260731.md
+docs/cach_sana_wam/stage2b/STAGE2B_SOURCE_FILES.txt
+scripts/verify_cach_stage2b.py
+src/sana_wam/cach/committed_action_history.py
+src/sana_wam/cach/stage2b_receipt_store.py
+src/sana_wam/cach/stage2b_state_snapshot.py
+src/sana_wam/cach/staging_variant.py
+src/sana_wam/model/cach_numerical_core.py
+src/sana_wam/model/cach_paired_stager.py
+src/sana_wam/model/video_backbone/sana/hybrid_cache_stage2b.py
+tests/test_cach_stage2b_committed_action_history.py
+tests/test_cach_stage2b_production_core.py
+tests/test_cach_stage2b_receipt_store.py
+tests/test_cach_stage2b_state_snapshot.py

@@ -1,0 +1,273 @@
+{
+  "schema": "cach.cach_a4.av2_tiny_real_data.data_selection.v1",
+  "state": "FROZEN_PRE_MODEL_PRE_GPU",
+  "selection_id": "CACH-A4-AV2-ADJUST-BOTTLE-E0-E15-RAW0-33-v1",
+  "created_on": "2026-08-05",
+  "canonical_environment": {
+    "ssh_alias": "H200",
+    "worktree": "/home/zch/workspace/sana-wam",
+    "dataset_root": "/DATA/share/RoboTwin2.0/dataset",
+    "python": "/home/zch/miniconda3/envs/RoboTwin/bin/python",
+    "runtime_versions": {
+      "opencv": "4.11.0",
+      "h5py": "3.16.0",
+      "numpy": "1.26.4",
+      "scipy": "1.15.3",
+      "torch": "2.4.1+cu121",
+      "pillow": "11.3.0"
+    }
+  },
+  "authority": {
+    "statement": "授权 AV2 tiny real-data 单GPU运行",
+    "statement_utf8_bytes": 38,
+    "statement_sha256": "7a2c2957f794de03fb46715d2446fc8780d09e237d70e6ac4051f69bf284aef2",
+    "scope": "ONE_AV2_TINY_REAL_DATA_SINGLE_GPU_FRESH_ROOT_RUN"
+  },
+  "selection_rule": {
+    "model_result_dependent": false,
+    "task": "adjust_bottle",
+    "task_rule": "LEXICOGRAPHIC_FIRST_MEMBER_OF_FROZEN_ROBOTWIN_ALL_TASKS_PRESENT_ON_DISK",
+    "robot": "aloha-agilex",
+    "variant": "clean_50",
+    "camera": "head_camera",
+    "episode_rule": "FIRST_SIXTEEN_NUMERIC_EPISODES",
+    "train_episode_ids": [0, 1, 2, 3, 4, 5, 6, 7],
+    "heldout_episode_ids": [8, 9, 10, 11, 12, 13, 14, 15],
+    "raw_start": 0,
+    "raw_end_exclusive": 33,
+    "fallback_or_reselection_after_model_or_adequacy_result": false,
+    "train_heldout_identity_and_interval_disjoint": true
+  },
+  "selected_files": [
+    {
+      "split": "train",
+      "episode_id": 0,
+      "episode_length": 140,
+      "path": "/DATA/share/RoboTwin2.0/dataset/adjust_bottle/aloha-agilex_clean_50/data/episode0.hdf5",
+      "size_bytes": 9104360,
+      "sha256": "6e5a49e2a1fefc405680cea04b338701dbf203724375336bce8e375260756181"
+    },
+    {
+      "split": "train",
+      "episode_id": 1,
+      "episode_length": 144,
+      "path": "/DATA/share/RoboTwin2.0/dataset/adjust_bottle/aloha-agilex_clean_50/data/episode1.hdf5",
+      "size_bytes": 8840536,
+      "sha256": "2a3df78ff054f169329526aaaf78285101436b144c0eb0fd38d7b96a2bd7b95a"
+    },
+    {
+      "split": "train",
+      "episode_id": 2,
+      "episode_length": 150,
+      "path": "/DATA/share/RoboTwin2.0/dataset/adjust_bottle/aloha-agilex_clean_50/data/episode2.hdf5",
+      "size_bytes": 8851750,
+      "sha256": "182d5751500e7fa4ac6551c1fc00e06339a39e7e2757b60b003fad15038adf3f"
+    },
+    {
+      "split": "train",
+      "episode_id": 3,
+      "episode_length": 149,
+      "path": "/DATA/share/RoboTwin2.0/dataset/adjust_bottle/aloha-agilex_clean_50/data/episode3.hdf5",
+      "size_bytes": 8870933,
+      "sha256": "a18f04f185e7dae7eab2761ae4626c81e35ceb97d6922c97b0e70015607a7e9a"
+    },
+    {
+      "split": "train",
+      "episode_id": 4,
+      "episode_length": 152,
+      "path": "/DATA/share/RoboTwin2.0/dataset/adjust_bottle/aloha-agilex_clean_50/data/episode4.hdf5",
+      "size_bytes": 9149200,
+      "sha256": "4a0174a5d778f8eb134ff94bc5fee9fd326cbe3c85c233c703a089ea47f5cd45"
+    },
+    {
+      "split": "train",
+      "episode_id": 5,
+      "episode_length": 148,
+      "path": "/DATA/share/RoboTwin2.0/dataset/adjust_bottle/aloha-agilex_clean_50/data/episode5.hdf5",
+      "size_bytes": 8984824,
+      "sha256": "f03361c298897e6b10e924e13d45f57d23b8d6add6966249ef078e8418b4dc6f"
+    },
+    {
+      "split": "train",
+      "episode_id": 6,
+      "episode_length": 138,
+      "path": "/DATA/share/RoboTwin2.0/dataset/adjust_bottle/aloha-agilex_clean_50/data/episode6.hdf5",
+      "size_bytes": 8481064,
+      "sha256": "7923d4afe210ff9c14a7c7314c68c9d8daf1f0da48fe32b322815ad67764aea7"
+    },
+    {
+      "split": "train",
+      "episode_id": 7,
+      "episode_length": 137,
+      "path": "/DATA/share/RoboTwin2.0/dataset/adjust_bottle/aloha-agilex_clean_50/data/episode7.hdf5",
+      "size_bytes": 8596466,
+      "sha256": "c02b7ff0a62564be92d436e42ce3eade652cf74af80e3334a5a10781dcd22404"
+    },
+    {
+      "split": "heldout",
+      "episode_id": 8,
+      "episode_length": 153,
+      "path": "/DATA/share/RoboTwin2.0/dataset/adjust_bottle/aloha-agilex_clean_50/data/episode8.hdf5",
+      "size_bytes": 9345598,
+      "sha256": "38a6f3528c5d26905f03ace7e3ce659dbe1e447c8ecd5fe131646adc749f59b2"
+    },
+    {
+      "split": "heldout",
+      "episode_id": 9,
+      "episode_length": 153,
+      "path": "/DATA/share/RoboTwin2.0/dataset/adjust_bottle/aloha-agilex_clean_50/data/episode9.hdf5",
+      "size_bytes": 9197035,
+      "sha256": "7cc9e7fb699a61c7b4c8d99237bdfb0dd80eee2651bafb57cbe05f127f181f41"
+    },
+    {
+      "split": "heldout",
+      "episode_id": 10,
+      "episode_length": 136,
+      "path": "/DATA/share/RoboTwin2.0/dataset/adjust_bottle/aloha-agilex_clean_50/data/episode10.hdf5",
+      "size_bytes": 8689568,
+      "sha256": "dcc7e71ffcdf322e5f3e625e4a56ace8c2898dbceec35f4d31bd081c912af80d"
+    },
+    {
+      "split": "heldout",
+      "episode_id": 11,
+      "episode_length": 144,
+      "path": "/DATA/share/RoboTwin2.0/dataset/adjust_bottle/aloha-agilex_clean_50/data/episode11.hdf5",
+      "size_bytes": 8638936,
+      "sha256": "58ef958f3eb06aaef020b09e571e978f8d167a1b15a9e15e8777892dafd25c76"
+    },
+    {
+      "split": "heldout",
+      "episode_id": 12,
+      "episode_length": 140,
+      "path": "/DATA/share/RoboTwin2.0/dataset/adjust_bottle/aloha-agilex_clean_50/data/episode12.hdf5",
+      "size_bytes": 8350740,
+      "sha256": "ea1e92226fe7116858d22a9b145a8ac1cd5348fd778ec560f53ec0bfe9413f39"
+    },
+    {
+      "split": "heldout",
+      "episode_id": 13,
+      "episode_length": 140,
+      "path": "/DATA/share/RoboTwin2.0/dataset/adjust_bottle/aloha-agilex_clean_50/data/episode13.hdf5",
+      "size_bytes": 9250380,
+      "sha256": "2bf43480ecb717a38e66fb167a460e895a2d7cb56a04da1f8c47936d15030efb"
+    },
+    {
+      "split": "heldout",
+      "episode_id": 14,
+      "episode_length": 144,
+      "path": "/DATA/share/RoboTwin2.0/dataset/adjust_bottle/aloha-agilex_clean_50/data/episode14.hdf5",
+      "size_bytes": 8793880,
+      "sha256": "cc7db1c96e73e16af618b9d6f19f744da888934838f68e204d8e13dbdd443a8a"
+    },
+    {
+      "split": "heldout",
+      "episode_id": 15,
+      "episode_length": 139,
+      "path": "/DATA/share/RoboTwin2.0/dataset/adjust_bottle/aloha-agilex_clean_50/data/episode15.hdf5",
+      "size_bytes": 8591042,
+      "sha256": "19b914c0e7f0b56301b1a500a8c43006ccbbf5ebf9bd233c51cd4dc096ca6a57"
+    }
+  ],
+  "adapter_contract": {
+    "direct_hdf5_exact_windows": true,
+    "standard_dataset_getitem_or_random_static_resample": false,
+    "action": {
+      "representation": "ABSOLUTE_EEF20_FLOAT32",
+      "layout": "[left_xyz3,left_rot6d6,left_gripper1,right_xyz3,right_rot6d6,right_gripper1]",
+      "raw_rows": [1, 33],
+      "normalization": "NONE",
+      "delta_action": false,
+      "shape": [8, 32, 20]
+    },
+    "proprio": {
+      "source": "RAW_EEF20_ROW_0_ONLY",
+      "future_state_read": false,
+      "repeat_for_two_chunks": true,
+      "shape": [8, 2, 20]
+    },
+    "observation": {
+      "jpeg_decoder": "cv2.imdecode(IMREAD_COLOR)",
+      "extra_color_conversion": false,
+      "reason": "MATCH_EXISTING_ROBOTWIN_DATASET_CHANNEL_SEMANTICS",
+      "relative_raw_indices": [0, 8, 16, 24, 32],
+      "projection": "FLOAT32_DIV_255_SPATIAL_CHANNEL_MEAN",
+      "absolute_projection_shape": [8, 5, 3, 1, 1],
+      "target": "ABSOLUTE_PROJECTION_MINUS_FRAME0_PROJECTION",
+      "target_anchor_exact_zero": true,
+      "noisy_video": "ABSOLUTE_FRAME0_PROJECTION_REPEATED_FIVE_TIMES",
+      "future_observation_in_forward": false,
+      "checkpoint_free": true,
+      "not_a_vae_latent": true
+    },
+    "context": "EXACT_ZERO_NO_TEXT_CHECKPOINT",
+    "typed_masks": "ALL_32_ACTION_ROWS_AND_ALL_5_FRAMES_VALID; A4_REDUCER_SEAM_MASK=F,T,T,T,T",
+    "shuffle_permutation": [1, 0, 3, 2, 5, 4, 7, 6]
+  },
+  "source_semantic_pins": {
+    "robotwin_dataset": {
+      "path": "src/sana_wam/dataloader/robotwin_dataset.py",
+      "sha256": "a7db73364f260b693e376f16783576d383ad88c3ee9f8258135acd91e81c1445"
+    },
+    "rotation": {
+      "path": "src/sana_wam/dataloader/transforms/rotation.py",
+      "sha256": "f928676154ba81d760074e586e853e7e59e91ba6ad58637bcd4970e1d42c624b"
+    },
+    "cach_stage1_config": {
+      "path": "configs/experiments/cach_sana_wam_stage1.yaml",
+      "sha256": "4d81b07cc825ef33415b4fd8851b198581c652b184f28bad5bc76bd961364c3b",
+      "bound_fields": {
+        "action_mode": "eef",
+        "delta_action": false,
+        "normalize_mode": null,
+        "num_frames": 33,
+        "temporal_compression": 8,
+        "video_stride": 1
+      }
+    },
+    "unused_stats_file_read_only_identity_pin": {
+      "path": "/DATA/share/RoboTwin2.0/dataset/adjust_bottle/aloha-agilex_clean_50/data/adjust_bottle_aloha-agilex_clean_50_stats.npy",
+      "sha256": "2404b012a04f4e7d09e72fdfdddb4288099866a32f5e42e127cf4b5613df5cfc",
+      "used_by_adapter": false
+    }
+  },
+  "derived_cpu_tensor_evidence": {
+    "dtype": "float32",
+    "byte_order": "C_CONTIGUOUS_RAW_BYTES",
+    "train": {
+      "actions_sha256": "0ad5448ff879e44a2e80d54e4843646fc42cfc8029fa1aaac350cb110d4978ec",
+      "target_sha256": "b62ffe0d6e86d6f1f82d6876733f9ffb5ebcaa130782f4c6a656ef30293b96fc",
+      "noisy_video_sha256": "b17ab2abac1d197a962e34d05f926c74a772ca2d3cc95e4eee23716acab1924e",
+      "proprio_sha256": "5bdb194140c6da82a7e6a7da5aeab99e25e59ee6ad75643c007033a8c2d3356d",
+      "action_variance": 0.298202050110979,
+      "shuffle_mse": 0.003350022557896686,
+      "motion_mse_from_anchor": 0.008603919861180734,
+      "finite": true,
+      "adequate": true
+    },
+    "heldout": {
+      "actions_sha256": "1b2501aebc821ef53e7ba88a54e2534ebf04feab23fb29b6cd9833b616950a15",
+      "target_sha256": "21bafdb948f6dafb15dd505d8c2eaabc796b023479adab95efb7c18a921d280f",
+      "noisy_video_sha256": "f836f66517c990a6e23f0e585ff24191cf59f942915013f22c9092f94d55ffa0",
+      "proprio_sha256": "5bdb194140c6da82a7e6a7da5aeab99e25e59ee6ad75643c007033a8c2d3356d",
+      "action_variance": 0.29996204285993977,
+      "shuffle_mse": 0.0921871627785206,
+      "motion_mse_from_anchor": 0.009143518803094608,
+      "finite": true,
+      "adequate": true
+    },
+    "thresholds": {
+      "min_action_variance": 1e-08,
+      "min_shuffle_mse": 1e-08,
+      "min_motion_mse": 1e-08
+    },
+    "data_inadequate_fallback_or_reselection_allowed": false
+  },
+  "execution_constraints": {
+    "reverify_all_selected_file_size_and_sha_before_model_gpu_optimizer": true,
+    "selection_mutation_after_freeze": false,
+    "real_data_scope": "TINY_OVERFIT_ARCHITECTURE_SCREEN_ONLY",
+    "generalization_or_formal_claim_allowed": false,
+    "checkpoint_load_or_save": false,
+    "automatic_rerun_or_root_reuse": false
+  }
+}

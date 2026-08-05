@@ -1,0 +1,172 @@
+{
+  "base_lineage": {
+    "sana_afcc_handoff_head": "9586486f2a9f5172d57b325e32093a3e018d34c0",
+    "sana_head": "16b9cec673e3335724ba2d8db25de7f9ed229292",
+    "sana_wam_head": "605f1c134b4c983ff80f8489c4bc8847036329e2",
+    "stage2_source_manifest": {
+      "path": "docs/cach_sana_wam/stage2/SOURCE_MANIFEST.json",
+      "sha256": "8333c74d9bc8115937f98d9fc12a60da62cab49dd8895cd403047027315052fb"
+    },
+    "stage2b_source_bundle": {
+      "mode": "0444",
+      "path": "/DATA/share/sana_cach_source_bundles/cach_stage2b_0feb797618cb9e02150abd52b357c03d2a4986177fc1e8ebeca626ee808389d2_20260731.tar",
+      "sha256": "0feb797618cb9e02150abd52b357c03d2a4986177fc1e8ebeca626ee808389d2",
+      "size_bytes": 389120
+    },
+    "stage2b_source_manifest": {
+      "path": "docs/cach_sana_wam/stage2b/SOURCE_MANIFEST.json",
+      "sha256": "87a5f36d13e06cdd5d951cf1dd96f4e353edc50fc555c96b3269d19859126c0a"
+    },
+    "stage2b_verifier": {
+      "path": "scripts/verify_cach_stage2b.py",
+      "sha256": "a9a2a58c0dbc831f886e43a0c299a52a59683e443f05dcd646dc99a41ff5a1fe"
+    }
+  },
+  "canonical_host": "H200",
+  "canonical_worktree": "/home/zch/workspace/sana-wam",
+  "created_at": "2026-07-31T00:00:00Z",
+  "execution_harness_pins": [
+    {
+      "path": ".gitmodules",
+      "sha256": "22e41c488f68ca762c6433e8a53bb504cdcddd899b2e7f4aa6935ae67297d066"
+    },
+    {
+      "path": ".python-version",
+      "sha256": "7b55f8e67b5623c4bef3fa691288da9437d79d3aba156de48d481db32ac7d16d"
+    },
+    {
+      "path": "pyproject.toml",
+      "sha256": "c84bce95525fcbe03800602bd6dc3e6a151f53888b0dbc91c405ac9bf6f6bafa"
+    },
+    {
+      "path": "src/sana_wam/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/sana_wam/cach/__init__.py",
+      "sha256": "0daf40668bd7042ff0de6d2c33a045e13d32f17722df3d915aa255268091c75b"
+    },
+    {
+      "path": "src/sana_wam/model/__init__.py",
+      "sha256": "78e9e9403c02e3af004d18b2a8026647fc0e5e873a8684b4f96251b9cc530f0d"
+    },
+    {
+      "path": "src/sana_wam/model/video_backbone/__init__.py",
+      "sha256": "72958a5200f4494a8740f4ff71db0d3d4489a84d2ae48e8e2555c0b35658eef9"
+    },
+    {
+      "path": "src/sana_wam/model/video_backbone/sana/__init__.py",
+      "sha256": "dc4acb3ca1022a0ed62904a61d09394ed03e7e8fedb022ebf6d25b2871f0d75f"
+    },
+    {
+      "path": "tests/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tests/conftest.py",
+      "sha256": "893ce1a02854323e0ebdd3574a74364c6f15aa489e8f8fd7187126efd81d39fc"
+    },
+    {
+      "path": "uv.lock",
+      "sha256": "31803c58048ff07600116ac389bd025f4def00cea0282a29637017b4acfec08c"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/cach_sana_wam/stage2b_l2/README.md",
+      "sha256": "b757b1a1cc128bb8a4fd24963ee688a780641d0621f838f460c8084a86536c96",
+      "size_bytes": 2365
+    },
+    {
+      "path": "docs/cach_sana_wam/stage2b_l2/STAGE2B_L2A_LIGHTWEIGHT_TEST_REPORT.json",
+      "sha256": "1683b1bd32bdece4f73ead31dbd1883fea720df002e29d7aa4e455ee6cea4731",
+      "size_bytes": 3603
+    },
+    {
+      "path": "docs/cach_sana_wam/stage2b_l2/STAGE2B_L2A_SOURCE_FILES.txt",
+      "sha256": "672c84a2963c3e3983e68e7816ff8f14ada891b1c82fea8daf95d23d292d1253",
+      "size_bytes": 379
+    },
+    {
+      "path": "docs/cach_sana_wam/stage2b_l2/STAGE2B_L2_OFFLINE_LEDGER_IMPLEMENTATION_PLAN_20260731.md",
+      "sha256": "35ef9c283d1802c781799fcb30ace0fb69155aad9f78d963946349a14ece5286",
+      "size_bytes": 18950
+    },
+    {
+      "path": "scripts/verify_cach_stage2b_l2a.py",
+      "sha256": "cd433d338ffb9f493f291905f0d5313c64591eafbf729bd7ae16c96fac1c9255",
+      "size_bytes": 31241
+    },
+    {
+      "path": "src/sana_wam/cach/stage2b_offline_ledger.py",
+      "sha256": "030a67332310d695395729161de7eb26999e391d469ff24b9c2d532666e77da6",
+      "size_bytes": 128455
+    },
+    {
+      "path": "tests/test_cach_stage2b_offline_ledger.py",
+      "sha256": "0c342390bef912c2f00e9840aa9dbb79393e7ca12ae9137df6a6939746483407",
+      "size_bytes": 76681
+    }
+  ],
+  "git_recovery_bundles": {
+    "local_afcc_handoff": null,
+    "sana_submodule": null,
+    "sana_wam": null
+  },
+  "inherited_source_pins": [
+    {
+      "path": "src/sana_wam/cach/stage2b_receipt_store.py",
+      "sha256": "8d8f313c5d08622c74b313d32249fbb0f79284e6f1f0c6a9c36590e4f9d3b83f"
+    },
+    {
+      "path": "src/sana_wam/cach/stage2b_state_snapshot.py",
+      "sha256": "269951d7c7e3145ffaad146eb580dc5e41d0572dccea11eadc23da2a3072805c"
+    },
+    {
+      "path": "src/sana_wam/cach/staging_variant.py",
+      "sha256": "99da23af8c5cd62fa2a7e468b6b372a298900608be22a18c4634b82ef0dea220"
+    },
+    {
+      "path": "src/sana_wam/model/action_chunk_layout.py",
+      "sha256": "8e6521a93614b4ce7e43ba51d2af4f67d2650b03cc60e7d7a152e36dfa3c8e39"
+    },
+    {
+      "path": "src/sana_wam/model/video_backbone/sana/hybrid_cache.py",
+      "sha256": "5b61ab6492670e8021b3603f965e9f3e8921e9d7f0ea77b49e40d92a77f78a74"
+    },
+    {
+      "path": "src/sana_wam/model/video_backbone/sana/hybrid_cache_stage2b.py",
+      "sha256": "8ab968b77660df1092b43a52eecb4dba16316060e7f83c0ad6fd214230a8a5dd"
+    }
+  ],
+  "overlay": {
+    "order": [
+      "stage0",
+      "stage1",
+      "stage2",
+      "stage2b",
+      "stage2b_l2a"
+    ],
+    "predecessor_resolved_file_count": 105,
+    "predecessor_resolved_inventory_sha256": "8e331c692298a73a8b1020d8857bbf9672d3dc0053ad7b991a159ad8cca053db",
+    "resolved_file_count": 112,
+    "stage2b_l2a_predecessor_collisions": [],
+    "stage2b_l2a_requires_zero_predecessor_collisions": true
+  },
+  "retained_stage2b_l2a_evidence": null,
+  "schema": "cach.stage2b_l2a.source_manifest.v1",
+  "scope": {
+    "execution_scope": "synthetic_cpu_single_process_offline_stage2b_l2a_only",
+    "file_count": 7,
+    "kind": "stage2b_l2a_zero_collision_delta_over_verified_stage2b",
+    "source_manifest_excluded_to_avoid_self_reference": true,
+    "transitive_runtime_closure": false
+  },
+  "stage2b_l2a_source_bundle": {
+    "mode": "0444",
+    "path": "/DATA/share/sana_cach_source_bundles/cach_stage2b_l2a_163737a9b8c9b88bfd8d7e05064052fc2948661f270c4a9a9f4ea55e96494b7d_20260731.tar",
+    "sha256": "163737a9b8c9b88bfd8d7e05064052fc2948661f270c4a9a9f4ea55e96494b7d",
+    "size_bytes": 276480
+  },
+  "status": "l2a_source_checkpoint_verified_scope_not_admitted_non_scientific"
+}

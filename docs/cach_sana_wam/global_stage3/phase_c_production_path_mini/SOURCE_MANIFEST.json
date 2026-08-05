@@ -1,0 +1,202 @@
+{
+  "authorized_on": "2026-08-02",
+  "base_lineage": {
+    "development_plan": {
+      "path": "docs/CAUSAL_ACTION_CONDITIONED_HYBRID_SANA_WAM_DEVELOPMENT_PLAN_20260731.md",
+      "sha256": "969d9668ffed07176844fcbd84062825f9d5f0af0325959b0068c38fe481f0dd"
+    },
+    "global_stage3_plan": {
+      "path": "docs/cach_sana_wam/global_stage3/GLOBAL_STAGE2_CLOSURE_AND_STAGE3_UPDATE_FREE_ADMISSION_PLAN_20260802.md",
+      "sha256": "93c015982b421161c137d40dee825de1f3ac5996b051a46591d9487b0eacecd8"
+    },
+    "minimal_cpu_source": {
+      "path": "src/sana_wam/model/cach_minimal_cpu.py",
+      "sha256": "2b91b3ce76a560034ddeb03cf634de1acb72807d1a5d37b2d14c14acbaabefa8"
+    },
+    "minimal_cpu_test": {
+      "path": "tests/test_cach_minimal_cpu.py",
+      "sha256": "724fc8447811279098dc5beb65501095170f8e4d873a9a8a3df0da6133c2d3c3"
+    },
+    "prior_cuda_smoke_source_not_executed": {
+      "path": "src/sana_wam/model/cach_minimal_cuda_smoke.py",
+      "sha256": "5c392cee053b7f0b05b881ad3ef998e24217e761f6ccd5ddc957bf2e72023a4e"
+    },
+    "sana_afcc_handoff_head": "9586486f2a9f5172d57b325e32093a3e018d34c0",
+    "sana_head": "16b9cec673e3335724ba2d8db25de7f9ed229292",
+    "sana_wam_head": "605f1c134b4c983ff80f8489c4bc8847036329e2",
+    "stage2b_l3_bundle": {
+      "mode": "0444",
+      "path": "/DATA/share/sana_cach_source_bundles/cach_stage2b_l3_1a2f984b179d6f0a719873e4eda7344b99b8093c75f4ad8528f63a373ca784c3_20260731.tar",
+      "sha256": "1a2f984b179d6f0a719873e4eda7344b99b8093c75f4ad8528f63a373ca784c3",
+      "size_bytes": 184320
+    },
+    "stage2b_l3_manifest": {
+      "path": "docs/cach_sana_wam/stage2b_l3/SOURCE_MANIFEST.json",
+      "sha256": "3c494faab4428ec8b7ba705b61c8bdd7bfe6f9f623366610ca1e9e94179f7b93"
+    },
+    "stage2b_l3_verifier": {
+      "path": "scripts/verify_cach_stage2b_l3.py",
+      "sha256": "b058c46b01c1041677dd84a14bfc974593909daad5023b5b8bb4e432b643812f"
+    }
+  },
+  "canonical_host": "H200",
+  "canonical_worktree": "/home/zch/workspace/sana-wam",
+  "created_at": "2026-08-02T17:18:46Z",
+  "files": [
+    {
+      "path": "docs/cach_sana_wam/global_stage3/phase_c_production_path_mini/README.md",
+      "sha256": "3b4a16c5a98883075afbe907b76f3e056954b6726f8dafff67ab99763e1bd5e4",
+      "size_bytes": 3013
+    },
+    {
+      "path": "docs/cach_sana_wam/global_stage3/phase_c_production_path_mini/PRODUCTION_PATH_MINI_C0_C8_CLOSURE_20260802.md",
+      "sha256": "f003b4e4c485d70da6d8bd427796a9d954b402878a43fb4e5f6e5748659fdcc3",
+      "size_bytes": 11171
+    },
+    {
+      "path": "docs/cach_sana_wam/global_stage3/phase_c_production_path_mini/PHASE_C_LIGHTWEIGHT_TEST_REPORT.json",
+      "sha256": "cb4adbe49e03f3889e209de3ea9b4d043af96d726ae4f78ce8e35554252d0fd6",
+      "size_bytes": 7020
+    },
+    {
+      "path": "docs/cach_sana_wam/global_stage3/phase_c_production_path_mini/PHASE_C_SOURCE_FILES.txt",
+      "sha256": "59ff254f82f546a8f0102d7fa03a340392da4a879a46ae8e267357db762cb216",
+      "size_bytes": 1114
+    },
+    {
+      "path": "scripts/verify_cach_phase_c_production_path_mini.py",
+      "sha256": "538c96496e7b72afb45995bd9ff3baa6902883ec0ee8d3d788b546e14d0a3191",
+      "size_bytes": 39902
+    },
+    {
+      "path": "src/sana_wam/model/action_backbone/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "src/sana_wam/model/action_backbone/backbone.py",
+      "sha256": "eedf5a6415b9083977c1c4cd5c87be56b65045cb997e386901ad4910fd72c934",
+      "size_bytes": 1512
+    },
+    {
+      "path": "src/sana_wam/model/action_backbone/components.py",
+      "sha256": "abd48045622daad2072acba3e1a298206a056043acd4bfec3aee210399ff5ba2",
+      "size_bytes": 15020
+    },
+    {
+      "path": "src/sana_wam/model/action_backbone/joint_action_dit.py",
+      "sha256": "e0f2fcde9914688e467a209346f9796af87335220754bca763065fa1d8960290",
+      "size_bytes": 50450
+    },
+    {
+      "path": "src/sana_wam/model/action_backbone/scheduler.py",
+      "sha256": "b7243eb00006105650af960a121b343670633d131f90c835aff70b7c279c20a4",
+      "size_bytes": 6287
+    },
+    {
+      "path": "src/sana_wam/model/cach_minimal_cpu.py",
+      "sha256": "2b91b3ce76a560034ddeb03cf634de1acb72807d1a5d37b2d14c14acbaabefa8",
+      "size_bytes": 73260
+    },
+    {
+      "path": "src/sana_wam/model/cach_production_path_mini.py",
+      "sha256": "2afa851fc0294f8b14c1425ebf78b89c498c76fdb89638f54c5f2e3fe04aef87",
+      "size_bytes": 103549
+    },
+    {
+      "path": "src/sana_wam/model/video_backbone/wan/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "src/sana_wam/model/video_backbone/wan/shared/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "src/sana_wam/model/video_backbone/wan/shared/core/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "src/sana_wam/model/video_backbone/wan/shared/core/gradient/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "src/sana_wam/model/video_backbone/wan/shared/core/gradient/gradient_checkpoint.py",
+      "sha256": "0bc3d9d50c3fd9479f1c4556dcdbfa169115b97be32eba2ece855dc3a9f57930",
+      "size_bytes": 908
+    },
+    {
+      "path": "tests/test_cach_production_path_mini.py",
+      "sha256": "84898da05c8e98e0a4a8f54b500bb973ad10b5c64a468d895fba1ecb3c3347c8",
+      "size_bytes": 52807
+    }
+  ],
+  "gate_state": {
+    "global_gate_s0": "NOT_CLAIMED",
+    "global_gate_s1": "NOT_CLAIMED",
+    "global_gate_s2": "BLOCKED_NOT_CLAIMED",
+    "global_stage3": "NOT_AUTHORIZED"
+  },
+  "overlay": {
+    "order": [
+      "stage2b_l3",
+      "global_stage3_phase_c_production_path_mini"
+    ],
+    "phase_c_predecessor_collisions": [],
+    "predecessor_resolved_file_count": 126,
+    "predecessor_resolved_inventory_sha256": "6f8714ff6ff5cf35aa9ef11267c742e77a9b9317a8a8a8f1edba9331db890a2a",
+    "resolved_file_count": 144,
+    "zero_collision_required": true
+  },
+  "retained_execution_evidence": null,
+  "runtime_dependency_pins": [
+    {"path": ".python-version", "sha256": "7b55f8e67b5623c4bef3fa691288da9437d79d3aba156de48d481db32ac7d16d"},
+    {"path": "pyproject.toml", "sha256": "c84bce95525fcbe03800602bd6dc3e6a151f53888b0dbc91c405ac9bf6f6bafa"},
+    {"path": "src/sana_wam/cach/action_conditioning.py", "sha256": "8323efa1544d5c0520e13192b55ed5f2e85490d03ac21c558d6009db38ee11c6"},
+    {"path": "src/sana_wam/cach/committed_action_history.py", "sha256": "162d7e7ee866b18cdba0f0e319b2c9b277d73d933ff5a4dd38c92ebcc762b5e9"},
+    {"path": "src/sana_wam/cach/prefix_compaction.py", "sha256": "1a2f12f38bb9699c65af7e4ea72183f9d122b6f81aae4d9628129040a3cfcdb7"},
+    {"path": "src/sana_wam/cach/stage2_failure_evidence.py", "sha256": "eef771a2ca0d1b423cdcced62ff7acf627bba8a852233cc3ffd9c4ce7658a03b"},
+    {"path": "src/sana_wam/cach/staging_variant.py", "sha256": "99da23af8c5cd62fa2a7e468b6b372a298900608be22a18c4634b82ef0dea220"},
+    {"path": "src/sana_wam/model/__init__.py", "sha256": "78e9e9403c02e3af004d18b2a8026647fc0e5e873a8684b4f96251b9cc530f0d"},
+    {"path": "src/sana_wam/model/action_backbone/__init__.py", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    {"path": "src/sana_wam/model/action_backbone/backbone.py", "sha256": "eedf5a6415b9083977c1c4cd5c87be56b65045cb997e386901ad4910fd72c934"},
+    {"path": "src/sana_wam/model/action_backbone/components.py", "sha256": "abd48045622daad2072acba3e1a298206a056043acd4bfec3aee210399ff5ba2"},
+    {"path": "src/sana_wam/model/action_backbone/joint_action_dit.py", "sha256": "e0f2fcde9914688e467a209346f9796af87335220754bca763065fa1d8960290"},
+    {"path": "src/sana_wam/model/action_backbone/scheduler.py", "sha256": "b7243eb00006105650af960a121b343670633d131f90c835aff70b7c279c20a4"},
+    {"path": "src/sana_wam/model/action_chunk_layout.py", "sha256": "8e6521a93614b4ce7e43ba51d2af4f67d2650b03cc60e7d7a152e36dfa3c8e39"},
+    {"path": "src/sana_wam/model/cach_minimal_cpu.py", "sha256": "2b91b3ce76a560034ddeb03cf634de1acb72807d1a5d37b2d14c14acbaabefa8"},
+    {"path": "src/sana_wam/model/cach_numerical_core.py", "sha256": "5259958d547a5e3fee7a64443551726d8c97974fbc9894afa37646eb73397dc9"},
+    {"path": "src/sana_wam/model/cach_paired_stager.py", "sha256": "c1455af51df4e0a0eff9971fa98e9272aac580084029a7990161817d246a6ef4"},
+    {"path": "src/sana_wam/model/video_backbone/sana/adapter.py", "sha256": "fdda391181e6f30455cf54fe1559b4bd2ee33bc9274b42712f0f5e826aef58d5"},
+    {"path": "src/sana_wam/model/video_backbone/sana/hybrid_cache.py", "sha256": "5b61ab6492670e8021b3603f965e9f3e8921e9d7f0ea77b49e40d92a77f78a74"},
+    {"path": "src/sana_wam/model/video_backbone/sana/hybrid_cache_codec.py", "sha256": "563454779c5e45ceee4dbae9a99f2636114cc7645a5492fab2b487e05f59e638"},
+    {"path": "src/sana_wam/model/video_backbone/sana/hybrid_cache_stage2b.py", "sha256": "8ab968b77660df1092b43a52eecb4dba16316060e7f83c0ad6fd214230a8a5dd"},
+    {"path": "src/sana_wam/model/video_backbone/sana/pipeline_builder.py", "sha256": "2a7e4f8688b1bec04a4290b6a5deb1a51064d9477ac34c9de3135d618acaba20"},
+    {"path": "src/sana_wam/model/video_backbone/wan/__init__.py", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    {"path": "src/sana_wam/model/video_backbone/wan/shared/__init__.py", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    {"path": "src/sana_wam/model/video_backbone/wan/shared/core/__init__.py", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    {"path": "src/sana_wam/model/video_backbone/wan/shared/core/gradient/__init__.py", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    {"path": "src/sana_wam/model/video_backbone/wan/shared/core/gradient/gradient_checkpoint.py", "sha256": "0bc3d9d50c3fd9479f1c4556dcdbfa169115b97be32eba2ece855dc3a9f57930"},
+    {"path": "tests/conftest.py", "sha256": "893ce1a02854323e0ebdd3574a74364c6f15aa489e8f8fd7187126efd81d39fc"},
+    {"path": "uv.lock", "sha256": "31803c58048ff07600116ac389bd025f4def00cea0282a29637017b4acfec08c"}
+  ],
+  "schema": "cach.global_stage3.phase_c.source_manifest.v1",
+  "scope": {
+    "complete_2b": false,
+    "dynamic_import_closure": false,
+    "exact_future_g3_dispatcher_reused": false,
+    "execution_scope": "cpu_synthetic_production_shaped_interface_proxy_c0_c8",
+    "file_count": 18,
+    "formal_admission_root_created": false,
+    "kind": "phase_c_additive_delta_over_verified_stage2b_l3",
+    "native_library_closure": false,
+    "source_manifest_excluded_to_avoid_self_reference": true,
+    "transitive_runtime_closure": false,
+    "vendor_gdn_numerical_parity": false
+  },
+  "source_bundle": null,
+  "status": "phase_c_worktree_source_delta_verified_not_runtime_closed_not_admitted_non_scientific"
+}

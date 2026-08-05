@@ -151,6 +151,8 @@ def build_mini_sana_pipeline(
     additional_flash_attn: str | None = None,
     flash_attn_window_count: list[int] | None = None,
     continuous_timestep_conditioning: bool = False,
+    use_delta_pose_additive: bool = False,
+    delta_pose_additive_dim: int = 20,
 ) -> SanaPipe:
     """Mini-config factory for unit tests: random-weight ``SanaMSVideo``.
 
@@ -204,6 +206,9 @@ def build_mini_sana_pipeline(
         caption_channels=64,
     )
     if _use_gdn:
+        if use_delta_pose_additive:
+            common["use_delta_pose_additive"] = True
+            common["delta_pose_additive_dim"] = int(delta_pose_additive_dim)
         from diffusion.model.nets.sana_multi_scale_video_camctrl import (  # noqa: E402
             SanaMSVideoCamCtrl,
         )
@@ -218,6 +223,12 @@ def build_mini_sana_pipeline(
             chunk_split_strategy="uniform",
             conv_kernel_size=4,
             k_conv_only=True,
+        )
+        if use_delta_pose_additive:
+            _reset_and_verify_delta_pose_output_projections(dit)
+    elif use_delta_pose_additive:
+        raise ValueError(
+            "use_delta_pose_additive requires the GDN CamCtrl block family"
         )
     else:
         from diffusion.model.nets.sana_multi_scale_video import (  # noqa: E402
@@ -240,6 +251,8 @@ def build_mini_sana_pipeline(
             "attn_kernel": attn_kernel,
             "chunk_size": chunk_size,
             "continuous_timestep_conditioning": continuous_timestep_conditioning,
+            "use_delta_pose_additive": bool(use_delta_pose_additive),
+            "delta_pose_additive_dim": int(delta_pose_additive_dim),
         },
     )
 
@@ -316,6 +329,10 @@ class _PipeSpec:
     backbone via ``prepare/run_block/finalize`` and needs the NON-streaming factory
     (``Bidirectional`` whole-clip GDN attention); the cached attention raises without
     a kv_cache. Same checkpoint keys load either way. Ignored without ``init_dit_from``."""
+    use_delta_pose_additive: bool = False
+    """Enable the explicit post-self-attention action-conditioning seam."""
+    delta_pose_additive_dim: int = 20
+    """Exact public action-condition width consumed by the vendor embedder."""
 
 
 def _resolve_model_path_and_kwargs(
@@ -441,6 +458,12 @@ def _spec_from_dictconfig(vb_cfg, *, ckpt_dir: Optional[str] = None) -> _PipeSpe
         use_first_frame_cond=bool(vb_cfg.get("use_first_frame_cond", False)),
         init_dit_from=vb_cfg.get("init_dit_from", None),
         gdn_streaming=bool(vb_cfg.get("gdn_streaming", True)),
+        use_delta_pose_additive=bool(
+            vb_cfg.get("use_delta_pose_additive", False)
+        ),
+        delta_pose_additive_dim=int(
+            vb_cfg.get("delta_pose_additive_dim", 20)
+        ),
     )
 
 
@@ -681,7 +704,52 @@ def _spec_from_dict(d: dict, *, ckpt_dir: Optional[str] = None) -> _PipeSpec:
         use_first_frame_cond=bool(d.get("use_first_frame_cond", False)),
         init_dit_from=d.get("init_dit_from", None),
         gdn_streaming=bool(d.get("gdn_streaming", True)),
+        use_delta_pose_additive=bool(d.get("use_delta_pose_additive", False)),
+        delta_pose_additive_dim=int(d.get("delta_pose_additive_dim", 20)),
     )
+
+
+def _reset_and_verify_delta_pose_output_projections(dit: nn.Module) -> None:
+    """Restore the CACH action seam's exact no-op after vendor initialization.
+
+    ``SanaVideoMSCamCtrlBlock.__init__`` zeroes ``delta_pose_proj``, but the
+    enclosing model's later global Linear Xavier pass overwrites it.  The
+    post-factory reset here is therefore load-bearing, not redundant.
+    """
+
+    embedder = getattr(dit, "delta_pose_embedder", None)
+    if embedder is None:
+        raise RuntimeError(
+            "use_delta_pose_additive requested but delta_pose_embedder is absent"
+        )
+    blocks = tuple(getattr(dit, "blocks", ()))
+    if not blocks:
+        raise RuntimeError("action-conditioned DiT has no blocks")
+    projections = []
+    for index, block in enumerate(blocks):
+        projection = getattr(block, "delta_pose_proj", None)
+        if projection is None:
+            raise RuntimeError(
+                f"action-conditioned block {index} lacks delta_pose_proj"
+            )
+        projections.append(projection)
+    with torch.no_grad():
+        for projection in projections:
+            projection.weight.zero_()
+            if projection.bias is not None:
+                projection.bias.zero_()
+    for index, projection in enumerate(projections):
+        if bool(torch.count_nonzero(projection.weight)):
+            raise RuntimeError(
+                f"delta_pose_proj.weight is not exact zero at block {index}"
+            )
+        if projection.bias is not None and bool(
+            torch.count_nonzero(projection.bias)
+        ):
+            raise RuntimeError(
+                f"delta_pose_proj.bias is not exact zero at block {index}"
+            )
+    dit._cach_delta_pose_output_zero_verified = True
 
 
 def _build_pipe_from_spec(
@@ -721,6 +789,23 @@ def _build_pipe_from_spec(
             )
     if spec.attn_kernel == "gdn":
         model_kwargs.setdefault("chunk_size", spec.chunk_size)
+    if spec.use_delta_pose_additive:
+        if spec.attn_kernel != "gdn":
+            raise ValueError(
+                "use_delta_pose_additive requires video_backbone.attn_kernel='gdn'"
+            )
+        if spec.delta_pose_additive_dim <= 0:
+            raise ValueError("delta_pose_additive_dim must be positive")
+        for key, expected in {
+            "use_delta_pose_additive": True,
+            "delta_pose_additive_dim": spec.delta_pose_additive_dim,
+        }.items():
+            observed = model_kwargs.get(key, expected)
+            if type(observed) is not type(expected) or observed != expected:
+                raise ValueError(
+                    f"model_kwargs.{key} conflicts with the CACH action seam"
+                )
+            model_kwargs[key] = expected
     # VAE-driven in_channels: the LTX2 latent is 128ch, so the DiT patch-embedder
     # must accept 128. The pretrained SANA-WM preset already sets this; force it
     # for any ltx2 build so a misconfig (ltx2 VAE + from-scratch 16ch DiT) fails
@@ -733,6 +818,8 @@ def _build_pipe_from_spec(
         )
         model_kwargs["in_channels"] = 128
     dit = factory(**model_kwargs)
+    if spec.use_delta_pose_additive:
+        _reset_and_verify_delta_pose_output_projections(dit)
     if positive_feature_map is not None:
         from sana_wam.model.video_backbone.sana.strictly_positive_feature_map import (
             install_strictly_positive_feature_maps,
@@ -878,6 +965,8 @@ def _build_pipe_from_spec(
             "chunk_size": spec.chunk_size,
             "use_first_frame_cond": spec.use_first_frame_cond,
             "continuous_timestep_conditioning": spec.continuous_timestep_conditioning,
+            "use_delta_pose_additive": spec.use_delta_pose_additive,
+            "delta_pose_additive_dim": spec.delta_pose_additive_dim,
         },
     )
 

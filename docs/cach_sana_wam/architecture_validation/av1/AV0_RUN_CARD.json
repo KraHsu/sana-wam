@@ -1,0 +1,829 @@
+{
+  "schema": "cach.architecture_validation.av0_run_card.v1",
+  "schema_policy": {
+    "all_listed_keys_required": true,
+    "reject_unknown_keys_in_every_object": true,
+    "load_bearing_runner_fallback": "REQUIRE_FULL_CARD_SHA256_MATCH_AND_A_DUPLICATE_KEY_REJECTING_JSON_LOADER_BEFORE_ANY_ROOT_CREATE_OR_EXECUTION",
+    "repo_paths_must_be_relative_without_parent_segments": true,
+    "sha256_pattern": "^[0-9a-f]{64}$"
+  },
+  "card_id": "cach-av1-transition-proxy-v1",
+  "card_state": "FROZEN_CARD_ONLY_EXECUTION_NOT_AUTHORIZED",
+  "identity": {
+    "canonical_host": "H200",
+    "canonical_worktree": "/home/zch/workspace/sana-wam",
+    "created_on": "2026-08-03",
+    "self_path": "docs/cach_sana_wam/architecture_validation/av1/AV0_RUN_CARD.json",
+    "self_pin_policy": "OUT_OF_BAND_FULL_LITERAL_SHA256_AFTER_SERIALIZATION",
+    "self_pin_binding_requirements": {
+      "directory_prefix_is_identity": false,
+      "twelve_hex_display_prefix_is_identity": false,
+      "future_authority_must_bind_self_path_and_full_sha256": true,
+      "runner_preflight_must_bind_self_path_and_full_sha256": true,
+      "result_artifact_must_bind_self_path_and_full_sha256": true,
+      "caller_must_publish_final_full_sha256_after_h200_sync": true
+    },
+    "governing_plan": {
+      "path": "docs/cach_sana_wam/global_stage3/post_phase_c_planning/ARCHITECTURE_VALIDATION_FIRST_PLAN_20260803_v1.md",
+      "sha256": "06f5d09127f8bc2a945cdbdc095054f40b1fe8d9757a90eccbdf0604ea89e079"
+    },
+    "ancestor_pins": {
+      "development_plan": {
+        "path": "docs/CAUSAL_ACTION_CONDITIONED_HYBRID_SANA_WAM_DEVELOPMENT_PLAN_20260731.md",
+        "sha256": "969d9668ffed07176844fcbd84062825f9d5f0af0325959b0068c38fe481f0dd"
+      },
+      "global_stage3_plan": {
+        "path": "docs/cach_sana_wam/global_stage3/GLOBAL_STAGE2_CLOSURE_AND_STAGE3_UPDATE_FREE_ADMISSION_PLAN_20260802.md",
+        "sha256": "93c015982b421161c137d40dee825de1f3ac5996b051a46591d9487b0eacecd8"
+      },
+      "phase_c_source_manifest": {
+        "path": "docs/cach_sana_wam/global_stage3/phase_c_production_path_mini/SOURCE_MANIFEST.json",
+        "sha256": "0b88a76c5d2bf73a72a830fb58d9faac091af77e738f341f843664eaced3ffff"
+      },
+      "phase_c_verifier": {
+        "path": "scripts/verify_cach_phase_c_production_path_mini.py",
+        "sha256": "538c96496e7b72afb45995bd9ff3baa6902883ec0ee8d3d788b546e14d0a3191"
+      },
+      "phase_c_report": {
+        "path": "docs/cach_sana_wam/global_stage3/phase_c_production_path_mini/PHASE_C_LIGHTWEIGHT_TEST_REPORT.json",
+        "sha256": "cb4adbe49e03f3889e209de3ea9b4d043af96d726ae4f78ce8e35554252d0fd6"
+      }
+    },
+    "repository_heads": {
+      "sana_wam": "605f1c134b4c983ff80f8489c4bc8847036329e2",
+      "third_party_sana": "16b9cec673e3335724ba2d8db25de7f9ed229292",
+      "sana_afcc_handoff": "9586486f2a9f5172d57b325e32093a3e018d34c0"
+    }
+  },
+  "global_gate_snapshot": {
+    "GATE_S0": "NOT_CLAIMED",
+    "GATE_S1": "NOT_CLAIMED",
+    "GATE_S2": "BLOCKED_NOT_CLAIMED",
+    "GLOBAL_STAGE3": "NOT_AUTHORIZED",
+    "this_card_may_change_global_gates": false
+  },
+  "pair": {
+    "reference": "REF-GDN-CORRECTED",
+    "candidate": "CACH-A",
+    "only_semantic_delta": "candidate_only_action_to_video_seam",
+    "candidate_action_path": "end_of_bin_action_condition -> reduced action_conditioner -> per_GDN_block_zero_initialized_action_output_projection_after_recurrence_before_FFN",
+    "production_to_reduced_name_mapping": "reduced action_conditioner is the AV1 semantic counterpart of production delta_pose_embedder; every result must record this mapping and may not claim module-name identity",
+    "reference_action_path": "structural_identity_bypass_that_reads_neither_action_tensor_nor_NO_ACTION_tensor",
+    "theta0_required_relation": "BITWISE_EQUAL_VIDEO_OUTPUT",
+    "shared_initialization_required": true,
+    "candidate_output_projection_zero_initialized": true,
+    "operator_level": "TRANSITION_PROXY",
+    "integration_path": "EXPERIMENTAL_PATH",
+    "architecture_conclusion_scope": "PROXY_ONLY_ACTUAL_ARCHITECTURE_NOT_ASSESSED",
+    "afcc_enabled": false,
+    "afcc_reference_present": false,
+    "anchors": false,
+    "attnres": false,
+    "self_forcing": false,
+    "dagger": false,
+    "rerank_or_best_of_n": false,
+    "full_2b": false,
+    "closed_loop_capability_evaluation": false
+  },
+  "additive_policy": {
+    "exact_additive_paths_scope": "AV0_AND_AV1_ONLY",
+    "phase_c_fixed_member_list": {
+      "path": "docs/cach_sana_wam/global_stage3/phase_c_production_path_mini/PHASE_C_SOURCE_FILES.txt",
+      "sha256": "59ff254f82f546a8f0102d7fa03a340392da4a879a46ae8e267357db762cb216",
+      "member_count": 18
+    },
+    "exact_additive_paths": [
+      "docs/cach_sana_wam/architecture_validation/av1/AV0_RUN_CARD.json",
+      "src/sana_wam/model/cach_av1_transition_proxy.py",
+      "configs/experiments/cach_av1_transition_proxy.yaml",
+      "scripts/run_cach_av1_transition_proxy.py",
+      "tests/test_cach_av1_transition_proxy.py"
+    ],
+    "fixed_member_overlap_required": [],
+    "modify_fixed_member": false,
+    "delete_fixed_member": false,
+    "overwrite_fixed_member": false,
+    "import_phase_c_private_trainable_classes": false,
+    "av1b_or_later_new_file_rule": "FREEZE_A_NEW_SUCCESSOR_CARD_WITH_A_NEW_EXACT_PATH_LIST_BEFORE_ANY_NEW_FILE_WRITE",
+    "successor_rule": "IF_A_FIXED_MEMBER_MUST_CHANGE_CREATE_A_NEW_SUCCESSOR_REVISION_PRESERVE_V1_BYTES_AND_DO_NOT_APPLY_THE_OLD_VERIFIER_CLAIM_TO_THE_CHANGED_TREE"
+  },
+  "authority": {
+    "authority_reference": "user message on 2026-08-03: 那么,按照计划开始吧",
+    "interpretation": "AV0_CARD_FREEZE_ONLY",
+    "inheritance": "NONE",
+    "future_unlisted_capability_default": "DENIED",
+    "current_stage": "AV-0",
+    "current_decision": "FREEZE_CARD_ONLY",
+    "freeze_this_card": true,
+    "documentation_write_exact_path_only": true,
+    "code_write": false,
+    "screen_root_create": false,
+    "cpu_execute": false,
+    "model_construct": false,
+    "forward_backward_or_jvp": false,
+    "optimizer_construct": false,
+    "parameter_update": false,
+    "lightweight_tests": false,
+    "gpu_or_cuda_or_jit": false,
+    "real_data_access": false,
+    "checkpoint_load": false,
+    "checkpoint_save": false,
+    "training": false,
+    "diagnostic_evaluation": false,
+    "capability_or_scientific_evaluation": false,
+    "deployment": false,
+    "capture": false,
+    "full_2b": false,
+    "global_stage3": false,
+    "future_stage_authority": {
+      "AV-1": {
+        "state": "NOT_AUTHORIZED",
+        "required_explicit_capabilities": [
+          "four_additive_non_card_file_writes",
+          "unique_nonformal_root_create",
+          "cpu_model_construct_and_execute",
+          "forward_backward",
+          "jvp_diagnostic",
+          "optimizer_construct_and_parameter_update",
+          "training",
+          "cpu_synthetic_lightweight_tests",
+          "diagnostic_metrics"
+        ]
+      },
+      "AV-1B": {
+        "state": "NOT_AUTHORIZED",
+        "required_explicit_capabilities": [
+          "new_additive_operator_bridge_files",
+          "unique_nonformal_root_create",
+          "single_reserved_gpu",
+          "cuda_and_jit",
+          "vendor_autograd_kernel",
+          "model_construct_and_execute",
+          "forward_backward",
+          "jvp_diagnostic",
+          "optimizer_construct_and_parameter_update",
+          "training",
+          "lightweight_tests",
+          "operator_qualification_and_diagnostic_metrics"
+        ]
+      },
+      "AV-2": {
+        "state": "NOT_AUTHORIZED",
+        "required_explicit_capabilities": [
+          "tiny_real_data_slice_read",
+          "unique_nonformal_root_create",
+          "exact_cpu_or_reserved_gpu_device_authority",
+          "qualified_reference_operator_or_vendor_kernel",
+          "model_construct_and_execute",
+          "forward_backward",
+          "optimizer_construct_and_parameter_update",
+          "training",
+          "lightweight_tests",
+          "actual_operator_training",
+          "tiny_overfit_diagnostics"
+        ]
+      },
+      "AV-3": {
+        "state": "NOT_AUTHORIZED",
+        "required_explicit_capabilities": [
+          "fixed_reduced_real_data_read",
+          "unique_nonformal_root_create",
+          "exact_cpu_or_reserved_gpu_device_authority",
+          "qualified_reference_operator_or_vendor_kernel",
+          "model_construct_and_execute",
+          "forward_backward",
+          "optimizer_construct_and_parameter_update",
+          "training",
+          "lightweight_tests",
+          "diagnostic_metrics",
+          "paired_reduced_training_and_short_rollout_diagnostics"
+        ]
+      },
+      "AV-4": {
+        "state": "NOT_AUTHORIZED",
+        "required_explicit_capabilities": [
+          "two_pre_registered_confirmation_seeds",
+          "expanded_fixed_holdout",
+          "expanded_rollout_horizon",
+          "new_unique_nonformal_roots",
+          "fixed_real_data_read",
+          "exact_cpu_or_reserved_gpu_device_authority",
+          "qualified_reference_operator_or_vendor_kernel",
+          "model_construct_and_execute",
+          "forward_backward",
+          "optimizer_construct_and_parameter_update",
+          "training",
+          "lightweight_tests",
+          "diagnostic_metrics"
+        ]
+      }
+    }
+  },
+  "root_contract": {
+    "label": "NON_FORMAL_ARCHITECTURE_SCREEN / IMMUTABLE / NOT_ADMISSION_EVIDENCE",
+    "path_template": "/DATA/share/sana_cach_wam_nonformal_screens/av1/06f5d09127f8/{card_sha256_12}-{run_nonce}",
+    "resolved_root": null,
+    "run_nonce": null,
+    "run_nonce_pattern": "^[0-9a-f]{32}$",
+    "created": false,
+    "creation_authorized": false,
+    "future_authority_must_bind_exact_resolved_path_and_nonce": true,
+    "future_authority_must_bind_full_run_card_pin": true,
+    "runner_preflight_must_verify_full_run_card_pin_before_create": true,
+    "twelve_hex_template_component_is_display_only": true,
+    "preflight_must_not_exist": true,
+    "exclusive_create_required": true,
+    "capacity_and_owner_check_required": true,
+    "preflight_blocked_must_not_create_root": true,
+    "precreate_block_record": "AUTH_BLOCKED_OR_ENV_BLOCKED_BEFORE_EXCLUSIVE_CREATE_WRITES_NO_FILES_UNLESS_FUTURE_AUTHORITY_BINDS_AN_EXACT_SEPARATE_ATTEMPT_ARTIFACT_PATH_AND_WRITE_PERMISSION; OTHERWISE_THE_CALLER_TRANSCRIPT_IS_THE_ONLY_RECORD; RESOLVED_ROOT_REMAINS_NULL",
+    "failure_trap_must_be_installed_before_first_root_mutation": true,
+    "created_root_must_finalize_on_every_terminal_state": true,
+    "postcreate_terminal_record": "SUCCESS_FAILURE_PARTIAL_INVALID_OR_HARNESS_REJECTED_AFTER_CREATE_MUST_FINALIZE_AND_FREEZE_THE_ROOT_AND_EMIT_A_FREEZE_RECEIPT",
+    "freeze_on_postcreate_av1_terminal_states": [
+      "AUTH_BLOCKED",
+      "ENV_BLOCKED",
+      "HARNESS_REJECTED",
+      "INVALID_RUN",
+      "IMPLEMENTATION_INVALID",
+      "NUMERICAL_INVALID",
+      "VALID_REVIEW_PROVISIONAL_NO_VERDICT",
+      "PROXY_GO",
+      "PROXY_STOP",
+      "PROXY_INCONCLUSIVE"
+    ],
+    "unlisted_postcreate_terminal_state_also_freezes_root": true,
+    "delete_after_creation": false,
+    "modify_after_freeze": false,
+    "reuse": false,
+    "retry_requires_new_root": true,
+    "formal_promotion_of_root": false
+  },
+  "experiment_contract": {
+    "experiment_kind": "TEACHER_ACTION_MECHANISM_SCREEN",
+    "execution_state": "NOT_RUN",
+    "device": "cpu",
+    "dtype": "float32",
+    "single_process": true,
+    "reduced_topology": {
+      "batch_size": 8,
+      "counterfactual_pair_count": 4,
+      "latent_channels": 3,
+      "spatial_height": 1,
+      "spatial_width": 1,
+      "hidden_dim": 4,
+      "context_dim": 4,
+      "context_token_count": 2,
+      "action_dim": 20,
+      "gdn_depth": 20,
+      "gdn_heads": 1,
+      "frame_chunk_size": 3,
+      "temporal_compression": 8,
+      "video_stride": 1,
+      "valid_raw_count": 33,
+      "valid_latent_count": 5,
+      "valid_action_count": 32,
+      "chunk_count": 2,
+      "chunk_valid_latent_counts": [
+        3,
+        2
+      ],
+      "chunk_action_slot_capacities": [
+        16,
+        24
+      ],
+      "chunk_valid_action_counts": [
+        16,
+        16
+      ],
+      "scored_future_horizons": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "reported_rollout_horizons": [
+        1,
+        2,
+        4
+      ],
+      "rollout_mode": "TEACHER_ACTION_CLAMPED_READONLY_RECURRENT_SEQUENCE",
+      "action_backbone": "REAL_ACTIONDIT_JOINT_CROSS_ATTN_DEPTH20_PRESENT_SHARED_DIAGNOSTIC_ONLY",
+      "action_prediction_loss_weight": 0.0,
+      "trainable_objective": "VIDEO_ONLY_ACTION_SENSITIVE_FUTURE_MSE"
+    },
+    "synthetic_task": {
+      "task_recipe_material": "cach.av1.synthetic_counterfactual.dct_teacher.raw33.k3.tc8.vs1.b8.h4.v1",
+      "task_recipe_sha256_rule": "SHA256_UTF8_OF_JQ_COMPACT_SORTED_JSON_PLUS_ITS_SINGLE_TRAILING_LF_FOR_THIS_SYNTHETIC_TASK_OBJECT_AFTER_DELETING_TASK_RECIPE_SHA256_AND_TASK_RECIPE_SHA256_RULE",
+      "task_recipe_sha256": "9d2a749d722775324ee233862772def530fbffe0ea9e55aeea87c160b87a51e4",
+      "slice_id": "synthetic_counterfactual_pairs_0000_0003",
+      "tensor_construction_contract": "Use CPython math.sin/cos/sqrt/pi; evaluate every analytic formula in IEEE binary64 in lexicographic tensor-index loop order, accumulate every action-dimension sum in ascending a=0..19 order, finish teacher recurrence and per-horizon normalization in binary64, cast once to contiguous CPU torch.float32, then apply exact boolean masks; no RNG is used for task tensors",
+      "tensor_inventory_and_shapes": {
+        "global_actions": "float32 [8,32,20]",
+        "chunk0_actions": "float32 [8,16,20] from global indices 0:16",
+        "chunk1_actions": "float32 [8,24,20] from global indices 16:32 followed by eight exact-zero padded slots",
+        "noisy_video": "float32 [8,5,3,1,1]",
+        "base_target": "float32 [8,5,3,1,1]",
+        "video_target": "float32 [8,5,3,1,1]",
+        "context": "float32 [8,2,2,4] indexed by row,chunk,token,dimension",
+        "context_mask": "bool [8,2,2] all true",
+        "proprio": "float32 [8,2,20] indexed by row,chunk,action_dimension",
+        "video_timestep": "float32 [8,2] with one registered scalar per chunk repeated over rows",
+        "action_timestep": "float32 [8,2] with one registered scalar per chunk repeated over rows",
+        "frame_valid_masks": "bool chunk0 [8,3] all true; chunk1 [8,3] values [true,true,false]",
+        "action_valid_masks": "bool chunk0 [8,16] all true; chunk1 [8,24] first sixteen true and last eight false",
+        "no_action_slot": "float32 [20] exact zero",
+        "clean_action_target": "NOT_CONSTRUCTED"
+      },
+      "row_to_pair": [
+        0,
+        0,
+        1,
+        1,
+        2,
+        2,
+        3,
+        3
+      ],
+      "row_sign": [
+        1,
+        -1,
+        1,
+        -1,
+        1,
+        -1,
+        1,
+        -1
+      ],
+      "action_formula": "u[r,t,a]=row_sign[r]*(0.75*sin((pair(r)+1)*(t+1)*(a+1)/17)+0.25*cos((pair(r)+2)*(t+1)/(a+2))) for valid t=0..31,a=0..19; padded slots are exact zero",
+      "noisy_video_formula": "x[r,l,c,0,0]=0.10*sin((pair(r)+1)*(l+1)*(c+1)/7)+0.03*cos((pair(r)+2)*(l+1)/(c+1)) for l=0..4,c=0..2",
+      "base_target_formula": "base[r,l,c,0,0]=0.60*x[r,l,c,0,0]+0.05*cos((pair(r)+1)*(l+1)*(c+1)/11) for l=0..4,c=0..2",
+      "context_formula": "context[r,j,q,d]=0.10*cos((pair(r)+1)*(j+1)*(q+1)*(d+1)/13) for j=0..1,q=0..1,d=0..3",
+      "proprio_formula": "proprio[r,j,a]=0.10*cos((pair(r)+1)*(j+1)*(a+1)/19) for j=0..1,a=0..19",
+      "teacher_matrix_formula": "W[a,c]=sqrt(2/20)*cos(pi*(a+0.5)*(c+1)/20) for a=0..19,c=0..2",
+      "end_of_bin_action_indices_by_future_horizon": [
+        7,
+        15,
+        23,
+        31
+      ],
+      "effect_formula": "raw_e[:,0,:]=0; for h=1..4 use the one-based horizon map {1:7,2:15,3:23,4:31} into zero-based global action indices and compute raw_e[r,h,c]=0.5*raw_e[r,h-1,c]+sum_a=0..19(u[r,end_index[h],a]*W[a,c]) in ascending a order; then independently for each h set e[:,h,:]=0.5*raw_e[:,h,:]/sqrt(mean_over_rows_then_channels_lexicographically(raw_e[:,h,:]^2))",
+      "target_formula": "target[:,0,:,:,:]=base[:,0,:,:,:]; target[:,h,c,0,0]=base[:,h,c,0,0]+e[:,h,c] for h=1..4,c=0..2",
+      "target_visibility": "TARGET_BYTES_ENTER_LOSS_ONLY",
+      "anchor_action_effect": 0.0,
+      "effect_rms_each_future_horizon": 0.5,
+      "required_float32_effect_rms_interval_each_horizon": [
+        0.499999,
+        0.500001
+      ],
+      "pair_non_action_tensor_relation": "BITWISE_EQUAL_WITHIN_EACH_PAIR",
+      "pair_action_relation": "NEGATION_ON_VALID_ACTION_SLOTS",
+      "pair_target_relation": "MUST_DIFFER_ON_EVERY_SCORED_HORIZON",
+      "no_clean_action_side_channel": true,
+      "no_future_video_side_channel": true,
+      "all_task_tensor_digests_must_be_materialized_before_model_construction": true,
+      "correct_mode": "use the registered valid action tensor at the real action-to-video seam",
+      "shuffle_mode": "replace each row seam action tensor by the fixed paired-row permutation while preserving masks/layout/timestep/noise/context/target bytes",
+      "shuffle_permutation": [
+        1,
+        0,
+        3,
+        2,
+        5,
+        4,
+        7,
+        6
+      ],
+      "shuffle_permutation_serialized": "[1,0,3,2,5,4,7,6]",
+      "shuffle_permutation_sha256": "93a9a618e0482688c85f8fc786cbaf7f845f69d5f48c356dd71881fb05d80dfd",
+      "no_action_mode": "replace every valid seam action slot by the model-owned exact-zero NO_ACTION value and keep padding exact zero",
+      "committed_history_mode": "correct/shuffled/no-action must transform the complete same-view action history consistently; no clean target history is visible",
+      "video_timesteps_by_chunk": [
+        701.0,
+        718.0
+      ],
+      "action_timesteps_by_chunk": [
+        503.0,
+        522.0
+      ],
+      "state_and_cache_lifecycle": {
+        "training_forward_mode": "CORRECT_ACTION_ONLY",
+        "optimizer_step_start": "FRESH_EMPTY_READONLY_RECURRENT_STATE_WITH_A_RECORDED_DIGEST",
+        "chunk0_to_chunk1": "PASS_ONLY_THE_DIFFERENTIABLE_SCRATCH_STATE_DERIVED_FROM_NOISY_VIDEO_NON_ACTION_INPUTS_AND_THE_CURRENT_MODE_ACTION_HISTORY; DO_NOT_READ_OR_COMMIT_TARGET_BYTES",
+        "live_mutable_cache_commit_during_training": false,
+        "state_detach_between_chunks": false,
+        "state_reuse_between_optimizer_steps": false,
+        "metric_modes_run_at_steps": "0_AND_AUTHORIZED_FINAL_N_ONLY",
+        "metric_mode_start": "the three reference modes share one reference_final_parameter_digest and owned clones of one reference_empty_state_digest; the three candidate modes share one candidate_final_parameter_digest and owned clones of one candidate_empty_state_digest",
+        "cross_arm_initial_state_relation": "reference and candidate empty states must have numerically bitwise-equal zero tensors plus identical layout and content-time, but model/staging identity digests are expected to differ",
+        "state_reuse_between_modes": false,
+        "mode_execution_order_may_change_outputs": false,
+        "mode_state_is_discarded_after_sequence": true,
+        "target_perturbation_required_relation": "BITWISE_NO_CHANGE_TO_ANY_PREDICTION_OR_RECURRENT_STATE",
+        "prediction_reverse_gradient_with_respect_to_target": "MUST_BE_NONE_OR_EXACT_ZERO",
+        "prediction_target_jvp": "MUST_BE_EXACT_ZERO",
+        "commit_semantics_diagnostic": "SEPARATE_UPDATE_FREE_SINGLE_PAIRED_COMMIT_CHECK_OUTSIDE_THE_OPTIMIZER; IDENTICAL_COMMIT_COUNT_AND_CONTENT_TIME_FOR_BOTH_ARMS; TARGET_BYTES_FORBIDDEN",
+        "commit_diagnostic_may_supply_training_loss": false
+      }
+    },
+    "initialization_and_seeds": {
+      "seed0": 202608030,
+      "conditional_confirmation_seed1": 202608031,
+      "conditional_confirmation_seed2": 202608032,
+      "shared_named_initialization_seed0": 2026080301,
+      "candidate_only_initialization_seed0": 2026080302,
+      "shared_named_initialization_seed1": 2026080311,
+      "candidate_only_initialization_seed1": 2026080312,
+      "shared_named_initialization_seed2": 2026080321,
+      "candidate_only_initialization_seed2": 2026080322,
+      "initializer_revision": "cach-av1-transition-proxy-v1",
+      "initializer_name_seed_formula": "derived_seed=big_endian_unsigned_integer_from_first_8_bytes_of_SHA256(UTF8(initializer_revision+\":\"+base_seed_decimal+\":\"+initializer_role+\":\"+exact_parameter_name))",
+      "shared_initializer_role": "shared_named_uniform_v1",
+      "candidate_only_initializer_role": "candidate_operator_named_uniform_v1",
+      "weight_initializer": "allocate CPU float32; create a fresh CPU torch.Generator per exact parameter name; manual_seed(derived_seed); under torch.no_grad call parameter.uniform_(-0.25/sqrt(fan_in),+0.25/sqrt(fan_in),generator=generator), where fan_in is the last shape dimension for rank>=2 and 1 otherwise",
+      "bias_initializer": "EXACT_FLOAT32_ZERO_FOR_EVERY_PARAMETER_NAME_ENDING_IN_.bias",
+      "candidate_action_output_projection_initializer": "EXACT_FLOAT32_ZERO_WEIGHTS_AND_BIASES_FOR_EVERY_blocks_i_action_output_projection",
+      "no_action_slot_initializer": "EXACT_FLOAT32_ZERO_AND_FROZEN",
+      "initializer_rule_precedence": "NO_ACTION_EXACT_ZERO_THEN_CANDIDATE_ACTION_OUTPUT_PROJECTION_EXACT_ZERO_THEN_ALL_REMAINING_BIASES_EXACT_ZERO_THEN_REMAINING_WEIGHTS_NAMED_UNIFORM",
+      "frozen_action_backbone_initializer": "apply the same shared named initializer and exact-zero bias rule to every action_backbone parameter, then freeze; constructor buffers are frozen and digested",
+      "initializer_iteration_order": "SORT_EXACT_PARAMETER_NAMES_BY_UTF8_BYTE_ORDER; EACH_NAME_HAS_AN_INDEPENDENT_GENERATOR_SO_ORDER_MAY_NOT_CHANGE_VALUES",
+      "theta0_manifest_before_any_forward": "materialize a name-sorted manifest of every parameter and buffer with exact name, role, shape, dtype, requires_grad and tensor SHA256; store per-arm full manifest digests in the future root before execution",
+      "theta0_tensor_digest_algorithm": "use the pinned hybrid_cache.tensor_digest on each detached tensor and canonical JSON SHA256 for the name-sorted manifest",
+      "theta0_common_parameter_relation": "every common parameter tensor digest must be pairwise equal between reference and candidate before any forward",
+      "common_parameter_values_must_match_at_theta0": true,
+      "candidate_action_output_projection_initialization": "EXACT_ZERO_WEIGHTS_AND_BIASES",
+      "reference_and_candidate_fresh_for_each_run": true,
+      "arm_execution_order": ["REF-GDN-CORRECTED", "CACH-A"],
+      "stochastic_layers_or_dropout_allowed": false,
+      "continuation_from_any_prior_screen_state": false,
+      "data_order": "SINGLE_FIXED_FULL_BATCH_NO_SHUFFLE"
+    },
+    "proposed_optimizer_not_active": {
+      "execution_authorized": false,
+      "name": "AdamW",
+      "learning_rate": 0.003,
+      "betas": [
+        0.9,
+        0.99
+      ],
+      "epsilon": 1e-08,
+      "weight_decay": 0.0,
+      "gradient_clip_global_l2": 1.0,
+      "parameter_scope": "reference optimizes exactly the generated common names; candidate optimizes exactly the same common names plus the generated candidate-only names",
+      "reference_and_candidate_use_same_common_parameter_scope": true,
+      "parameter_name_generation_contract": {
+        "common_exact_names": [
+          "video_input_projection.weight",
+          "video_input_projection.bias",
+          "video_timestep_projection.weight",
+          "video_output_projection.weight",
+          "video_output_projection.bias",
+          "proprio_context_encoder.weight",
+          "proprio_context_encoder.bias"
+        ],
+        "common_per_block_suffixes_for_i_0_through_19_under_blocks_i": [
+          "q_projection.weight",
+          "k_projection.weight",
+          "v_projection.weight",
+          "beta_projection.weight",
+          "beta_projection.bias",
+          "decay_projection.weight",
+          "decay_projection.bias",
+          "attention_output_projection.weight",
+          "attention_output_projection.bias",
+          "ffn_input_projection.weight",
+          "ffn_input_projection.bias",
+          "ffn_output_projection.weight",
+          "ffn_output_projection.bias"
+        ],
+        "candidate_only_exact_names": [
+          "action_conditioner.0.weight",
+          "action_conditioner.0.bias",
+          "action_conditioner.2.weight",
+          "action_conditioner.2.bias"
+        ],
+        "candidate_only_per_block_suffixes_for_i_0_through_19_under_blocks_i": [
+          "action_output_projection.weight",
+          "action_output_projection.bias"
+        ],
+        "frozen_name_prefixes": [
+          "action_backbone."
+        ],
+        "frozen_exact_names": [
+          "cach_core.no_action_slot"
+        ],
+        "no_action_slot_required_value_before_and_after_every_step": "EXACT_FLOAT32_ZERO",
+        "no_action_slot_requires_grad": false,
+        "unlisted_trainable_parameter_allowed": false,
+        "all_buffers_and_nontrainable_parameters_must_be_frozen_and_digested": true,
+        "optimizer_group_must_equal_generated_trainable_name_set": true
+      }
+    },
+    "budget_not_active": {
+      "execution_authorized": false,
+      "initial_run_optimizer_steps_per_arm_N": 200,
+      "initial_run_final_step_N": 200,
+      "initial_run_metric_steps": [0, 200],
+      "best_step_selection": false,
+      "intermediate_checkpoint_selection": false,
+      "initial_run_max_wall_seconds_total": 900,
+      "max_process_rss_bytes": 4294967296,
+      "max_root_bytes": 67108864,
+      "automatic_budget_extension": false,
+      "completion_rule": "BOTH_ARMS_MUST_COMPLETE_EXACTLY_THE_AUTHORIZED_N_STEPS",
+      "budget_failure_rule": "IF_EITHER_ARM_DOES_NOT_COMPLETE_N_OR_ANY_WALL_RSS_OR_ROOT_LIMIT_IS_EXCEEDED_RETURN_HARNESS_REJECTED_AND_DO_NOT_COMPUTE_GO_STOP_OR_INCONCLUSIVE"
+    },
+    "conditional_future_confirmation_frozen_before_seed0": {
+      "execution_authorized": false,
+      "expanded_recipe_sha256_rule": "SHA256_UTF8_OF_JQ_COMPACT_SORTED_JSON_PLUS_ITS_SINGLE_TRAILING_LF_FOR_THIS_CONFIRMATION_OBJECT_AFTER_DELETING_EXPANDED_RECIPE_SHA256_AND_EXPANDED_RECIPE_SHA256_RULE",
+      "expanded_recipe_sha256": "8dad54b92da710c2502753d3f4966b72e3d813b66239f78ca43425186d064997",
+      "required_precondition": "PROXY_GO_DOES_NOT_SELF_AUTHORIZE_ANY_FUTURE_STAGE",
+      "seed_ids": [
+        202608031,
+        202608032
+      ],
+      "expanded_synthetic_holdout_pair_ids": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19
+      ],
+      "expanded_rollout_horizon": 8,
+      "expanded_valid_raw_count": 65,
+      "expanded_valid_latent_count": 9,
+      "expanded_valid_action_count": 64,
+      "expanded_chunk_count": 3,
+      "expanded_chunk_valid_latent_counts": [3, 3, 3],
+      "expanded_chunk_action_slot_capacities": [16, 24, 24],
+      "expanded_chunk_valid_action_counts": [16, 24, 24],
+      "expanded_end_of_bin_action_indices": [7, 15, 23, 31, 39, 47, 55, 63],
+      "expanded_action_formula": "Use the exact seed0 action formula with pair ids 4..19, valid zero-based action index t=0..63, and action dimension a=0..19",
+      "expanded_teacher_formula": "Use the same W and raw_e recurrence through h=8; independently normalize each horizon over all 32 expanded rows and three channels to effect RMS 0.5 before splitting into microbatches",
+      "expanded_target_formula": "target[:,0,:,:,:]=base[:,0,:,:,:]; target[:,h,c,0,0]=base[:,h,c,0,0]+e[:,h,c] for h=1..8,c=0..2",
+      "expanded_non_action_formula": "Use the exact seed0 noisy_video/base/context/proprio formulas with l=0..8, chunks j=0..2, and pair ids 4..19",
+      "expanded_tensor_construction_contract": "Use the identical seed0 binary64 function, index, accumulation, cast, contiguity, and mask rules before slicing the 32 rows into microbatches",
+      "expanded_video_timesteps_by_chunk": [701.0, 718.0, 735.0],
+      "expanded_action_timesteps_by_chunk": [503.0, 522.0, 541.0],
+      "expanded_microbatch_pair_ids_in_order": [
+        [4, 5, 6, 7],
+        [8, 9, 10, 11],
+        [12, 13, 14, 15],
+        [16, 17, 18, 19]
+      ],
+      "expanded_microbatch_row_order": "FOR_EACH_PAIR_IN_LISTED_ORDER_EMIT_SIGN_PLUS_ONE_THEN_SIGN_MINUS_ONE_SO_EVERY_MICROBATCH_HAS_BATCH_SIZE_8",
+      "expanded_training_slice": "synthetic_counterfactual_pairs_0000_0003",
+      "expanded_holdout_slice": "synthetic_counterfactual_pairs_0004_0019",
+      "expanded_data_order": "FOUR_MICROBATCHES_IN_THE_LISTED_ORDER_WITH_NO_SHUFFLE",
+      "expanded_evaluation_only": true,
+      "real_data_episode_and_window_ids": "MUST_BE_FROZEN_IN_A_SEPARATE_AV2_CARD_BEFORE_REAL_DATA_ACCESS_OR_RESULTS"
+    },
+    "implementation_sources_observed_not_executed": {
+      "transition_proxy": {
+        "path": "src/sana_wam/model/cach_minimal_cpu.py",
+        "sha256": "2b91b3ce76a560034ddeb03cf634de1acb72807d1a5d37b2d14c14acbaabefa8"
+      },
+      "production_shaped_phase_c": {
+        "path": "src/sana_wam/model/cach_production_path_mini.py",
+        "sha256": "2afa851fc0294f8b14c1425ebf78b89c498c76fdb89638f54c5f2e3fe04aef87"
+      },
+      "action_reducer": {
+        "path": "src/sana_wam/cach/action_conditioning.py",
+        "sha256": "8323efa1544d5c0520e13192b55ed5f2e85490d03ac21c558d6009db38ee11c6"
+      },
+      "typed_layout": {
+        "path": "src/sana_wam/model/action_chunk_layout.py",
+        "sha256": "8e6521a93614b4ce7e43ba51d2af4f67d2650b03cc60e7d7a152e36dfa3c8e39"
+      },
+      "active_vendor_gdn_class": {
+        "path": "third_party/Sana/diffusion/model/nets/sana_gdn_blocks_triton.py",
+        "sha256": "0ae10e7a09005c60cfac1fcb1035ff3495f80024cfb2e3f01b96b84e0adf3933"
+      },
+      "active_production_action_seam": {
+        "path": "third_party/Sana/diffusion/model/nets/sana_multi_scale_video_camctrl.py",
+        "sha256": "bfbd72dfb22a44e2843f1985049ecfbb1f887f5e5f5ed852905c4670e2029fbe"
+      },
+      "candidate_non_drop_in_torch_reference": {
+        "path": "third_party/Sana/diffusion/model/nets/sana_v2v_attn_blocks.py",
+        "sha256": "a7b7a32482760518868b7d82dd97c6da6d91d24cc4440d00139e37480d48e689",
+        "classification": "DIFFERENT_V2V_BLOCK_FAMILY_NOT_REFERENCE_OPERATOR"
+      },
+      "vendor_autograd_entry": {
+        "path": "third_party/Sana/diffusion/model/ops/fused_gdn.py",
+        "sha256": "863cbbb601ddebc5666179e2b209b777d5dc213c94a1450cde695a33b0a8aded"
+      },
+      "vendor_chunkwise_entry": {
+        "path": "third_party/Sana/diffusion/model/ops/fused_gdn_chunkwise.py",
+        "sha256": "3af972561f924f76c2af10ff2ac34debf386f4011703c41d8403e80ee9a0f558"
+      }
+    },
+    "operator_bridge_observation": {
+      "drop_in_cpu_reference_operator_exists": false,
+      "v2v_torch_recurrence_may_be_called_reference_operator_now": false,
+      "av1b_shortest_path": "DIRECT_CHUNKCAUSALGDNTriton_USE_AUTOGRAD_KERNEL_TRUE_ON_ONE_EXPLICITLY_RESERVED_GPU",
+      "av1b_initial_operator_level_if_used": "VENDOR_KERNEL",
+      "av1b_initial_integration_path_if_used": "EXPERIMENTAL_PATH",
+      "av1b_requires_separate_authority": true,
+      "av1b_not_authorized_by_this_card": true
+    },
+    "planned_command_not_authorized": "./.venv/bin/python scripts/run_cach_av1_transition_proxy.py --config configs/experiments/cach_av1_transition_proxy.yaml --root EXACT_AUTHORIZED_ROOT"
+  },
+  "metric_contract": {
+    "accumulator_dtype": "float64",
+    "epsilon": 1e-12,
+    "score_mask": "M is boolean [B,H]=[8,4] over batch rows and future horizons only; M is all true for h=1..4; anchor, channel, and padding axes are not part of M",
+    "score_mask_numerator": "sum_over_b_h_c M[b,h]*(prediction[b,h,c]-target[b,h,c])^2",
+    "score_mask_denominator": "latent_channels*sum_over_b_h M[b,h]",
+    "train_loss_formula": "mean_h=1..4 MSE_correct_h with equal weights 0.25; video only",
+    "mse_mode_formula": "sum(score_mask*(prediction_mode-target)^2)/(latent_channels*sum(score_mask_over_batch_and_time))",
+    "mse_horizon_formula": "mean over batch and latent_channels of squared error at exact future horizon h",
+    "primary_1_2_4_formula": "0.20*MSE_h1+0.30*MSE_h2+0.50*MSE_h4",
+    "primary_horizon_weights": {
+      "1": 0.2,
+      "2": 0.3,
+      "4": 0.5
+    },
+    "counterfactual_delta_nmse_formula": "sum_i,h=1..4,c(((pred[2i]-pred[2i+1])-(target[2i]-target[2i+1]))^2)/(sum_i,h=1..4,c((target[2i]-target[2i+1])^2)+epsilon)",
+    "counterfactual_delta_nmse_h_formula": "for each h separately, sum_i,c(((pred[2i,h,c]-pred[2i+1,h,c])-(target[2i,h,c]-target[2i+1,h,c]))^2)/(sum_i,c((target[2i,h,c]-target[2i+1,h,c])^2)+epsilon)",
+    "loss_drop_rel_formula": "(candidate_train_loss_correct_step0-candidate_train_loss_correct_stepN)/max(candidate_train_loss_correct_step0,epsilon), where N is the exact final step in the separately authorized initial or review budget",
+    "shuffle_gap_rel_formula": "(primary_shuffle_stepN-primary_correct_stepN)/max(primary_shuffle_stepN,epsilon)",
+    "no_action_gap_rel_formula": "(primary_no_action_stepN-primary_correct_stepN)/max(primary_no_action_stepN,epsilon)",
+    "candidate_gain_vs_reference_formula": "(primary_reference_stepN-primary_candidate_correct_stepN)/max(primary_reference_stepN,epsilon)",
+    "shuffle_gap_rel_h_formula": "for exact horizon h, (MSE_shuffle_h_stepN-MSE_correct_h_stepN)/max(MSE_shuffle_h_stepN,epsilon)",
+    "no_action_gap_rel_h_formula": "for exact horizon h, (MSE_no_action_h_stepN-MSE_correct_h_stepN)/max(MSE_no_action_h_stepN,epsilon)",
+    "seam_grad_rms_step0_formula": "sqrt(sum(grad^2)/numel) over candidate per-block action-to-video output-projection WEIGHTS only; biases excluded",
+    "seam_update_rms_final_formula": "sqrt(sum((weight_stepN-weight_step0)^2)/numel) over the same candidate output-projection WEIGHTS only; biases excluded",
+    "finite_all_scope": "all losses, outputs, recurrent states, gradients, parameter updates, and reported metrics",
+    "final_step_only": true,
+    "best_step_forbidden": true,
+    "validity_requirements": {
+      "pair_non_action_digests_exact_equal": true,
+      "pair_action_digests_must_differ": true,
+      "pair_target_digests_must_differ": true,
+      "theta0_candidate_reference_output_bitwise_equal": true,
+      "theta0_candidate_reference_output_bitwise_equal_in_correct_shuffle_and_no_action_modes": true,
+      "trained_reference_pair_predictions_bitwise_equal": true,
+      "trained_reference_correct_shuffle_and_no_action_outputs_bitwise_equal": true,
+      "no_action_candidate_pair_predictions_bitwise_equal": true,
+      "candidate_no_action_slot_remains_exact_zero_and_update_free": true,
+      "reference_counterfactual_delta_nmse_abs_difference_from_one_max_each_horizon_1_2_3_4": 1e-06,
+      "target_counterfactual_delta_rms_interval_each_horizon_1_2_3_4": [0.999998, 1.000002],
+      "valid_action_exact_once_and_padding_zero": true,
+      "correct_shuffle_no_action_non_seam_bytes_bitwise_equal": true,
+      "no_future_target_or_clean_action_side_channel": true,
+      "target_perturbation_changes_any_prediction_or_state": false,
+      "prediction_target_reverse_gradient_or_jvp_nonzero": false,
+      "within_each_arm_all_modes_start_from_that_arms_same_empty_state_digest_and_do_not_share_live_state": true,
+      "cross_arm_empty_state_identity_digest_equality_required": false,
+      "cross_arm_empty_state_zero_tensor_layout_and_content_time_bitwise_equality_required": true
+    },
+    "proxy_go_thresholds_all_required": {
+      "finite_all": true,
+      "theta0_exact_identity": true,
+      "seam_grad_rms_step0_strictly_greater_than": 1e-08,
+      "seam_update_rms_final_strictly_greater_than": 1e-06,
+      "loss_drop_rel_min": 0.8,
+      "counterfactual_delta_nmse_correct_max": 0.25,
+      "counterfactual_delta_nmse_correct_h1_max": 0.35,
+      "counterfactual_delta_nmse_correct_h2_max": 0.35,
+      "counterfactual_delta_nmse_correct_h4_max": 0.35,
+      "shuffle_gap_rel_min": 0.5,
+      "shuffle_gap_rel_h1_min": 0.25,
+      "shuffle_gap_rel_h2_min": 0.25,
+      "shuffle_gap_rel_h4_min": 0.25,
+      "no_action_gap_rel_min": 0.5,
+      "no_action_gap_rel_h1_min": 0.25,
+      "no_action_gap_rel_h2_min": 0.25,
+      "no_action_gap_rel_h4_min": 0.25,
+      "candidate_gain_vs_reference_min": 0.5
+    },
+    "proxy_strong_stop_thresholds_all_required": {
+      "valid_data_implementation_and_numerics": true,
+      "seam_grad_rms_step0_strictly_greater_than": 1e-08,
+      "seam_update_rms_final_strictly_greater_than": 1e-06,
+      "loss_drop_rel_max": 0.1,
+      "counterfactual_delta_nmse_correct_min": 0.9,
+      "shuffle_gap_rel_max": 0.05,
+      "no_action_gap_rel_max": 0.05,
+      "candidate_gain_vs_reference_max": 0.05
+    },
+    "review_band": "ANY_VALID_RESULT_MATCHING_NEITHER_ALL_GO_NOR_ALL_STRONG_STOP_CONDITIONS",
+    "threshold_kind": "SCREENING_NOT_SCIENTIFIC"
+  },
+  "review_token": {
+    "token_id": "cadfd92f1c72ebd9cc9aa8bfad029ddc6f0e72d9f7942f34e74629ca1ae37252",
+    "chain_scope": "AV-1_THROUGH_AV-4_EXACTLY_ONCE",
+    "ledger_contract": {
+      "canonical_claim_path_template": "/DATA/share/sana_cach_wam_nonformal_screens/token_ledgers/{full_card_sha256}/cadfd92f1c72ebd9cc9aa8bfad029ddc6f0e72d9f7942f34e74629ca1ae37252.claim.json",
+      "resolved_claim_path": null,
+      "claim_creation_authorized": false,
+      "future_authority_must_bind_exact_claim_path_and_write_permission": true,
+      "future_authority_must_bind_latest_token_state_head_path_and_full_sha256": true,
+      "review_execution_must_be_serial_and_concurrent_review_authority_is_forbidden": true,
+      "preclaim_must_not_exist": true,
+      "claim_must_use_atomic_exclusive_create": true,
+      "provisional_root_typed_state": "VALID_REVIEW_PROVISIONAL_NO_VERDICT",
+      "claim_payload_must_bind_full_card_pin_prior_result_full_pin_current_frozen_provisional_result_full_pin_current_raw_evidence_full_pin_current_freeze_receipt_full_pin_choice_authority_full_pin_root_nonce_AND_THE_FINAL_TYPED_VERDICT_WITH_ALL_FINAL_METRICS": true,
+      "claim_timing": "AFTER_THE_REVIEW_RUN_HAS_A_FROZEN_VALID_REVIEW_PROVISIONAL_NO_VERDICT_RESULT_AND_AFTER_THE_FINAL_TYPED_VERDICT_HAS_BEEN_COMPUTED",
+      "invalid_blocked_or_resource_failed_review_must_not_attempt_claim": true,
+      "successful_complete_claim_is_simultaneously_the_only_consumed_chain_head_AND_THE_FINAL_IMMUTABLE_REVIEW_RESULT_AND_VERDICT_PUBLICATION": true,
+      "no_postclaim_verdict_write_is_allowed_or_required": true,
+      "incomplete_or_noncanonical_claim_file_state": "TOKEN_LEDGER_CORRUPT_FAIL_CLOSED_NO_VERDICT_NO_SECOND_CLAIM_WITHOUT_NEW_EXPLICIT_RECOVERY_AUTHORITY",
+      "second_or_forked_claim_must_fail_closed": true,
+      "claim_race_loser_state": "CALLER_TRANSCRIPT_HARNESS_REJECTED_WITH_VALIDITY_REASON_TOKEN_CLAIM_CONFLICT_NO_ARCHITECTURE_VERDICT_AND_VALID_REVIEW_PROVISIONAL_ROOT_REMAINS_FROZEN"
+    },
+    "initial_state": "UNCONSUMED",
+    "consumed_by": null,
+    "selection_rule": "IF_CONSUMED_SELECT_EXACTLY_ONE_ALLOWED_CHOICE",
+    "allowed_choices": [
+      "BUG_FIX_FRESH_REVISION_FRESH_ROOT_FRESH_INITIALIZATION_200_STEPS",
+      "NO_BUG_BUDGET_EXTENSION_FRESH_ROOT_FRESH_INITIALIZATION_300_STEPS"
+    ],
+    "simultaneous_or_sequential_use_of_both_choices_forbidden": true,
+    "bug_fix_budget": {
+      "final_step_N": 200,
+      "metric_steps": [0, 200],
+      "max_wall_seconds_total": 900
+    },
+    "no_bug_extension_budget": {
+      "final_step_N": 300,
+      "metric_steps": [0, 300],
+      "max_wall_seconds_total": 1350
+    },
+    "blocked_invalid_or_resource_failure_consumes_token": false,
+    "consumption_artifact_required_bindings": [
+      "run_card_self_path_and_full_sha256",
+      "prior_result_path_and_full_sha256",
+      "current_frozen_provisional_result_path_and_full_sha256",
+      "current_raw_evidence_path_and_full_sha256",
+      "current_root_freeze_receipt_path_and_full_sha256",
+      "final_exact_typed_verdict_and_all_final_metrics",
+      "token_id",
+      "selected_choice",
+      "new_authority_artifact_path_and_full_sha256",
+      "new_exact_root_and_nonce",
+      "fresh_initialization_digest"
+    ],
+    "consumption_record_location": "THE_CANONICAL_ATOMIC_TOKEN_CLAIM_ARTIFACT_IS_ITSELF_THE_FINAL_IMMUTABLE_REVIEW_RESULT",
+    "mutate_this_card_on_consumption": false
+  },
+  "verdict_contract": {
+    "initial_state": "NOT_RUN",
+    "observed_verdict": null,
+    "raw_evidence_pin": null,
+    "result_must_be_separate_immutable_artifact_except_precreate_auth_or_env_block": true,
+    "precreate_auth_or_env_block_exception": "when blocked before root creation and before any filesystem write, an immutable caller transcript event id plus its platform pin is sufficient; resolved_root is null and no separate filesystem result artifact is required",
+    "result_required_fields": [
+      "exact_typed_state",
+      "operator_level",
+      "integration_path",
+      "validity_reason",
+      "raw_evidence_sha256",
+      "run_card_self_path_and_full_sha256",
+      "review_token_id_and_consumption_state",
+      "code_and_config_pins",
+      "resolved_root_or_null_only_for_precreate_block",
+      "root_lifecycle_and_freeze_receipt_or_precreate_transcript_event_id_and_pin",
+      "authority_pin"
+    ],
+    "av1_allowed_states": [
+      "AUTH_BLOCKED",
+      "ENV_BLOCKED",
+      "HARNESS_REJECTED",
+      "INVALID_RUN",
+      "IMPLEMENTATION_INVALID",
+      "NUMERICAL_INVALID",
+      "VALID_REVIEW_PROVISIONAL_NO_VERDICT",
+      "PROXY_GO",
+      "PROXY_STOP",
+      "PROXY_INCONCLUSIVE"
+    ],
+    "proxy_go_effect": "MAY_REQUEST_AV1B_AUTHORITY_ONLY",
+    "valid_review_provisional_effect": "NO_ARCHITECTURE_VERDICT_AND_NO_STAGE_UNLOCK; ONLY_A_SUCCESSFUL_COMPLETE_CANONICAL_TOKEN_CLAIM_CAN_ATOMICALLY_PUBLISH_THE_FINAL_REVIEW_VERDICT",
+    "proxy_stop_effect": "STOP_PROXY_BRANCH_ACTUAL_ARCHITECTURE_REMAINS_NOT_ASSESSED",
+    "proxy_inconclusive_effect": "MAY_CONSUME_THE_SINGLE_REVIEW_TOKEN_ONLY_UNDER_A_NEW_EXACT_AUTHORITY",
+    "invalid_state_is_architecture_negative_evidence": false,
+    "global_gate_effect": "NONE"
+  },
+  "current_effect": {
+    "scope": "THIS_AV0_ACTION_ONLY",
+    "card_freeze_only": true,
+    "root_created": false,
+    "execution_performed": false,
+    "files_other_than_card_written": false,
+    "scientific_eligible": false,
+    "formal_admission_evidence": false,
+    "global_gates_unchanged": true,
+    "next_action": "REQUEST_EXPLICIT_AV1_CODE_CPU_OPTIMIZER_UPDATE_TEST_AND_EXACT_ROOT_AUTHORITY"
+  }
+}

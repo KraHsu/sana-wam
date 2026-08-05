@@ -1,0 +1,153 @@
+schema: cach.av1.transition_proxy.config.v1
+identity:
+  canonical_host: H200
+  canonical_worktree: /home/zch/workspace/sana-wam
+  run_card_path: docs/cach_sana_wam/architecture_validation/av1/AV0_RUN_CARD.json
+  run_card_sha256: c73a943047295338cd9de14e6e53199b463ea66ae92b99d4b0b3393f5ec34030
+  governing_plan_path: docs/cach_sana_wam/global_stage3/post_phase_c_planning/ARCHITECTURE_VALIDATION_FIRST_PLAN_20260803_v1.md
+  governing_plan_sha256: 06f5d09127f8bc2a945cdbdc095054f40b1fe8d9757a90eccbdf0604ea89e079
+  phase_c_fixed_member_list_path: docs/cach_sana_wam/global_stage3/phase_c_production_path_mini/PHASE_C_SOURCE_FILES.txt
+  phase_c_fixed_member_list_sha256: 59ff254f82f546a8f0102d7fa03a340392da4a879a46ae8e267357db762cb216
+  resolved_root: /DATA/share/sana_cach_wam_nonformal_screens/av1/06f5d09127f8/c73a94304729-d755b67c667d9a22686c8d90d187832d
+  run_nonce: d755b67c667d9a22686c8d90d187832d
+authority:
+  statement: "授权在 H200 执行 AV‑1：新增卡片中固定的四个代码/config/runner/test 文件，创建上述唯一 non-formal root，运行 CPU synthetic 轻量测试、forward/backward/JVP、AdamW 200-step 参数更新和诊断指标；禁止 GPU、真实数据、checkpoint、完整 2B、正式评测及 Global Stage 3。"
+  statement_sha256: d6007c24ae618896aef4b679999afeb51c0a2f5f279f1cc2f6c0e2d46e77ef5c
+  statement_sha256_rule: SHA256_UTF8_WITHOUT_TRAILING_NEWLINE
+  code_write: true
+  screen_root_create: true
+  cpu_execute: true
+  model_construct: true
+  forward_backward: true
+  jvp_diagnostic: true
+  optimizer_construct: true
+  parameter_update: true
+  lightweight_tests: true
+  training: true
+  diagnostic_metrics: true
+  gpu_or_cuda_or_jit: false
+  real_data_access: false
+  checkpoint_load: false
+  checkpoint_save: false
+  full_2b: false
+  formal_evaluation: false
+  global_stage3: false
+classification:
+  operator_level: TRANSITION_PROXY
+  integration_path: EXPERIMENTAL_PATH
+  experiment_kind: TEACHER_ACTION_MECHANISM_SCREEN
+  result_scope: PROXY_ONLY_ACTUAL_ARCHITECTURE_NOT_ASSESSED
+  root_label: NON_FORMAL_ARCHITECTURE_SCREEN / IMMUTABLE / NOT_ADMISSION_EVIDENCE
+runtime:
+  device: cpu
+  dtype: float32
+  single_process: true
+  cuda_visible_devices: ""
+  allow_cuda_initialization: false
+  allow_compile_or_jit: false
+  allow_checkpoint: false
+  allow_real_data: false
+  allow_network: false
+topology:
+  batch_size: 8
+  counterfactual_pair_count: 4
+  latent_channels: 3
+  spatial_height: 1
+  spatial_width: 1
+  hidden_dim: 4
+  context_dim: 4
+  context_token_count: 2
+  action_dim: 20
+  gdn_depth: 20
+  gdn_heads: 1
+  frame_chunk_size: 3
+  temporal_compression: 8
+  video_stride: 1
+  valid_raw_count: 33
+  valid_latent_count: 5
+  valid_action_count: 32
+  chunk_count: 2
+  chunk_valid_latent_counts: [3, 2]
+  chunk_action_slot_capacities: [16, 24]
+  chunk_valid_action_counts: [16, 16]
+  scored_future_horizons: [1, 2, 3, 4]
+  reported_rollout_horizons: [1, 2, 4]
+  action_backbone: REAL_ACTIONDIT_JOINT_CROSS_ATTN_DEPTH20_FROZEN_DIAGNOSTIC_ONLY
+recipe:
+  task_recipe_sha256: 9d2a749d722775324ee233862772def530fbffe0ea9e55aeea87c160b87a51e4
+  expanded_recipe_sha256: 8dad54b92da710c2502753d3f4966b72e3d813b66239f78ca43425186d064997
+  slice_id: synthetic_counterfactual_pairs_0000_0003
+  shuffle_permutation: [1, 0, 3, 2, 5, 4, 7, 6]
+  shuffle_permutation_sha256: 93a9a618e0482688c85f8fc786cbaf7f845f69d5f48c356dd71881fb05d80dfd
+  video_timesteps_by_chunk: [701.0, 718.0]
+  action_timesteps_by_chunk: [503.0, 522.0]
+initialization:
+  seed0: 202608030
+  shared_named_seed: 2026080301
+  candidate_only_seed: 2026080302
+  initializer_revision: cach-av1-transition-proxy-v1
+  shared_role: shared_named_uniform_v1
+  candidate_role: candidate_operator_named_uniform_v1
+  named_uniform_bound_numerator: 0.25
+  zero_all_biases: true
+  zero_candidate_action_output_projection: true
+  freeze_no_action_slot: true
+  freeze_action_backbone: true
+optimizer:
+  name: AdamW
+  learning_rate: 0.003
+  betas: [0.9, 0.99]
+  epsilon: 1.0e-8
+  weight_decay: 0.0
+  gradient_clip_global_l2: 1.0
+budget:
+  optimizer_steps_per_arm: 200
+  final_step: 200
+  metric_steps: [0, 200]
+  max_wall_seconds_total: 900
+  max_process_rss_bytes: 4294967296
+  max_root_bytes: 67108864
+  best_step_selection: false
+  intermediate_checkpoint_selection: false
+metrics:
+  accumulator_dtype: float64
+  epsilon: 1.0e-12
+  primary_horizon_weights:
+    1: 0.2
+    2: 0.3
+    4: 0.5
+thresholds:
+  proxy_go:
+    seam_grad_rms_step0_gt: 1.0e-8
+    seam_update_rms_final_gt: 1.0e-6
+    loss_drop_rel_min: 0.8
+    counterfactual_delta_nmse_correct_max: 0.25
+    counterfactual_delta_nmse_correct_h1_max: 0.35
+    counterfactual_delta_nmse_correct_h2_max: 0.35
+    counterfactual_delta_nmse_correct_h4_max: 0.35
+    shuffle_gap_rel_min: 0.5
+    shuffle_gap_rel_h1_min: 0.25
+    shuffle_gap_rel_h2_min: 0.25
+    shuffle_gap_rel_h4_min: 0.25
+    no_action_gap_rel_min: 0.5
+    no_action_gap_rel_h1_min: 0.25
+    no_action_gap_rel_h2_min: 0.25
+    no_action_gap_rel_h4_min: 0.25
+    candidate_gain_vs_reference_min: 0.5
+  proxy_strong_stop:
+    seam_grad_rms_step0_gt: 1.0e-8
+    seam_update_rms_final_gt: 1.0e-6
+    loss_drop_rel_max: 0.1
+    counterfactual_delta_nmse_correct_min: 0.9
+    shuffle_gap_rel_max: 0.05
+    no_action_gap_rel_max: 0.05
+    candidate_gain_vs_reference_max: 0.05
+artifacts:
+  write_model_checkpoint: false
+  write_optimizer_state: false
+  write_raw_metrics: true
+  write_loss_trace: true
+  write_theta0_manifests: true
+  write_final_parameter_digests: true
+  freeze_root_on_every_postcreate_terminal: true
+  chmod_frozen_mode: "0555_dirs_0444_files"

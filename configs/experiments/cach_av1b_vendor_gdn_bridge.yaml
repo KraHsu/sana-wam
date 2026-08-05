@@ -1,0 +1,436 @@
+schema: cach.av1b.vendor_gdn_bridge.config.v1
+
+identity:
+  canonical_host: H200
+  canonical_worktree: /home/zch/workspace/sana-wam
+  run_card_path: docs/cach_sana_wam/architecture_validation/av1b/AV1B_RUN_CARD.json
+  run_card_sha256: c0e15bcb8c20441d7d989ec6d375284e45f24962c98e15b984dbbbbd198248fb
+  governing_plan_path: docs/cach_sana_wam/global_stage3/post_phase_c_planning/ARCHITECTURE_VALIDATION_FIRST_PLAN_20260803_v1.md
+  governing_plan_sha256: 06f5d09127f8bc2a945cdbdc095054f40b1fe8d9757a90eccbdf0604ea89e079
+  predecessor_av0_card_path: docs/cach_sana_wam/architecture_validation/av1/AV0_RUN_CARD.json
+  predecessor_av0_card_sha256: c73a943047295338cd9de14e6e53199b463ea66ae92b99d4b0b3393f5ec34030
+  predecessor_av1_root: /DATA/share/sana_cach_wam_nonformal_screens/av1/06f5d09127f8/c73a94304729-d755b67c667d9a22686c8d90d187832d
+  predecessor_av1_result_sha256: b7b23642d5772efb09e3c0ff09cb1aead3d5834b70b325ddc8b1c10d7438303e
+  predecessor_av1_raw_evidence_sha256: e6fd480994ee7768366e76881162c9929283185c3e8b2e1ffb4e0caaa3e21357
+  predecessor_av1_freeze_receipt_sha256: c093b2b067c6390f2439c6132b08a31ab6e04869ec314b7ebc4c164673c9c774
+  predecessor_av1_typed_state: PROXY_GO
+  resolved_root: /DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3
+  run_nonce: 1a9a3a6ca4b18fac904fdb806c2a8fb3
+  gpu_physical_index: 7
+  gpu_uuid: GPU-41c95a43-ce96-fff3-33e0-739a3931d603
+  generated_paths:
+    bridge:
+      path: src/sana_wam/model/cach_av1b_vendor_gdn_bridge.py
+      sha256: RUNTIME_BIND_FULL_SHA256_BEFORE_ROOT_CREATE_OR_VENDOR_IMPORT
+    config:
+      path: configs/experiments/cach_av1b_vendor_gdn_bridge.yaml
+      sha256: RUNTIME_BIND_FULL_SHA256_BEFORE_ROOT_CREATE_OR_VENDOR_IMPORT
+    runner:
+      path: scripts/run_cach_av1b_vendor_gdn_bridge.py
+      sha256: RUNTIME_BIND_FULL_SHA256_BEFORE_ROOT_CREATE_OR_VENDOR_IMPORT
+    test:
+      path: tests/test_cach_av1b_vendor_gdn_bridge.py
+      sha256: RUNTIME_BIND_FULL_SHA256_BEFORE_ROOT_CREATE_OR_VENDOR_IMPORT
+  source_pins:
+    development_plan:
+      path: docs/CAUSAL_ACTION_CONDITIONED_HYBRID_SANA_WAM_DEVELOPMENT_PLAN_20260731.md
+      sha256: 969d9668ffed07176844fcbd84062825f9d5f0af0325959b0068c38fe481f0dd
+    av1_transition_proxy:
+      path: src/sana_wam/model/cach_av1_transition_proxy.py
+      sha256: fa01453769dec24927bdb31b42147e1ecd3e1a77700aaf686b0ce964a77eebcf
+    av1_config:
+      path: configs/experiments/cach_av1_transition_proxy.yaml
+      sha256: e12f052ee63d3e93c69ddc58146b1ee18d1d1eef39c8e85b2fa38e11f91c6361
+    av1_runner:
+      path: scripts/run_cach_av1_transition_proxy.py
+      sha256: d0714ea1e09436980c72f477d131a1350e94eef89c564de4a90068c7ce905a4a
+    av1_test:
+      path: tests/test_cach_av1_transition_proxy.py
+      sha256: 2cb3e0578a72abd2cf9fe283740590fb3529397f870e421e704f3a58ef29c8d6
+    action_reducer:
+      path: src/sana_wam/cach/action_conditioning.py
+      sha256: 8323efa1544d5c0520e13192b55ed5f2e85490d03ac21c558d6009db38ee11c6
+    phase_c_fixed_member_list:
+      path: docs/cach_sana_wam/global_stage3/phase_c_production_path_mini/PHASE_C_SOURCE_FILES.txt
+      sha256: 59ff254f82f546a8f0102d7fa03a340392da4a879a46ae8e267357db762cb216
+    typed_layout:
+      path: src/sana_wam/model/action_chunk_layout.py
+      sha256: 8e6521a93614b4ce7e43ba51d2af4f67d2650b03cc60e7d7a152e36dfa3c8e39
+    vendor_base_gdn:
+      path: third_party/Sana/diffusion/model/nets/sana_gdn_blocks.py
+      sha256: ef15578c63f9815d670dc3ef4cf2876c4f236754bfdfb0d2070da387048a495e
+    vendor_triton_gdn:
+      path: third_party/Sana/diffusion/model/nets/sana_gdn_blocks_triton.py
+      sha256: 0ae10e7a09005c60cfac1fcb1035ff3495f80024cfb2e3f01b96b84e0adf3933
+    vendor_chunk_boundary_utility:
+      path: third_party/Sana/diffusion/utils/chunk_utils.py
+      sha256: b1b4185b2ebfdb550cbea45dd104c956260ce99e2eeb097896bab80cd1b546ef
+    vendor_autograd_kernel:
+      path: third_party/Sana/diffusion/model/ops/fused_gdn.py
+      sha256: 863cbbb601ddebc5666179e2b209b777d5dc213c94a1450cde695a33b0a8aded
+    vendor_stateful_chunkwise_observed_not_used:
+      path: third_party/Sana/diffusion/model/ops/fused_gdn_chunkwise.py
+      sha256: 3af972561f924f76c2af10ff2ac34debf386f4011703c41d8403e80ee9a0f558
+    production_action_seam:
+      path: third_party/Sana/diffusion/model/nets/sana_multi_scale_video_camctrl.py
+      sha256: bfbd72dfb22a44e2843f1985049ecfbb1f887f5e5f5ed852905c4670e2029fbe
+    non_reference_v2v_family:
+      path: third_party/Sana/diffusion/model/nets/sana_v2v_attn_blocks.py
+      sha256: a7b7a32482760518868b7d82dd97c6da6d91d24cc4440d00139e37480d48e689
+      classification: DIFFERENT_V2V_BLOCK_FAMILY_NOT_REFERENCE_OPERATOR
+    hybrid_cache_digest_utility:
+      path: src/sana_wam/model/video_backbone/sana/hybrid_cache.py
+      sha256: 5b61ab6492670e8021b3603f965e9f3e8921e9d7f0ea77b49e40d92a77f78a74
+
+authority:
+  execution_statement: "授权在 H200 严格按 docs/cach_sana_wam/architecture_validation/av1b/AV1B_RUN_CARD.json SHA256c0e15bcb8c20441d7d989ec6d375284e45f24962c98e15b984dbbbbd198248fb 执行 AV‑1B：仅新增卡内固定的 src/sana_wam/model/cach_av1b_vendor_gdn_bridge.py、configs/experiments/cach_av1b_vendor_gdn_bridge.yaml、scripts/run_cach_av1b_vendor_gdn_bridge.py、tests/test_cach_av1b_vendor_gdn_bridge.py；创建 root /DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3（nonce1a9a3a6ca4b18fac904fdb806c2a8fb3）；独占预留并使用物理 GPU 7 / UUID GPU-41c95a43-ce96-fff3-33e0-739a3931d603；允许 CUDA/Triton JIT、vendor autograd kernel、模型构造与执行、forward/backward、卡内局部JVP、每臂 AdamW 200-step synthetic non-formal training、轻量测试和诊断指标；禁止真实数据、checkpoint load/JVP、每臂 AdamW 200-step synthetic non-formal training、轻量测试和诊断指标；禁止真实数据、checkpoint load/review token，所有已创建 terminal root 必须 fail-closed 冻结。"
+  execution_statement_sha256: d96e7681321ef58d1450632d6816be95733605fe392dc9781205ac7e4d565dd4
+  confirmation_statement: "确认允许卡内局部 JVP 和每臂 AdamW 200-step synthetic non-formal training；禁止真实数据、checkpoint load/save 和 review token 消费；其余严格按卡片 SHA256c0e15bcb8c20441d7d989ec6d375284e45f24962c98e15b984dbbbbd198248fb 执行。"
+  confirmation_statement_sha256: 6ba9eaf13617f87b87c09b0f3ca64b72403c84188011e0e9185f304c3365a654
+  statement_sha256_rule: SHA256_UTF8_WITHOUT_TRAILING_NEWLINE
+  effective_interpretation: CLARIFICATION_CONTROLS_AND_PERMITS_CARD_LOCAL_JVP_AND_TWO_ARM_200_STEP_SYNTHETIC_TRAINING
+  review_token_state: UNCONSUMED
+  capabilities:
+    code_write: true
+    root_create: true
+    single_gpu: true
+    cuda: true
+    triton_jit: true
+    vendor_autograd_kernel: true
+    model_execute: true
+    forward_backward: true
+    jvp: true
+    optimizer: true
+    parameter_update: true
+    synthetic_nonformal_training: true
+    lightweight_tests: true
+    diagnostic_metrics: true
+    real_data: false
+    checkpoint_load: false
+    checkpoint_save: false
+    review_token_consume: false
+    full_2b: false
+    formal_evaluation: false
+    admission: false
+    deploy_capture: false
+    av2: false
+    global_stage3: false
+
+classification:
+  pair: [REF-GDN-CORRECTED, CACH-A]
+  only_semantic_delta: CACH-A_ONLY_ACTION_TO_VIDEO_SEAM
+  operator_level: VENDOR_KERNEL
+  integration_path: EXPERIMENTAL_PATH
+  experiment_kind: TEACHER_ACTION_MECHANISM_SCREEN
+  result_scope: SYNTHETIC_SINGLE_BATCH_SINGLE_CALL_VENDOR_OPERATOR_ONLY
+  architecture_conclusion_scope: ACTUAL_VENDOR_GDN_LEARNABILITY_AND_ACTION_DEPENDENCE_ONLY_NOT_FULL_ARCHITECTURE_OR_PRODUCTION_PARITY
+  reference_action_path: STRUCTURAL_IDENTITY_BYPASS_THAT_READS_NEITHER_ACTION_TENSOR_NOR_NO_ACTION_TENSOR
+  candidate_action_path: END_OF_BIN_ACTION_CONDITION_THROUGH_REDUCER_AND_ACTION_CONDITIONER_THEN_PER_VENDOR_GDN_BLOCK_ZERO_INITIALIZED_ACTION_OUTPUT_PROJECTION_AFTER_GDN_RECURRENCE_BEFORE_FFN
+  vendor_entry_class: diffusion.model.nets.sana_gdn_blocks_triton.ChunkCausalGDNTriton
+  vendor_constructor_requirement: use_autograd_kernel=True
+  vendor_autograd_call_chain: ChunkCausalGDNTriton.forward -> fused_bigdn_forward_with_grad -> FusedBiGDNFunction
+  proxy_or_reference_operator_fallback: FORBIDDEN
+  cross_call_state_or_commit: NOT_ASSESSED_BY_DESIGN
+  stateful_chunkwise_forward_backward_qualification: NOT_ASSESSED
+  public_wrapper_dispatcher_owner_parity: NOT_ASSESSED
+  review_token_id: cadfd92f1c72ebd9cc9aa8bfad029ddc6f0e72d9f7942f34e74629ca1ae37252
+  review_token_state: UNCONSUMED
+  first_execution_must_not_consume_review_token: true
+
+runtime:
+  device: cuda:0
+  dtype: float32
+  single_process: true
+  distributed_or_context_parallel: false
+  expected_environment:
+    python: 3.12.13
+    torch: 2.7.1+cu128
+    triton: 3.5.1
+    cuda_toolkit: "12.8"
+    nvcc: 12.8.61
+    driver: 570.211.01
+  environment_before_any_torch_or_vendor_import:
+    CUDA_VISIBLE_DEVICES: GPU-41c95a43-ce96-fff3-33e0-739a3931d603
+    CUDA_DEVICE_ORDER: PCI_BUS_ID
+    GDN_DISABLE_COMPILE: "1"
+    TORCHDYNAMO_DISABLE: "1"
+    FUSED_GDN_PRECISION: "0"
+    PYTHONDONTWRITEBYTECODE: "1"
+    PYTHONPATH: /home/zch/workspace/sana-wam/src:/home/zch/workspace/sana-wam/third_party/Sana
+    TRITON_CACHE_DIR: /DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/triton_cache
+  fused_gdn_precision_interpretation: IEEE_FP32_DOTS_AND_FP32_STATE
+  cuda_logical_index: 0
+  required_cuda_device_uuid: GPU-41c95a43-ce96-fff3-33e0-739a3931d603
+  gpu_preflight_snapshot_window_seconds: 120
+  gpu_preflight_required_observations:
+    - UUID_TO_PHYSICAL_INDEX_MAPPING_MATCHES
+    - MEMORY_USED_IS_ZERO_AT_BOTH_SNAPSHOTS
+    - UTILIZATION_IS_ZERO_AT_BOTH_SNAPSHOTS
+    - NVIDIA_SMI_COMPUTE_APPS_EMPTY
+    - NVIDIA_SMI_PMON_EMPTY
+    - NO_EXTERNAL_FUSER_PROCESS_ON_DEVICE
+  immediate_launch_time_gpu_recheck: true
+  gpu_change_rule: FAIL_CLOSED_BEFORE_ROOT_CREATE_OR_CUDA_IMPORT
+  source_environment_authority_preflight_before_root_create: true
+  failure_trap_before_first_root_mutation: true
+  cuda_cache_disable_must_be_unset: true
+  allow_dependency_install: false
+  allow_network: false
+  allow_real_data: false
+  allow_checkpoint: false
+  allow_full_2b: false
+  allow_proxy_or_reference_fallback: false
+
+topology:
+  batch_size: 8
+  counterfactual_pair_count: 4
+  latent_channels: 3
+  spatial_height: 1
+  spatial_width: 1
+  valid_raw_count: 33
+  valid_latent_count: 5
+  valid_action_count: 32
+  action_dim: 20
+  context_dim: 4
+  vendor_hidden_dim: 64
+  vendor_heads: 2
+  vendor_head_dim: 32
+  vendor_gdn_depth: 20
+  vendor_conv_kernel_size: 0
+  vendor_k_conv_only: true
+  vendor_qk_norm: true
+  vendor_use_output_gate: true
+  vendor_use_autograd_kernel: true
+  frame_count: 5
+  HW: [5, 1, 1]
+  chunk_count: 2
+  chunk_boundaries: [0, 3, 5]
+  chunk_size: null
+  chunk_split_strategy: uniform
+  chunk_valid_latent_counts: [3, 2]
+  temporal_compression: 8
+  video_stride: 1
+  scored_future_horizons: [1, 2, 3, 4]
+  primary_horizons: [1, 2, 4]
+  ffn_hidden_dim: 128
+  action_conditioner: LINEAR_20_TO_64_SILU_LINEAR_64_TO_20
+  action_output_projection: LINEAR_20_TO_64_AFTER_VENDOR_GDN_BEFORE_FFN
+  frozen_action_backbone: REAL_ACTIONDIT_JOINT_CROSS_ATTN_DEPTH20_DIAGNOSTIC_ONLY
+  action_prediction_loss_weight: 0.0
+  frame_valid_mask: null
+  persistent_state_input_or_output: false
+  every_forward_is_one_complete_five_frame_vendor_call: true
+  forward_direction_state_within_call: PERSISTS_ACROSS_CHUNKS
+  reverse_direction_state_within_call: RESETS_AT_INTERIOR_BOUNDARY_3
+  future_chunk_to_past_chunk_influence: FORBIDDEN
+  past_chunk_to_future_chunk_influence: ALLOWED
+
+recipe:
+  source: REUSE_PINNED_AV1_SYNTHETIC_COUNTERFACTUAL_TASK_BYTES_AND_FORMULAS
+  task_recipe_sha256: 9d2a749d722775324ee233862772def530fbffe0ea9e55aeea87c160b87a51e4
+  slice_id: synthetic_counterfactual_pairs_0000_0003
+  shuffle_permutation: [1, 0, 3, 2, 5, 4, 7, 6]
+  shuffle_permutation_sha256: 93a9a618e0482688c85f8fc786cbaf7f845f69d5f48c356dd71881fb05d80dfd
+  end_of_bin_action_indices: [7, 15, 23, 31]
+  anchor_action_condition: MODEL_OWNED_EXACT_ZERO_NO_ACTION_SLOT
+  correct_mode: PINNED_VALID_ACTION_TENSOR_AT_REAL_CANDIDATE_SEAM
+  shuffle_mode: PINNED_PAIRED_ROW_PERMUTATION_AT_THE_SAME_SEAM_ONLY
+  no_action_mode: MODEL_OWNED_EXACT_ZERO_AT_EVERY_VALID_SEAM_SLOT
+  non_action_video_context_noise_target_bytes_equal_across_modes: true
+  target_visibility: TARGET_BYTES_ENTER_LOSS_ONLY
+  no_clean_action_or_future_video_side_channel: true
+  task_tensor_digest_manifest_required_before_model_construct: true
+
+initialization:
+  seed0: 202608033
+  shared_named_seed: 2026080331
+  candidate_only_seed: 2026080332
+  initializer_revision: cach-av1b-vendor-gdn-bridge-v1
+  common_method: SET_CPU_AND_CUDA_SEED_TO_SHARED_NAMED_SEED_CONSTRUCT_ONE_COMMON_TEMPLATE_ON_CPU_DEEPCOPY_ITS_PARAMETER_AND_BUFFER_BYTES_INTO_BOTH_ARMS_THEN_MOVE_BOTH_ARMS_TO_THE_RESERVED_CUDA_DEVICE_BEFORE_ANY_FORWARD
+  candidate_only_method: PER_EXACT_PARAMETER_NAME_DETERMINISTIC_GENERATOR_FROM_CANDIDATE_ONLY_SEED
+  candidate_non_seam_named_uniform_bound_numerator: 0.25
+  zero_candidate_action_output_projection_weight: true
+  zero_candidate_action_output_projection_bias: true
+  zero_all_other_biases: true
+  no_action_slot_frozen_exact_zero: true
+  shared_theta0_parameter_bytes_equal: true
+  theta0_video_outputs_bitwise_equal_all_modes: true
+  fresh_initialization: true
+  continuation_from_av1_parameters_or_state: false
+  continuation_from_checkpoint: false
+  common_parameter_manifest_required_before_forward: true
+  candidate_only_manifest_required_before_forward: true
+  arm_execution_order: [REF-GDN-CORRECTED, CACH-A]
+  data_order: SINGLE_FIXED_FULL_BATCH_NO_SHUFFLE
+
+optimizer:
+  name: AdamW
+  learning_rate: 0.003
+  betas: [0.9, 0.99]
+  epsilon: 1.0e-8
+  weight_decay: 0.0
+  gradient_clip_global_l2: 1.0
+  optimizer_steps_per_arm: 200
+  metric_steps: [0, 200]
+  best_step_selection: false
+  intermediate_checkpoint_selection: false
+  write_optimizer_state: false
+  reference_parameter_scope: ALL_AND_ONLY_GENERATED_COMMON_TRAINABLE_NAMES
+  candidate_parameter_scope: IDENTICAL_COMMON_NAMES_PLUS_ALL_AND_ONLY_GENERATED_CANDIDATE_ACTION_SEAM_NAMES
+  unlisted_trainable_parameter_allowed: false
+
+budget:
+  max_wall_seconds_total: 1800
+  max_gpu_memory_bytes: 17179869184
+  max_process_rss_bytes: 17179869184
+  max_root_bytes: 536870912
+  minimum_free_bytes_before_root_create: 107374182400
+  max_optimizer_steps_total: 400
+  exact_optimizer_steps_per_arm: 200
+  automatic_budget_extension: false
+  completion_rule: BOTH_ARMS_COMPLETE_EXACTLY_200_STEPS_AND_ALL_REQUIRED_DIAGNOSTICS
+  budget_failure_state: HARNESS_REJECTED
+
+diagnostics:
+  vendor_identity:
+    exact_class: diffusion.model.nets.sana_gdn_blocks_triton.ChunkCausalGDNTriton
+    use_autograd_kernel: true
+    actual_vendor_forward_call_count_strictly_positive: true
+    cuda_logical_device_zero_uuid: GPU-41c95a43-ce96-fff3-33e0-739a3931d603
+    HW: [5, 1, 1]
+    normalized_chunk_boundaries: [0, 3, 5]
+    fused_gdn_precision: 0
+  required_execution:
+    - THETA0_FORWARD
+    - BACKWARD_AT_STEP0
+    - LAST_BLOCK_POST_VENDOR_LOCAL_SEAM_PARAMETER_DIRECTIONAL_JVP_AT_THETA0
+    - LAST_BLOCK_POST_VENDOR_LOCAL_ACTION_CONDITION_DIRECTIONAL_JVP_AT_STEP200
+    - TARGET_PERTURBATION_AND_REVERSE_GRADIENT_LEAKAGE_CHECK
+    - 200_ADAMW_STEPS_PER_ARM
+    - FINAL_CORRECT_SHUFFLE_NO_ACTION_METRICS
+    - FIRST_CHUNK_PREFIX_INVARIANCE_CHECK
+    - FINITE_OUTPUT_OBSERVABLE_POST_VENDOR_HIDDEN_GRADIENT_AND_UPDATE_CHECK
+    - FINITE_NONZERO_BACKWARD_GRADIENT_TO_VENDOR_COMMON_PARAMETERS
+    - FINAL_PARAMETER_DIGESTS
+  prefix_invariance:
+    perturb_only_second_chunk_video_or_action_inputs: true
+    compare_first_chunk_predictions: true
+  local_jvp:
+    vendor_primal_outside_forward_mode_transform: true
+    detached_last_block_post_vendor_hidden: true
+    pure_torch_tail_only: true
+    vendor_custom_autograd_forward_mode_claim: false
+    theta0_parameter_tangent: UTF8_PARAMETER_ORDER_FLATTENED_ALTERNATING_PLUS_ONE_MINUS_ONE_NORMALIZED_TO_UNIT_L2
+    step200_action_condition_tangent: FLATTENED_ALTERNATING_PLUS_ONE_MINUS_ONE_ON_VALID_ENTRIES_NORMALIZED_TO_UNIT_L2_WITH_ALL_PADDING_TANGENTS_EXACT_ZERO
+    post_vendor_hidden_digest_required: true
+  target_leakage:
+    target_bytes_enter_loss_only: true
+    target_perturbation_must_not_change_prediction_or_post_vendor_hidden: true
+    prediction_target_reverse_gradient_must_be_zero_or_unused: true
+  cross_call_state_or_commit: NOT_ASSESSED_BY_DESIGN
+  vendor_reference_parity: NOT_REQUIRED_FOR_DIRECT_VENDOR_KERNEL_CLASSIFICATION
+  compile_oom_missing_kernel_or_import_failure: HARNESS_REJECTED_OR_ENV_BLOCKED_NOT_ARCHITECTURE_NEGATIVE
+
+metrics:
+  accumulator_dtype: float64
+  epsilon: 1.0e-12
+  train_loss_formula: EQUAL_WEIGHT_MEAN_OF_CORRECT_ACTION_VIDEO_MSE_AT_FUTURE_HORIZONS_1_2_3_4
+  primary_horizon_weights:
+    1: 0.2
+    2: 0.3
+    4: 0.5
+  counterfactual_delta_nmse_formula: SUM_PAIR_HORIZON_CHANNEL_OF_PREDICTED_PAIR_DELTA_MINUS_TARGET_PAIR_DELTA_SQUARED_DIVIDED_BY_TARGET_PAIR_DELTA_SQUARED_PLUS_EPSILON
+  loss_drop_rel_formula: (CANDIDATE_CORRECT_LOSS_STEP0-CANDIDATE_CORRECT_LOSS_STEP200)/MAX(CANDIDATE_CORRECT_LOSS_STEP0,EPSILON)
+  shuffle_gap_rel_formula: (PRIMARY_SHUFFLE_STEP200-PRIMARY_CORRECT_STEP200)/MAX(PRIMARY_SHUFFLE_STEP200,EPSILON)
+  no_action_gap_rel_formula: (PRIMARY_NO_ACTION_STEP200-PRIMARY_CORRECT_STEP200)/MAX(PRIMARY_NO_ACTION_STEP200,EPSILON)
+  candidate_gain_vs_reference_formula: (PRIMARY_REFERENCE_STEP200-PRIMARY_CANDIDATE_CORRECT_STEP200)/MAX(PRIMARY_REFERENCE_STEP200,EPSILON)
+  seam_grad_rms_step0_formula: RMS_OVER_CANDIDATE_PER_BLOCK_ACTION_OUTPUT_PROJECTION_WEIGHT_GRADIENTS_BIASES_EXCLUDED
+  seam_update_rms_final_formula: RMS_OVER_STEP200_MINUS_STEP0_FOR_THE_SAME_WEIGHTS_BIASES_EXCLUDED
+  last_block_local_seam_parameter_jvp_rms_theta0_formula: RMS_OF_LAST_BLOCK_POST_VENDOR_TAIL_OUTPUT_JVP_FOR_FIXED_UNIT_NORM_PARAMETER_DIRECTION
+  last_block_local_action_condition_jvp_rms_step200_formula: RMS_OF_TRAINED_LAST_BLOCK_POST_VENDOR_TAIL_OUTPUT_JVP_FOR_FIXED_VALID_ACTION_DIRECTION
+  prefix_invariance_max_abs_formula: MAX_ABS_FIRST_CHUNK_OUTPUT_DIFFERENCE_AFTER_ONLY_SECOND_CHUNK_INPUT_PERTURBATION
+  final_step_only: true
+  best_step_forbidden: true
+
+thresholds:
+  validity:
+    finite_all: true
+    theta0_reference_candidate_video_output_bitwise_equal_all_modes: true
+    reference_correct_shuffle_no_action_video_outputs_bitwise_equal: true
+    no_action_candidate_pair_predictions_bitwise_equal: true
+    no_action_candidate_slot_exact_zero_and_update_free: true
+    common_theta0_parameter_bytes_equal: true
+    valid_action_exact_once_and_padding_zero: true
+    non_seam_bytes_bitwise_equal_across_modes: true
+    target_perturbation_changes_prediction_or_post_vendor_hidden: false
+    prediction_target_reverse_gradient_nonzero: false
+    prefix_invariance_max_abs: 0.0001
+    prefix_invariance_max_rel: 0.0001
+    exact_vendor_identity_checks_pass: true
+    actual_vendor_forward_call_count_strictly_positive: true
+    vendor_common_parameter_gradient_rms_step0_gt: 1.0e-8
+    last_block_local_seam_parameter_jvp_rms_theta0_gt: 1.0e-8
+    last_block_local_action_condition_jvp_rms_step200_gt: 1.0e-8
+    no_real_data_checkpoint_or_fallback_path_used: true
+    cuda_and_jit_inventory_recorded: true
+    exactly_200_optimizer_steps_completed_per_arm: true
+  operator_go:
+    seam_grad_rms_step0_gt: 1.0e-8
+    seam_update_rms_final_gt: 1.0e-6
+    last_block_local_seam_parameter_jvp_rms_theta0_gt: 1.0e-8
+    last_block_local_action_condition_jvp_rms_step200_gt: 1.0e-8
+    loss_drop_rel_min: 0.8
+    counterfactual_delta_nmse_correct_max: 0.25
+    counterfactual_delta_nmse_correct_h1_max: 0.35
+    counterfactual_delta_nmse_correct_h2_max: 0.35
+    counterfactual_delta_nmse_correct_h4_max: 0.35
+    shuffle_gap_rel_min: 0.5
+    shuffle_gap_rel_h1_min: 0.25
+    shuffle_gap_rel_h2_min: 0.25
+    shuffle_gap_rel_h4_min: 0.25
+    no_action_gap_rel_min: 0.5
+    no_action_gap_rel_h1_min: 0.25
+    no_action_gap_rel_h2_min: 0.25
+    no_action_gap_rel_h4_min: 0.25
+    candidate_gain_vs_reference_min: 0.5
+  operator_strong_stop:
+    valid_data_implementation_and_numerics: true
+    seam_grad_rms_step0_gt: 1.0e-8
+    seam_update_rms_final_gt: 1.0e-6
+    loss_drop_rel_max: 0.1
+    counterfactual_delta_nmse_correct_min: 0.9
+    shuffle_gap_rel_max: 0.05
+    no_action_gap_rel_max: 0.05
+    candidate_gain_vs_reference_max: 0.05
+  first_execution_classification:
+    all_validity_and_all_go: OPERATOR_GO
+    valid_non_go_with_unconsumed_token: REVIEW_ONCE
+    invalid_implementation_or_numerics: TYPED_INVALID_STATE_WITH_NO_ARCHITECTURE_VERDICT
+    environment_compile_oom_resource_or_harness_failure: ENV_BLOCKED_OR_HARNESS_REJECTED_WITH_NO_ARCHITECTURE_VERDICT
+    operator_stop_before_review_process: FORBIDDEN
+
+artifacts:
+  root_label: NON_FORMAL_ARCHITECTURE_SCREEN_IMMUTABLE_NOT_ADMISSION_EVIDENCE
+  root_preflight_must_not_exist: true
+  exclusive_root_create: true
+  triton_cache_inside_root: true
+  write_model_checkpoint: false
+  write_optimizer_state: false
+  required_if_root_created:
+    - RUN_CONTEXT.json
+    - PROGRESS_EVENTS.json
+    - THETA0_MANIFESTS.json
+    - LOSS_TRACE.json
+    - RAW_METRICS.json
+    - RAW_EVIDENCE.json
+    - FINAL_PARAMETER_DIGESTS.json
+    - JIT_INVENTORY.json
+    - RESULT.json
+    - FREEZE_RECEIPT.json
+  freeze_root_on_every_postcreate_terminal: true
+  chmod_frozen_mode: 0555_DIRECTORIES_AND_0444_FILES
+  delete_after_creation: false
+  modify_after_freeze: false
+  reuse: false
+  retry_requires_new_card_or_successor_attempt_card_and_new_root_nonce: true
+  formal_promotion: false

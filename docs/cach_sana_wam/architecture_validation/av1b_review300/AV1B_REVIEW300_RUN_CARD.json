@@ -1,0 +1,1045 @@
+{
+  "schema": "cach.architecture_validation.av1b_review300_run_card.v1",
+  "schema_policy": {
+    "all_listed_keys_required": true,
+    "reject_unknown_keys_in_every_object": true,
+    "duplicate_key_rejecting_json_loader_required": true,
+    "repo_paths_must_be_relative_without_parent_segments": true,
+    "sha256_pattern": "^[0-9a-f]{64}$",
+    "self_pin_policy": "OUT_OF_BAND_FULL_LITERAL_SHA256_AFTER_SERIALIZATION",
+    "runner_must_match_full_card_sha256_before_root_create_or_import": true
+  },
+  "card_id": "cach-av1b-review300-no-bug-budget-extension-v1",
+  "card_state": "FROZEN_CARD_ONLY_EXECUTION_NOT_AUTHORIZED",
+  "identity": {
+    "canonical_host": "H200",
+    "canonical_worktree": "/home/zch/workspace/sana-wam",
+    "created_on": "2026-08-04",
+    "self_path": "docs/cach_sana_wam/architecture_validation/av1b_review300/AV1B_REVIEW300_RUN_CARD.json",
+    "self_sha256": null,
+    "self_sha256_binding": "OUT_OF_BAND_FULL_LITERAL_SHA256_AFTER_FINAL_SERIALIZATION; FUTURE_SOURCE_AUTHORITY_EXECUTION_AUTHORITY_RUN_CONTEXT_PROVISIONAL_RESULT_FREEZE_RECEIPT_AND_TOKEN_CLAIM_MUST_BIND_THIS_PATH_PLUS_FULL_SHA256",
+    "governing_plan": {
+      "path": "docs/cach_sana_wam/global_stage3/post_phase_c_planning/ARCHITECTURE_VALIDATION_FIRST_PLAN_20260803_v1.md",
+      "sha256": "06f5d09127f8bc2a945cdbdc095054f40b1fe8d9757a90eccbdf0604ea89e079"
+    },
+    "repository_heads": {
+      "sana_wam": "605f1c134b4c983ff80f8489c4bc8847036329e2",
+      "third_party_sana": "16b9cec673e3335724ba2d8db25de7f9ed229292",
+      "sana_afcc_handoff": "9586486f2a9f5172d57b325e32093a3e018d34c0"
+    },
+    "predecessor_av0_card": {
+      "path": "docs/cach_sana_wam/architecture_validation/av1/AV0_RUN_CARD.json",
+      "sha256": "c73a943047295338cd9de14e6e53199b463ea66ae92b99d4b0b3393f5ec34030"
+    },
+    "predecessor_av1_root": "/DATA/share/sana_cach_wam_nonformal_screens/av1/06f5d09127f8/c73a94304729-d755b67c667d9a22686c8d90d187832d",
+    "predecessor_av1_artifacts": {
+      "result": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1/06f5d09127f8/c73a94304729-d755b67c667d9a22686c8d90d187832d/RESULT.json",
+        "sha256": "b7b23642d5772efb09e3c0ff09cb1aead3d5834b70b325ddc8b1c10d7438303e"
+      },
+      "raw_evidence": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1/06f5d09127f8/c73a94304729-d755b67c667d9a22686c8d90d187832d/RAW_EVIDENCE.json",
+        "sha256": "e6fd480994ee7768366e76881162c9929283185c3e8b2e1ffb4e0caaa3e21357"
+      },
+      "raw_metrics": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1/06f5d09127f8/c73a94304729-d755b67c667d9a22686c8d90d187832d/RAW_METRICS.json",
+        "sha256": "dcd188ddb74e6c09049f7df57fb16c07a5045d25550ae9cc33daca6236f41b0f"
+      },
+      "run_context": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1/06f5d09127f8/c73a94304729-d755b67c667d9a22686c8d90d187832d/RUN_CONTEXT.json",
+        "sha256": "78fbaa9c91a3efe06409118a152cfb8f457bc9ca0a5ad24143cbd373287c3cc4"
+      },
+      "freeze_receipt": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1/06f5d09127f8/c73a94304729-d755b67c667d9a22686c8d90d187832d/FREEZE_RECEIPT.json",
+        "sha256": "c093b2b067c6390f2439c6132b08a31ab6e04869ec314b7ebc4c164673c9c774"
+      }
+    },
+    "predecessor_av1_typed_state": "PROXY_GO",
+    "predecessor_av1_scope": "PROXY_ONLY_ACTUAL_ARCHITECTURE_NOT_ASSESSED",
+    "created_at_utc": "2026-08-03T18:17:10Z",
+    "predecessor_av1b_card": {
+      "path": "docs/cach_sana_wam/architecture_validation/av1b/AV1B_RUN_CARD.json",
+      "sha256": "c0e15bcb8c20441d7d989ec6d375284e45f24962c98e15b984dbbbbd198248fb"
+    },
+    "predecessor_av1b_root": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3",
+    "predecessor_av1b_nonce": "1a9a3a6ca4b18fac904fdb806c2a8fb3",
+    "predecessor_av1b_typed_state": "REVIEW_ONCE",
+    "predecessor_av1b_review_token_state": "UNCONSUMED",
+    "predecessor_av1b_root_modes": {
+      "directories": "0555",
+      "files": "0444",
+      "symlink_count": 0,
+      "owner": "zch:sharegrp",
+      "du_bytes": 7366980
+    },
+    "predecessor_av1b_artifacts": {
+      "final_parameter_digests": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/FINAL_PARAMETER_DIGESTS.json",
+        "sha256": "26ba3cd50fd9dea3050d480ee051b3b108d73591aa9b4176e943b9ef6a64fd40"
+      },
+      "freeze_receipt": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/FREEZE_RECEIPT.json",
+        "sha256": "2949acd034ffc6f59038d2ba3b2501854fcb0b94c11a8675d96d0ab40907f677"
+      },
+      "jit_inventory": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/JIT_INVENTORY.json",
+        "sha256": "162d791afc15452731b2eb17e41518a3d4d9bda01f39bcd52d1f473ca2a623a9"
+      },
+      "loss_trace": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/LOSS_TRACE.json",
+        "sha256": "181e33ef7b8cf8900a842d2129ba0c058d8b8ce71970059f32f85bb08ced7de0"
+      },
+      "progress_events": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/PROGRESS_EVENTS.json",
+        "sha256": "b3d427d94d251bfed4d5989285613d5021d6e5e7f3f40b1da82bab4322d4f1b0"
+      },
+      "raw_evidence": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/RAW_EVIDENCE.json",
+        "sha256": "0b0110f054e7e1f54ad19175c39c20fc8117d311b988b13f362b1973d09f60a1"
+      },
+      "raw_metrics": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/RAW_METRICS.json",
+        "sha256": "18083938b4bcb58d38a71311582bb8f5332352d6d112bd4bd79d41d8b681be6b"
+      },
+      "result": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/RESULT.json",
+        "sha256": "d33e2e6bdf59cc1d2ffe51b32d48ce22daa4da1a902e3e9bded28cce29adb5de"
+      },
+      "run_context": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/RUN_CONTEXT.json",
+        "sha256": "fbe794fed1fb7c17ac8c71812dae5f22a46e9b7840ad1ba262a7bedbe9f2a09c"
+      },
+      "theta0_manifests": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/THETA0_MANIFESTS.json",
+        "sha256": "5b1c3f8db83987da31bb3d0719e9ef495ec317f9bdb7d3df68f5c770db135539"
+      }
+    },
+    "predecessor_av1b_freeze_receipt_inventory_reverified": true,
+    "predecessor_av1b_mutation_deletion_reuse_or_promotion": false
+  },
+  "authority": {
+    "selection_statement": "NO_BUG_BUDGET_EXTENSION_FRESH_ROOT_FRESH_INITIALIZATION_300_STEPS",
+    "selection_statement_sha256": "4ffbe5d81c788957680c29a47457f3e332152672b8143748c75e85297dcb0cc1",
+    "card_freeze_statement": "授权上述 card-only 契约。",
+    "card_freeze_statement_sha256": "7bbf4a93f11deea41a9f2418c4e29628002e2150816559aa8c88af4031cafb3c",
+    "statement_sha256_rule": "SHA256_UTF8_WITHOUT_TRAILING_NEWLINE",
+    "interpretation": "EXCLUSIVE_REVIEW_BRANCH_SELECTION_AND_SUCCESSOR_CARD_FREEZE_ONLY",
+    "selected_choice": "NO_BUG_BUDGET_EXTENSION_FRESH_ROOT_FRESH_INITIALIZATION_300_STEPS",
+    "rejected_choice": "BUG_FIX_FRESH_REVISION_FRESH_ROOT_FRESH_INITIALIZATION_200_STEPS",
+    "simultaneous_or_sequential_use_of_both_choices": false,
+    "documentation_write_exact_path_only": true,
+    "freeze_this_card": true,
+    "create_parent_directory_for_this_card_only": true,
+    "code_config_runner_or_test_write": false,
+    "screen_root_create": false,
+    "review_token_claim_create_or_consume": false,
+    "gpu_reservation_or_use": false,
+    "cuda_or_jit": false,
+    "python_torch_or_vendor_import": false,
+    "model_construct_or_execute": false,
+    "forward_backward_or_jvp": false,
+    "optimizer_construct_or_parameter_update": false,
+    "training_or_model_test": false,
+    "static_json_path_sha_and_permission_validation": true,
+    "real_data_access": false,
+    "checkpoint_load_or_save": false,
+    "full_2b_formal_admission_deploy_av2_or_global_stage3": false,
+    "future_execution_authority_must_bind": [
+      "this_card_path_and_full_literal_sha256",
+      "the_four_review300_exact_additive_paths_and_full_sha256_after_materialization",
+      "all_predecessor_card_source_and_result_pins",
+      "selected_choice_and_both_choices_forbidden",
+      "new_exact_root_and_nonce",
+      "exact_run_and_token_namespace_parent_paths_creation_permissions_modes_owner_symlink_race_and_fsync_rules",
+      "review_token_id_latest_state_head_and_canonical_claim_path",
+      "atomic_exclusive_claim_write_permission_and_timing",
+      "gpu_physical_index_7_and_exact_uuid",
+      "single_reserved_gpu_cuda_triton_jit_vendor_autograd_forward_backward_local_jvp",
+      "fresh_initialization_and_exactly_300_adamw_updates_per_arm",
+      "lightweight_tests_diagnostics_and_terminal_freeze"
+    ],
+    "future_unlisted_capability_default": "DENIED"
+  },
+  "classification": {
+    "pair": [
+      "REF-GDN-CORRECTED",
+      "CACH-A"
+    ],
+    "only_semantic_delta": "CACH-A_ONLY_ACTION_TO_VIDEO_SEAM",
+    "reference_action_path": "STRUCTURAL_IDENTITY_BYPASS_THAT_READS_NEITHER_ACTION_TENSOR_NOR_NO_ACTION_TENSOR",
+    "candidate_action_path": "END_OF_BIN_ACTION_CONDITION_THROUGH_REDUCER_AND_ACTION_CONDITIONER_THEN_PER_VENDOR_GDN_BLOCK_ZERO_INITIALIZED_ACTION_OUTPUT_PROJECTION_AFTER_GDN_RECURRENCE_BEFORE_FFN",
+    "operator_level": "VENDOR_KERNEL",
+    "integration_path": "EXPERIMENTAL_PATH",
+    "experiment_kind": "TEACHER_ACTION_MECHANISM_SCREEN",
+    "result_scope": "SYNTHETIC_SINGLE_BATCH_SINGLE_CALL_VENDOR_OPERATOR_ONLY",
+    "architecture_conclusion_scope": "ACTUAL_VENDOR_GDN_LEARNABILITY_AND_ACTION_DEPENDENCE_ONLY_NOT_FULL_ARCHITECTURE_OR_PRODUCTION_PARITY",
+    "proxy_or_reference_operator_fallback": "FORBIDDEN",
+    "vendor_entry_class": "diffusion.model.nets.sana_gdn_blocks_triton.ChunkCausalGDNTriton",
+    "vendor_constructor_requirement": "use_autograd_kernel=True",
+    "vendor_autograd_call_chain": "ChunkCausalGDNTriton.forward -> fused_bigdn_forward_with_grad -> FusedBiGDNFunction",
+    "single_call_chunk_causal_semantics": {
+      "input_temporal_frames": 5,
+      "HW": [
+        5,
+        1,
+        1
+      ],
+      "chunk_index": [
+        0,
+        3,
+        5
+      ],
+      "chunk_size": null,
+      "chunk_split_strategy": "uniform",
+      "forward_direction_state": "PERSISTS_ACROSS_THE_TWO_CHUNKS_INSIDE_ONE_VENDOR_CALL",
+      "reverse_direction_state": "RESETS_AT_INTERIOR_BOUNDARY_3_VIA_BETA_BWD_AND_DECAY_BWD_MASKING",
+      "future_chunk_to_past_chunk_influence": "FORBIDDEN",
+      "past_chunk_to_future_chunk_influence": "ALLOWED",
+      "frame_valid_mask": null
+    },
+    "explicitly_not_assessed": [
+      "CROSS_CALL_INIT_STATE_OR_FINAL_STATE_IO",
+      "TWO_CALL_DIFFERENTIABLE_SCRATCH_STATE_CONTINUATION",
+      "LIVE_CACHE_COMMIT_OR_CONTENT_TIME",
+      "PUBLIC_WRAPPER_DISPATCHER_OR_OWNER_PARITY",
+      "STATEFUL_CHUNKWISE_FORWARD_BACKWARD_QUALIFICATION",
+      "REAL_DATA_OR_CLOSED_LOOP_CAPABILITY",
+      "FULL_2B"
+    ],
+    "semantic_non_equivalence_warning": "SINGLE_CALL_CHUNK_INDEX_MASKING_MUST_NOT_BE_REPORTED_AS_CROSS_CALL_PERSISTENT_STATE_CONTINUATION"
+  },
+  "additive_policy": {
+    "exact_additive_paths_scope": "AV1B_REVIEW300_NO_BUG_SUCCESSOR_V1_ONLY",
+    "exact_additive_paths": [
+      "docs/cach_sana_wam/architecture_validation/av1b_review300/AV1B_REVIEW300_RUN_CARD.json",
+      "src/sana_wam/model/cach_av1b_vendor_gdn_bridge_review300.py",
+      "configs/experiments/cach_av1b_vendor_gdn_bridge_review300.yaml",
+      "scripts/run_cach_av1b_vendor_gdn_bridge_review300.py",
+      "tests/test_cach_av1b_vendor_gdn_bridge_review300.py"
+    ],
+    "current_authority_write_subset": [
+      "docs/cach_sana_wam/architecture_validation/av1b_review300/AV1B_REVIEW300_RUN_CARD.json"
+    ],
+    "all_five_paths_observed_absent_before_card_write": true,
+    "four_non_card_paths_currently_authorized": false,
+    "future_source_authority_required_before_four_non_card_paths_are_written": true,
+    "preserve_predecessor_card_and_quartet_bytes": true,
+    "modify_any_predecessor_av1b_path": false,
+    "modify_phase_c_fixed_member": false,
+    "modify_av0_or_av1_predecessor": false,
+    "delete_overwrite_or_reuse_any_existing_file_or_root": false,
+    "future_source_authority_may_exclusive_create_only_four_new_non_card_paths": [
+      "src/sana_wam/model/cach_av1b_vendor_gdn_bridge_review300.py",
+      "configs/experiments/cach_av1b_vendor_gdn_bridge_review300.yaml",
+      "scripts/run_cach_av1b_vendor_gdn_bridge_review300.py",
+      "tests/test_cach_av1b_vendor_gdn_bridge_review300.py"
+    ],
+    "future_execution_authority_may_create_only_exact_namespace_parents_exact_root_and_canonical_claim": true,
+    "execution_must_not_modify_the_materialized_four_new_non_card_paths": true,
+    "phase_separation_contract": {
+      "source_phase": "EXCLUSIVE_CREATE_ONLY_THE_FOUR_NEW_NON_CARD_PATHS_UNDER_A_FUTURE_EXACT_SOURCE_AUTHORITY_THEN_STATICALLY_VALIDATE_COMPUTE_FULL_SHA256_AND_CHMOD_0444",
+      "execution_phase": "TREAT_CARD_AND_ALL_FOUR_MATERIALIZED_PATHS_AS_READ_ONLY_VERIFY_FULL_SHA256_BEFORE_ROOT_CREATE_AND_CUDA_IMPORT_AND_REVERIFY_AFTER_SCREEN_BEFORE_PROVISIONAL_RESULT_FREEZE",
+      "execution_code_config_runner_or_test_write": false,
+      "source_pin_change_after_execution_authority": "AUTH_BLOCKED_BEFORE_ROOT_CREATE"
+    },
+    "future_execution_namespace_parent_write_exact_paths": {
+      "run_namespace": [
+        "/DATA/share/sana_cach_wam_nonformal_screens/av1b_review300",
+        "/DATA/share/sana_cach_wam_nonformal_screens/av1b_review300/06f5d09127f8"
+      ],
+      "token_namespace": [
+        "/DATA/share/sana_cach_wam_nonformal_screens/token_ledgers",
+        "/DATA/share/sana_cach_wam_nonformal_screens/token_ledgers/c73a943047295338cd9de14e6e53199b463ea66ae92b99d4b0b3393f5ec34030"
+      ],
+      "all_observed_absent_at_card_freeze": true,
+      "creation_authorized_by_this_card": false,
+      "future_exact_authority_required": true
+    },
+    "successor_revision_rule": "ANY_CHANGE_TO_FROZEN_CARD_BYTES_EXACT_PATHS_SEMANTICS_BUDGET_THRESHOLDS_GPU_ROOT_NONCE_OR_TOKEN_TRANSACTION_REQUIRES_A_NEW_SUCCESSOR_CARD_PATH_AND_NEW_AUTHORITY"
+  },
+  "source_pins": {
+    "development_plan": {
+      "path": "docs/CAUSAL_ACTION_CONDITIONED_HYBRID_SANA_WAM_DEVELOPMENT_PLAN_20260731.md",
+      "sha256": "969d9668ffed07176844fcbd84062825f9d5f0af0325959b0068c38fe481f0dd"
+    },
+    "av1_transition_proxy": {
+      "path": "src/sana_wam/model/cach_av1_transition_proxy.py",
+      "sha256": "fa01453769dec24927bdb31b42147e1ecd3e1a77700aaf686b0ce964a77eebcf"
+    },
+    "av1_config": {
+      "path": "configs/experiments/cach_av1_transition_proxy.yaml",
+      "sha256": "e12f052ee63d3e93c69ddc58146b1ee18d1d1eef39c8e85b2fa38e11f91c6361"
+    },
+    "av1_runner": {
+      "path": "scripts/run_cach_av1_transition_proxy.py",
+      "sha256": "d0714ea1e09436980c72f477d131a1350e94eef89c564de4a90068c7ce905a4a"
+    },
+    "av1_test": {
+      "path": "tests/test_cach_av1_transition_proxy.py",
+      "sha256": "2cb3e0578a72abd2cf9fe283740590fb3529397f870e421e704f3a58ef29c8d6"
+    },
+    "action_reducer": {
+      "path": "src/sana_wam/cach/action_conditioning.py",
+      "sha256": "8323efa1544d5c0520e13192b55ed5f2e85490d03ac21c558d6009db38ee11c6"
+    },
+    "phase_c_fixed_member_list": {
+      "path": "docs/cach_sana_wam/global_stage3/phase_c_production_path_mini/PHASE_C_SOURCE_FILES.txt",
+      "sha256": "59ff254f82f546a8f0102d7fa03a340392da4a879a46ae8e267357db762cb216"
+    },
+    "typed_layout": {
+      "path": "src/sana_wam/model/action_chunk_layout.py",
+      "sha256": "8e6521a93614b4ce7e43ba51d2af4f67d2650b03cc60e7d7a152e36dfa3c8e39"
+    },
+    "vendor_base_gdn": {
+      "path": "third_party/Sana/diffusion/model/nets/sana_gdn_blocks.py",
+      "sha256": "ef15578c63f9815d670dc3ef4cf2876c4f236754bfdfb0d2070da387048a495e"
+    },
+    "vendor_triton_gdn": {
+      "path": "third_party/Sana/diffusion/model/nets/sana_gdn_blocks_triton.py",
+      "sha256": "0ae10e7a09005c60cfac1fcb1035ff3495f80024cfb2e3f01b96b84e0adf3933"
+    },
+    "vendor_chunk_boundary_utility": {
+      "path": "third_party/Sana/diffusion/utils/chunk_utils.py",
+      "sha256": "b1b4185b2ebfdb550cbea45dd104c956260ce99e2eeb097896bab80cd1b546ef"
+    },
+    "vendor_autograd_kernel": {
+      "path": "third_party/Sana/diffusion/model/ops/fused_gdn.py",
+      "sha256": "863cbbb601ddebc5666179e2b209b777d5dc213c94a1450cde695a33b0a8aded"
+    },
+    "vendor_stateful_chunkwise_observed_not_used": {
+      "path": "third_party/Sana/diffusion/model/ops/fused_gdn_chunkwise.py",
+      "sha256": "3af972561f924f76c2af10ff2ac34debf386f4011703c41d8403e80ee9a0f558"
+    },
+    "production_action_seam": {
+      "path": "third_party/Sana/diffusion/model/nets/sana_multi_scale_video_camctrl.py",
+      "sha256": "bfbd72dfb22a44e2843f1985049ecfbb1f887f5e5f5ed852905c4670e2029fbe"
+    },
+    "non_reference_v2v_family": {
+      "path": "third_party/Sana/diffusion/model/nets/sana_v2v_attn_blocks.py",
+      "sha256": "a7b7a32482760518868b7d82dd97c6da6d91d24cc4440d00139e37480d48e689",
+      "classification": "DIFFERENT_V2V_BLOCK_FAMILY_NOT_REFERENCE_OPERATOR"
+    },
+    "hybrid_cache_digest_utility": {
+      "path": "src/sana_wam/model/video_backbone/sana/hybrid_cache.py",
+      "sha256": "5b61ab6492670e8021b3603f965e9f3e8921e9d7f0ea77b49e40d92a77f78a74"
+    },
+    "predecessor_av1b_bridge": {
+      "path": "src/sana_wam/model/cach_av1b_vendor_gdn_bridge.py",
+      "sha256": "ef72052d9e09e05cf70da992bf875bd3fabeddbde06468babe6e63601ccd7eb7"
+    },
+    "predecessor_av1b_config": {
+      "path": "configs/experiments/cach_av1b_vendor_gdn_bridge.yaml",
+      "sha256": "e3504349cf4983698c4c8c772cb5691e03bdc409bb97ce4cbb0b3ac6c9e4f702"
+    },
+    "predecessor_av1b_runner": {
+      "path": "scripts/run_cach_av1b_vendor_gdn_bridge.py",
+      "sha256": "34b7c39616cde8ee0ab5084b63892c596ab977239e5469534a66f91ae2c2af01"
+    },
+    "predecessor_av1b_test": {
+      "path": "tests/test_cach_av1b_vendor_gdn_bridge.py",
+      "sha256": "63f35cd1e9da3ac556fe5f6037ca3e173ba82d298a4046f552979e289e93a260"
+    },
+    "future_review300_generated_files": {
+      "paths": [
+        "src/sana_wam/model/cach_av1b_vendor_gdn_bridge_review300.py",
+        "configs/experiments/cach_av1b_vendor_gdn_bridge_review300.yaml",
+        "scripts/run_cach_av1b_vendor_gdn_bridge_review300.py",
+        "tests/test_cach_av1b_vendor_gdn_bridge_review300.py"
+      ],
+      "state_at_card_freeze": "ALL_ABSENT",
+      "pin_policy": "MATERIALIZE_ONLY_UNDER_FUTURE_SOURCE_AUTHORITY_THEN_BIND_EACH_FULL_SHA256_IN_A_SEPARATE_EXECUTION_AUTHORITY_BEFORE_ROOT_CREATE_CUDA_OR_VENDOR_IMPORT",
+      "allowed_semantic_delta": [
+        "OPTIMIZER_STEPS_PER_ARM_200_TO_300",
+        "MAX_OPTIMIZER_STEPS_TOTAL_400_TO_600",
+        "LOSS_TRACE_LENGTH_201_TO_301",
+        "FINAL_STEP_LABELS_AND_FINAL_DIAGNOSTIC_INDEX_200_TO_300",
+        "MAX_WALL_SECONDS_TOTAL_1800_TO_AV0_PREREGISTERED_1350",
+        "REVIEW_TOKEN_PROVISIONAL_FREEZE_AND_ATOMIC_CLAIM_TRANSACTION"
+      ],
+      "forbidden_semantic_delta": [
+        "MODEL_ARCHITECTURE_OR_TENSOR_FORMULA",
+        "ACTION_OBSERVATION_TARGET_ALIGNMENT_OR_MASK",
+        "SYNTHETIC_TASK_BYTES_DATA_ORDER_SEEDS_OR_INITIALIZATION",
+        "OPTIMIZER_TYPE_LR_BETAS_EPSILON_WEIGHT_DECAY_OR_CLIP",
+        "METRIC_FORMULA_THRESHOLDS_FINAL_ONLY_RULE_OR_BEST_STEP_SELECTION",
+        "VENDOR_OPERATOR_ACTION_SEAM_OR_SINGLE_CALL_CHUNK_CAUSAL_SCOPE"
+      ]
+    },
+    "transitive_runtime_closure_claimed": false
+  },
+  "gpu_contract": {
+    "canonical_host": "H200",
+    "physical_index_at_card_freeze": 7,
+    "uuid": "GPU-41c95a43-ce96-fff3-33e0-739a3931d603",
+    "model": "NVIDIA H200",
+    "compute_capability": "9.0",
+    "logical_index_after_visibility_filter": 0,
+    "reservation_state": "NOT_ACQUIRED_CARD_ONLY",
+    "future_authority_must_explicitly_reserve_exact_uuid": true,
+    "no_fallback_gpu": true,
+    "exclude_physical_indices_with_stale_runner_text": [
+      0,
+      1
+    ],
+    "preflight_snapshot_window_seconds": 120,
+    "preflight_required_observations": [
+      "UUID_TO_PHYSICAL_INDEX_MAPPING_MATCHES",
+      "MEMORY_USED_IS_ZERO_AT_BOTH_SNAPSHOTS",
+      "UTILIZATION_IS_ZERO_AT_BOTH_SNAPSHOTS",
+      "NVIDIA_SMI_COMPUTE_APPS_EMPTY",
+      "NVIDIA_SMI_PMON_EMPTY",
+      "NO_EXTERNAL_FUSER_PROCESS_ON_DEVICE"
+    ],
+    "immediate_launch_time_recheck_required": true,
+    "external_process_or_mapping_change_rule": "FAIL_CLOSED_BEFORE_ROOT_CREATE_OR_CUDA_IMPORT",
+    "reservation_is_not_implied_by_this_card": true,
+    "gpu_or_cuda_used_during_card_freeze": false,
+    "fresh_two_snapshot_preflight_and_immediate_launch_recheck_required": true
+  },
+  "launcher_contract": {
+    "expected_environment": {
+      "python": "3.12.13",
+      "torch": "2.7.1+cu128",
+      "triton": "3.5.1",
+      "cuda_toolkit": "12.8",
+      "nvcc": "12.8.61",
+      "driver": "570.211.01"
+    },
+    "environment_must_be_set_before_any_torch_or_vendor_import": {
+      "CUDA_VISIBLE_DEVICES": "GPU-41c95a43-ce96-fff3-33e0-739a3931d603",
+      "CUDA_DEVICE_ORDER": "PCI_BUS_ID",
+      "GDN_DISABLE_COMPILE": "1",
+      "TORCHDYNAMO_DISABLE": "1",
+      "FUSED_GDN_PRECISION": "0",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "PYTHONPATH": "/home/zch/workspace/sana-wam/src:/home/zch/workspace/sana-wam/third_party/Sana",
+      "TRITON_CACHE_DIR": "/DATA/share/sana_cach_wam_nonformal_screens/av1b_review300/06f5d09127f8/av1b-review300-bd32b08576c9d598c629b90286331b87/triton_cache"
+    },
+    "precision_interpretation": "FUSED_GDN_PRECISION_0_MEANS_IEEE_FP32_DOTS_AND_FP32_STATE",
+    "cuda_device_zero_must_match_uuid": "GPU-41c95a43-ce96-fff3-33e0-739a3931d603",
+    "single_process": true,
+    "distributed_or_context_parallel": false,
+    "network_access": false,
+    "allow_dependency_install": false,
+    "allow_checkpoint": false,
+    "allow_real_data": false,
+    "allow_full_2b": false,
+    "allow_cpu_proxy_or_reference_fallback": false,
+    "cuda_cache_disable_must_be_unset": true,
+    "source_and_environment_preflight_before_root_create": true,
+    "card_and_authority_preflight_before_root_create": true,
+    "gpu_recheck_before_root_create_and_import": true,
+    "failure_trap_before_first_root_mutation": true,
+    "planned_command_template_not_authorized": "env CUDA_VISIBLE_DEVICES=GPU-41c95a43-ce96-fff3-33e0-739a3931d603 CUDA_DEVICE_ORDER=PCI_BUS_ID GDN_DISABLE_COMPILE=1 TORCHDYNAMO_DISABLE=1 FUSED_GDN_PRECISION=0 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/home/zch/workspace/sana-wam/src:/home/zch/workspace/sana-wam/third_party/Sana TRITON_CACHE_DIR=/DATA/share/sana_cach_wam_nonformal_screens/av1b_review300/06f5d09127f8/av1b-review300-bd32b08576c9d598c629b90286331b87/triton_cache ./.venv/bin/python scripts/run_cach_av1b_vendor_gdn_bridge_review300.py --config configs/experiments/cach_av1b_vendor_gdn_bridge_review300.yaml --card docs/cach_sana_wam/architecture_validation/av1b_review300/AV1B_REVIEW300_RUN_CARD.json --card-sha256 FUTURE_FULL_LITERAL_CARD_SHA256 --root /DATA/share/sana_cach_wam_nonformal_screens/av1b_review300/06f5d09127f8/av1b-review300-bd32b08576c9d598c629b90286331b87 --nonce bd32b08576c9d598c629b90286331b87",
+    "successor_launcher_requirements": {
+      "standard_library_only_before_all_preflight_checks": true,
+      "reject_predecessor_runner_for_review300": true,
+      "reject_any_200_step_bridge_config_runner_or_test_execution": true,
+      "bind_materialized_review300_source_sha_before_root_create_or_vendor_import": true,
+      "verify_predecessor_root_evidence_and_latest_token_head_before_root_create": true,
+      "verify_or_exclusively_create_only_card_listed_run_namespace_parents_before_root_create": true,
+      "token_namespace_parents_must_not_be_created_until_valid_provisional_root_is_frozen_and_final_verdict_computed": true,
+      "invalid_or_resource_failure_before_claim_does_not_consume_token": true,
+      "valid_review_provisional_root_freezes_before_atomic_claim": true,
+      "no_postclaim_root_or_verdict_write": true
+    }
+  },
+  "root_contract": {
+    "label": "NON_FORMAL_ARCHITECTURE_REVIEW_SCREEN_IMMUTABLE_NOT_ADMISSION_EVIDENCE",
+    "resolved_root": "/DATA/share/sana_cach_wam_nonformal_screens/av1b_review300/06f5d09127f8/av1b-review300-bd32b08576c9d598c629b90286331b87",
+    "namespace_basis": "GOVERNING_PLAN_SHA256_12_AND_LITERAL_AV1B_REVIEW300_PREFIX",
+    "run_nonce": "bd32b08576c9d598c629b90286331b87",
+    "run_nonce_pattern": "^[0-9a-f]{32}$",
+    "nonexistence_observed_at_card_freeze": true,
+    "created": false,
+    "creation_authorized": false,
+    "future_authority_must_bind_exact_root_nonce_and_full_card_sha256": true,
+    "preflight_must_not_exist": true,
+    "exclusive_create_required": true,
+    "capacity_and_owner_check_required": true,
+    "minimum_free_bytes_before_create": 107374182400,
+    "precreate_block_rule": "AUTH_ENV_SOURCE_GPU_RESERVATION_OR_CAPACITY_BLOCK_BEFORE_EXCLUSIVE_CREATE_WRITES_NO_ROOT_AND_USES_CALLER_TRANSCRIPT_ONLY",
+    "triton_cache_must_be_inside_root": true,
+    "created_root_must_freeze_on_every_terminal_state": true,
+    "freeze_modes": "0555_DIRECTORIES_AND_0444_FILES",
+    "delete_after_creation": false,
+    "modify_after_freeze": false,
+    "reuse": false,
+    "retry_requires_new_card_or_successor_attempt_card_AND_NEW_ROOT_NONCE": true,
+    "formal_promotion": false,
+    "required_artifacts_if_root_created": [
+      "RUN_CONTEXT.json",
+      "PROGRESS_EVENTS.json",
+      "THETA0_MANIFESTS.json",
+      "LOSS_TRACE.json",
+      "RAW_METRICS.json",
+      "RAW_EVIDENCE.json",
+      "FINAL_PARAMETER_DIGESTS.json",
+      "JIT_INVENTORY.json",
+      "RESULT.json",
+      "FREEZE_RECEIPT.json"
+    ],
+    "preflight_must_not_exist_or_be_symlink": true,
+    "valid_review_result_before_claim": "VALID_REVIEW_PROVISIONAL_NO_VERDICT",
+    "final_valid_review_result_location": "CANONICAL_ATOMIC_TOKEN_CLAIM_OUTSIDE_FROZEN_ROOT",
+    "postclaim_root_write": false,
+    "retry_after_created_root": false,
+    "namespace_parent_contract": {
+      "exact_paths_in_creation_order": [
+        "/DATA/share/sana_cach_wam_nonformal_screens/av1b_review300",
+        "/DATA/share/sana_cach_wam_nonformal_screens/av1b_review300/06f5d09127f8"
+      ],
+      "observed_absent_at_card_freeze": true,
+      "creation_authorized_by_this_card": false,
+      "future_authority_must_explicitly_allow_creation": true,
+      "expected_owner": "zch:sharegrp",
+      "creation_mode_then_verify": "02775",
+      "base_parent": "/DATA/share/sana_cach_wam_nonformal_screens",
+      "base_parent_observed_mode_owner": "02775 zch:sharegrp",
+      "lstat_every_ancestor_and_reject_symlink_or_non_directory": true,
+      "exclusive_creation_in_declared_order": true,
+      "unexpected_eexist_or_race": "FAIL_CLOSED_BEFORE_ROOT_CREATE_OR_CUDA_IMPORT",
+      "fsync_each_new_directory_and_its_parent": true,
+      "namespace_parents_remain_02775_after_terminal_root_freeze": true
+    }
+  },
+  "experiment_contract": {
+    "execution_state": "NOT_RUN",
+    "device": "cuda:0_AFTER_EXACT_UUID_FILTER",
+    "dtype": "float32",
+    "topology": {
+      "batch_size": 8,
+      "counterfactual_pair_count": 4,
+      "latent_channels": 3,
+      "spatial_height": 1,
+      "spatial_width": 1,
+      "valid_raw_count": 33,
+      "valid_latent_count": 5,
+      "valid_action_count": 32,
+      "action_dim": 20,
+      "context_dim": 4,
+      "vendor_hidden_dim": 64,
+      "vendor_heads": 2,
+      "vendor_head_dim": 32,
+      "vendor_gdn_depth": 20,
+      "vendor_conv_kernel_size": 0,
+      "vendor_k_conv_only": true,
+      "vendor_qk_norm": true,
+      "vendor_use_output_gate": true,
+      "vendor_use_autograd_kernel": true,
+      "frame_count": 5,
+      "chunk_count": 2,
+      "chunk_boundaries": [
+        0,
+        3,
+        5
+      ],
+      "chunk_valid_latent_counts": [
+        3,
+        2
+      ],
+      "temporal_compression": 8,
+      "video_stride": 1,
+      "scored_future_horizons": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "primary_horizons": [
+        1,
+        2,
+        4
+      ],
+      "frozen_action_backbone": "REAL_ACTIONDIT_JOINT_CROSS_ATTN_DEPTH20_DIAGNOSTIC_ONLY",
+      "action_prediction_loss_weight": 0.0
+    },
+    "synthetic_recipe": {
+      "source": "REUSE_PINNED_AV1_SYNTHETIC_COUNTERFACTUAL_TASK_BYTES_AND_FORMULAS",
+      "task_recipe_sha256": "9d2a749d722775324ee233862772def530fbffe0ea9e55aeea87c160b87a51e4",
+      "slice_id": "synthetic_counterfactual_pairs_0000_0003",
+      "shuffle_permutation": [
+        1,
+        0,
+        3,
+        2,
+        5,
+        4,
+        7,
+        6
+      ],
+      "shuffle_permutation_sha256": "93a9a618e0482688c85f8fc786cbaf7f845f69d5f48c356dd71881fb05d80dfd",
+      "end_of_bin_action_indices_for_future_horizons_1_2_3_4": [
+        7,
+        15,
+        23,
+        31
+      ],
+      "anchor_action_condition": "MODEL_OWNED_EXACT_ZERO_NO_ACTION_SLOT",
+      "correct_mode": "PINNED_VALID_ACTION_TENSOR_AT_REAL_CANDIDATE_SEAM",
+      "shuffle_mode": "PINNED_PAIRED_ROW_PERMUTATION_AT_THE_SAME_SEAM_ONLY",
+      "no_action_mode": "MODEL_OWNED_EXACT_ZERO_AT_EVERY_VALID_SEAM_SLOT",
+      "non_action_video_context_noise_target_bytes_equal_across_modes": true,
+      "target_visibility": "TARGET_BYTES_ENTER_LOSS_ONLY",
+      "no_clean_action_or_future_video_side_channel": true,
+      "task_tensor_digest_manifest_required_before_model_construct": true
+    },
+    "architecture_pair": {
+      "shared_initialization_required": true,
+      "theta0_video_outputs_bitwise_equal_all_modes": true,
+      "candidate_action_conditioner": "LINEAR_20_TO_64_SILU_LINEAR_64_TO_20",
+      "candidate_per_block_action_output_projection": "LINEAR_20_TO_64_AFTER_VENDOR_GDN_BEFORE_FFN",
+      "candidate_action_output_projection_initialization": "EXACT_ZERO_WEIGHT_AND_BIAS",
+      "per_block_formula": "NORMALIZED=PARAMETER_FREE_RMS_NORM(HIDDEN); POST_GDN=HIDDEN+ChunkCausalGDNTriton(NORMALIZED,HW=(5,1,1),chunk_index=[0,3,5]); CACH_A_ONLY_POST_GDN=POST_GDN+ACTION_OUTPUT_PROJECTION(ACTION_CONDITION); OUTPUT=POST_GDN_PLUS_OPTIONAL_ACTION+FFN_OUTPUT(SILU(FFN_INPUT(PARAMETER_FREE_RMS_NORM(POST_GDN_PLUS_OPTIONAL_ACTION))))",
+      "ffn_hidden_dim": 128,
+      "reference_structural_bypass": true,
+      "reference_must_not_read_any_action_or_no_action_tensor": true,
+      "no_action_slot_frozen_exact_zero": true,
+      "dropout_or_stochastic_layer": false,
+      "cross_arm_common_parameter_names_shapes_and_theta0_bytes_equal": true
+    },
+    "operator_lifecycle": {
+      "every_model_forward_is_one_complete_five_frame_vendor_call": true,
+      "persistent_state_input_or_output": false,
+      "state_reuse_between_modes_steps_or_arms": false,
+      "vendor_internal_scan_state": "EPHEMERAL_TO_ONE_FORWARD_CALL",
+      "vendor_internal_recurrent_state_observable": false,
+      "target_bytes_may_enter_operator_inputs": false,
+      "no_claim_of_internal_recurrent_state_validation": true
+    },
+    "initialization": {
+      "seed0": 202608033,
+      "shared_named_seed": 2026080331,
+      "candidate_only_seed": 2026080332,
+      "initializer_revision": "cach-av1b-vendor-gdn-bridge-v1",
+      "common_initialization_method": "SET_CPU_AND_CUDA_SEED_TO_SHARED_NAMED_SEED_CONSTRUCT_ONE_COMMON_TEMPLATE_ON_CPU_DEEPCOPY_ITS_PARAMETER_AND_BUFFER_BYTES_INTO_BOTH_ARMS_THEN_MOVE_BOTH_ARMS_TO_THE_RESERVED_CUDA_DEVICE_BEFORE_ANY_FORWARD",
+      "candidate_only_initialization_method": "PER_EXACT_PARAMETER_NAME_DETERMINISTIC_GENERATOR_FROM_CANDIDATE_ONLY_SEED; NON_SEAM_WEIGHTS_USE_AV1_NAMED_UNIFORM_RULE; BIASES_ZERO; EVERY_PER_BLOCK_ACTION_OUTPUT_PROJECTION_WEIGHT_AND_BIAS_EXACT_ZERO",
+      "fresh_initialization": true,
+      "continuation_from_av1_parameters_or_state": false,
+      "continuation_from_checkpoint": false,
+      "common_parameter_manifest_required_before_forward": true,
+      "candidate_only_manifest_required_before_forward": true,
+      "arm_execution_order": [
+        "REF-GDN-CORRECTED",
+        "CACH-A"
+      ],
+      "data_order": "SINGLE_FIXED_FULL_BATCH_NO_SHUFFLE",
+      "continuation_from_predecessor_av1b_parameters_optimizer_or_rng_state": false,
+      "same_seed_initializer_arm_order_and_data_order_as_predecessor": true,
+      "fresh_theta0_manifest_equivalence_to_predecessor": {
+        "predecessor_path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/THETA0_MANIFESTS.json",
+        "predecessor_sha256": "5b1c3f8db83987da31bb3d0719e9ef495ec317f9bdb7d3df68f5c770db135539",
+        "comparison": "NORMALIZED_PER_ARM_PER_ENTRY_PARAMETER_AND_BUFFER_NAME_SHAPE_DTYPE_AND_BYTE_DIGEST_EQUAL",
+        "raw_file_sha_equality_not_required_because_run_metadata_may_differ": true,
+        "mismatch_state": "IMPLEMENTATION_INVALID_NO_TOKEN_CONSUMPTION"
+      }
+    },
+    "optimizer": {
+      "name": "AdamW",
+      "learning_rate": 0.003,
+      "betas": [
+        0.9,
+        0.99
+      ],
+      "epsilon": 1e-08,
+      "weight_decay": 0.0,
+      "gradient_clip_global_l2": 1.0,
+      "optimizer_steps_per_arm": 300,
+      "metric_steps": [
+        0,
+        300
+      ],
+      "best_step_selection": false,
+      "intermediate_checkpoint_selection": false,
+      "write_optimizer_state": false,
+      "reference_parameter_scope": "ALL_AND_ONLY_GENERATED_COMMON_TRAINABLE_NAMES",
+      "candidate_parameter_scope": "THE_IDENTICAL_COMMON_NAMES_PLUS_ALL_AND_ONLY_GENERATED_CANDIDATE_ACTION_SEAM_NAMES",
+      "unlisted_trainable_parameter_allowed": false
+    },
+    "budget": {
+      "max_wall_seconds_total": 1350,
+      "max_gpu_memory_bytes": 17179869184,
+      "max_process_rss_bytes": 17179869184,
+      "max_root_bytes": 536870912,
+      "max_optimizer_steps_total": 600,
+      "automatic_budget_extension": false,
+      "completion_rule": "BOTH_ARMS_COMPLETE_EXACTLY_300_STEPS_AND_ALL_REQUIRED_DIAGNOSTICS",
+      "budget_failure_state": "HARNESS_REJECTED",
+      "wall_budget_source": "PRE_REGISTERED_AV0_NO_BUG_EXTENSION_BUDGET_1350_SECONDS_OVERRIDES_PREDECESSOR_AV1B_FIRST_RUN_CAP_1800_SECONDS"
+    },
+    "review_choice": "NO_BUG_BUDGET_EXTENSION_FRESH_ROOT_FRESH_INITIALIZATION_300_STEPS",
+    "only_budget_delta_from_predecessor": {
+      "optimizer_steps_per_arm": {
+        "before": 200,
+        "after": 300
+      },
+      "max_optimizer_steps_total": {
+        "before": 400,
+        "after": 600
+      },
+      "loss_trace_points_per_arm": {
+        "before": 201,
+        "after": 301
+      },
+      "metric_steps": {
+        "before": [
+          0,
+          200
+        ],
+        "after": [
+          0,
+          300
+        ]
+      },
+      "max_wall_seconds_total": {
+        "before": 1800,
+        "after": 1350,
+        "source": "AV0_PRE_REGISTERED_NO_BUG_EXTENSION_BUDGET"
+      }
+    },
+    "all_other_scientific_semantics_equal_predecessor": true
+  },
+  "diagnostic_contract": {
+    "vendor_identity": [
+      "EXACT_CLASS_IS_ChunkCausalGDNTriton",
+      "use_autograd_kernel_IS_TRUE",
+      "ACTUAL_VENDOR_FORWARD_CALL_COUNT_IS_STRICTLY_POSITIVE",
+      "CUDA_LOGICAL_DEVICE_ZERO_UUID_MATCHES_CARD",
+      "HW_EQUALS_5_1_1",
+      "NORMALIZED_CHUNK_BOUNDARIES_EQUAL_0_3_5",
+      "FUSED_GDN_PRECISION_EQUALS_0"
+    ],
+    "required_execution": [
+      "THETA0_FORWARD",
+      "BACKWARD_AT_STEP0",
+      "LAST_BLOCK_POST_VENDOR_LOCAL_SEAM_PARAMETER_DIRECTIONAL_JVP_AT_THETA0",
+      "LAST_BLOCK_POST_VENDOR_LOCAL_ACTION_CONDITION_DIRECTIONAL_JVP_AT_STEP300",
+      "TARGET_PERTURBATION_AND_REVERSE_GRADIENT_LEAKAGE_CHECK",
+      "300_ADAMW_STEPS_PER_ARM",
+      "FINAL_CORRECT_SHUFFLE_NO_ACTION_METRICS",
+      "FIRST_CHUNK_PREFIX_INVARIANCE_CHECK",
+      "FINITE_OUTPUT_OBSERVABLE_POST_VENDOR_HIDDEN_GRADIENT_AND_UPDATE_CHECK",
+      "FINITE_NONZERO_BACKWARD_GRADIENT_TO_VENDOR_COMMON_PARAMETERS",
+      "FINAL_PARAMETER_DIGESTS"
+    ],
+    "single_call_causality_check": "PERTURB_ONLY_SECOND_CHUNK_VIDEO_OR_ACTION_INPUTS_AND_REQUIRE_FIRST_CHUNK_PREDICTIONS_UNCHANGED_WITHIN_FIXED_TOLERANCE",
+    "jvp_scope": "RUN_THE_VENDOR_PRIMAL_OUTSIDE_THE_FORWARD_MODE_TRANSFORM; DETACH_AND_FIX_THE_LAST_BLOCK_POST_VENDOR_HIDDEN; THEN_RUN_FORWARD_MODE_JVP_ONLY_OVER_THE_PURE_TORCH_LAST_ACTION_SEAM_PLUS_FFN_AND_OUTPUT_TAIL; THIS_DOES_NOT_CLAIM_VENDOR_CUSTOM_AUTOGRAD_FORWARD_MODE_SUPPORT",
+    "jvp_fixed_primal_and_tangent": {
+      "theta0_parameter_primal": "EXACT_ZERO_LAST_BLOCK_ACTION_OUTPUT_PROJECTION_WEIGHT_WITH_CORRECT_MODE_DETACHED_POST_VENDOR_HIDDEN_AND_ACTION_CONDITION",
+      "theta0_parameter_tangent": "UTF8_PARAMETER_ORDER_FLATTENED_ALTERNATING_PLUS_ONE_MINUS_ONE_NORMALIZED_TO_UNIT_L2",
+      "step300_action_condition_primal": "DETACHED_LAST_BLOCK_CORRECT_MODE_VALID_ACTION_CONDITION_WITH_DIGEST_RECORDED",
+      "step300_action_condition_tangent": "FLATTENED_ALTERNATING_PLUS_ONE_MINUS_ONE_ON_VALID_ENTRIES_NORMALIZED_TO_UNIT_L2_WITH_ALL_PADDING_TANGENTS_EXACT_ZERO",
+      "tail_parameters": "FIXED_AT_THE_CORRESPONDING_THETA0_OR_STEP300_DIGEST_AND_NOT_TANGENT_INPUTS",
+      "post_vendor_hidden_digest_required": true
+    },
+    "cross_call_state_or_commit_diagnostic": "NOT_ASSESSED_BY_DESIGN",
+    "vendor_reference_parity": "NOT_REQUIRED_FOR_DIRECT_VENDOR_KERNEL_CLASSIFICATION",
+    "compile_oom_missing_kernel_or_import_failure": "HARNESS_REJECTED_OR_ENV_BLOCKED_NOT_ARCHITECTURE_NEGATIVE",
+    "frame_valid_mask_use": "FORBIDDEN_BECAUSE_VENDOR_PATH_DOES_NOT_SUPPORT_IT"
+  },
+  "metric_contract": {
+    "accumulator_dtype": "float64",
+    "epsilon": 1e-12,
+    "train_loss_formula": "EQUAL_WEIGHT_MEAN_OF_CORRECT_ACTION_VIDEO_MSE_AT_FUTURE_HORIZONS_1_2_3_4",
+    "primary_formula": "0.20*MSE_H1+0.30*MSE_H2+0.50*MSE_H4",
+    "primary_horizon_weights": {
+      "1": 0.2,
+      "2": 0.3,
+      "4": 0.5
+    },
+    "counterfactual_delta_nmse_formula": "SUM_PAIR_HORIZON_CHANNEL_OF_PREDICTED_PAIR_DELTA_MINUS_TARGET_PAIR_DELTA_SQUARED_DIVIDED_BY_TARGET_PAIR_DELTA_SQUARED_PLUS_EPSILON",
+    "loss_drop_rel_formula": "(CANDIDATE_CORRECT_LOSS_STEP0-CANDIDATE_CORRECT_LOSS_STEP300)/MAX(CANDIDATE_CORRECT_LOSS_STEP0,EPSILON)",
+    "shuffle_gap_rel_formula": "(PRIMARY_SHUFFLE_STEP300-PRIMARY_CORRECT_STEP300)/MAX(PRIMARY_SHUFFLE_STEP300,EPSILON)",
+    "no_action_gap_rel_formula": "(PRIMARY_NO_ACTION_STEP300-PRIMARY_CORRECT_STEP300)/MAX(PRIMARY_NO_ACTION_STEP300,EPSILON)",
+    "candidate_gain_vs_reference_formula": "(PRIMARY_REFERENCE_STEP300-PRIMARY_CANDIDATE_CORRECT_STEP300)/MAX(PRIMARY_REFERENCE_STEP300,EPSILON)",
+    "seam_grad_rms_step0_formula": "RMS_OVER_CANDIDATE_PER_BLOCK_ACTION_OUTPUT_PROJECTION_WEIGHT_GRADIENTS_BIASES_EXCLUDED",
+    "seam_update_rms_final_formula": "RMS_OVER_STEP300_MINUS_STEP0_FOR_THE_SAME_WEIGHTS_BIASES_EXCLUDED",
+    "last_block_local_seam_parameter_jvp_rms_theta0_formula": "RMS_OF_THE_LAST_BLOCK_POST_VENDOR_TAIL_OUTPUT_DIRECTIONAL_JVP_FOR_A_FIXED_UNIT_NORM_ALTERNATING_SIGN_DIRECTION_OVER_THAT_BLOCK_ACTION_OUTPUT_PROJECTION_WEIGHTS_ONLY",
+    "last_block_local_action_condition_jvp_rms_step300_formula": "RMS_OF_THE_TRAINED_LAST_BLOCK_POST_VENDOR_TAIL_OUTPUT_DIRECTIONAL_JVP_FOR_A_FIXED_NONZERO_VALID_ACTION_CONDITION_DIRECTION_WITH_PADDING_TANGENTS_EXACT_ZERO",
+    "prefix_invariance_max_abs_formula": "MAX_ABS_FIRST_CHUNK_OUTPUT_DIFFERENCE_AFTER_ONLY_SECOND_CHUNK_INPUT_PERTURBATION",
+    "final_step_only": true,
+    "best_step_forbidden": true
+  },
+  "threshold_contract": {
+    "threshold_kind": "NONFORMAL_SCREENING_NOT_SCIENTIFIC",
+    "validity_all_required": {
+      "finite_all_outputs_losses_observable_post_vendor_hidden_gradients_updates_optimizer_scalars_and_metrics": true,
+      "theta0_reference_candidate_video_output_bitwise_equal_all_modes": true,
+      "reference_correct_shuffle_no_action_video_outputs_bitwise_equal": true,
+      "no_action_candidate_pair_predictions_bitwise_equal": true,
+      "candidate_no_action_slot_remains_exact_zero_and_update_free": true,
+      "common_theta0_parameter_bytes_equal": true,
+      "valid_action_exact_once_and_padding_zero": true,
+      "non_seam_bytes_bitwise_equal_across_correct_shuffle_no_action": true,
+      "target_perturbation_changes_prediction_or_observable_post_vendor_hidden": false,
+      "prediction_target_reverse_gradient_nonzero": false,
+      "single_call_first_chunk_prefix_invariance_max_abs": 0.0001,
+      "single_call_first_chunk_prefix_invariance_max_rel": 0.0001,
+      "exact_vendor_identity_checks_pass": true,
+      "actual_vendor_forward_call_count_strictly_positive": true,
+      "vendor_common_parameter_gradient_rms_step0_strictly_greater_than": 1e-08,
+      "candidate_last_block_local_seam_parameter_jvp_rms_theta0_strictly_greater_than": 1e-08,
+      "candidate_last_block_local_action_condition_jvp_rms_step300_strictly_greater_than": 1e-08,
+      "no_real_data_checkpoint_or_fallback_path_used": true,
+      "cuda_and_jit_inventory_recorded": true,
+      "exactly_300_optimizer_steps_completed_per_arm": true
+    },
+    "operator_go_all_required": {
+      "seam_grad_rms_step0_strictly_greater_than": 1e-08,
+      "seam_update_rms_final_strictly_greater_than": 1e-06,
+      "last_block_local_seam_parameter_jvp_rms_theta0_strictly_greater_than": 1e-08,
+      "last_block_local_action_condition_jvp_rms_step300_strictly_greater_than": 1e-08,
+      "loss_drop_rel_min": 0.8,
+      "counterfactual_delta_nmse_correct_max": 0.25,
+      "counterfactual_delta_nmse_correct_h1_max": 0.35,
+      "counterfactual_delta_nmse_correct_h2_max": 0.35,
+      "counterfactual_delta_nmse_correct_h4_max": 0.35,
+      "shuffle_gap_rel_min": 0.5,
+      "shuffle_gap_rel_h1_min": 0.25,
+      "shuffle_gap_rel_h2_min": 0.25,
+      "shuffle_gap_rel_h4_min": 0.25,
+      "no_action_gap_rel_min": 0.5,
+      "no_action_gap_rel_h1_min": 0.25,
+      "no_action_gap_rel_h2_min": 0.25,
+      "no_action_gap_rel_h4_min": 0.25,
+      "candidate_gain_vs_reference_min": 0.5
+    },
+    "operator_strong_stop_all_required": {
+      "valid_data_implementation_and_numerics": true,
+      "seam_grad_rms_step0_strictly_greater_than": 1e-08,
+      "seam_update_rms_final_strictly_greater_than": 1e-06,
+      "loss_drop_rel_max": 0.1,
+      "counterfactual_delta_nmse_correct_min": 0.9,
+      "shuffle_gap_rel_max": 0.05,
+      "no_action_gap_rel_max": 0.05,
+      "candidate_gain_vs_reference_max": 0.05
+    },
+    "post_result_threshold_change": false,
+    "review_run_classification": {
+      "all_validity_and_all_go": "OPERATOR_GO",
+      "all_validity_and_all_strong_stop": "OPERATOR_STOP",
+      "valid_matching_neither_all_go_nor_all_strong_stop": "OPERATOR_INCONCLUSIVE_REVIEW_EXHAUSTED",
+      "invalid_implementation_data_or_numerics": "TYPED_INVALID_STATE_NO_TOKEN_CONSUMPTION_NO_ARCHITECTURE_VERDICT",
+      "environment_compile_oom_resource_or_harness_failure": "TYPED_BLOCKED_STATE_NO_TOKEN_CONSUMPTION_NO_ARCHITECTURE_VERDICT"
+    }
+  },
+  "review_token": {
+    "token_id": "cadfd92f1c72ebd9cc9aa8bfad029ddc6f0e72d9f7942f34e74629ca1ae37252",
+    "chain_scope": "AV1_THROUGH_AV4_EXACTLY_ONCE",
+    "state_at_successor_card_freeze": "UNCONSUMED",
+    "selected_choice": "NO_BUG_BUDGET_EXTENSION_FRESH_ROOT_FRESH_INITIALIZATION_300_STEPS",
+    "rejected_choice": "BUG_FIX_FRESH_REVISION_FRESH_ROOT_FRESH_INITIALIZATION_200_STEPS",
+    "simultaneous_or_sequential_use_of_both_choices_forbidden": true,
+    "selection_itself_consumes_token": false,
+    "claim_creation_authorized_by_this_card": false,
+    "canonical_claim_path": "/DATA/share/sana_cach_wam_nonformal_screens/token_ledgers/c73a943047295338cd9de14e6e53199b463ea66ae92b99d4b0b3393f5ec34030/cadfd92f1c72ebd9cc9aa8bfad029ddc6f0e72d9f7942f34e74629ca1ae37252.claim.json",
+    "claim_path_and_symlink_absent_at_successor_card_freeze": true,
+    "latest_token_state_head": {
+      "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/RESULT.json",
+      "sha256": "d33e2e6bdf59cc1d2ffe51b32d48ce22daa4da1a902e3e9bded28cce29adb5de",
+      "typed_state": "REVIEW_ONCE",
+      "token_state": "UNCONSUMED",
+      "supporting_raw_evidence": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/RAW_EVIDENCE.json",
+        "sha256": "0b0110f054e7e1f54ad19175c39c20fc8117d311b988b13f362b1973d09f60a1"
+      },
+      "supporting_freeze_receipt": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/FREEZE_RECEIPT.json",
+        "sha256": "2949acd034ffc6f59038d2ba3b2501854fcb0b94c11a8675d96d0ab40907f677"
+      }
+    },
+    "pre_registered_no_bug_extension_budget": {
+      "final_step_N": 300,
+      "metric_steps": [
+        0,
+        300
+      ],
+      "max_wall_seconds_total": 1350
+    },
+    "authority_artifact_contract": {
+      "choice_authority_artifact": {
+        "path": "docs/cach_sana_wam/architecture_validation/av1b_review300/AV1B_REVIEW300_RUN_CARD.json",
+        "full_sha256_binding": "OUT_OF_BAND_FULL_LITERAL_SUCCESSOR_CARD_SHA256",
+        "must_contain_selection_statement_and_sha256": true
+      },
+      "source_and_execution_authority_artifact": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b_review300/06f5d09127f8/av1b-review300-bd32b08576c9d598c629b90286331b87/RUN_CONTEXT.json",
+        "full_sha256_binding": "CURRENT_FROZEN_RUN_CONTEXT_FULL_SHA256",
+        "must_contain_verbatim_source_and_execution_authority_statements_and_sha256": true,
+        "must_be_written_before_torch_cuda_or_vendor_import": true,
+        "must_be_bound_by_freeze_receipt_and_canonical_claim": true
+      }
+    },
+    "claim_transaction_contract": {
+      "future_authority_must_bind_exact_claim_path_and_write_permission": true,
+      "future_authority_must_bind_latest_token_state_head_path_and_full_sha256": true,
+      "review_execution_must_be_serial": true,
+      "concurrent_or_forked_review_authority": "FORBIDDEN",
+      "preclaim_path_and_symlink_must_not_exist": true,
+      "claim_must_use_atomic_exclusive_create": true,
+      "ledger_namespace_parent_contract": {
+        "exact_paths_in_creation_order": [
+          "/DATA/share/sana_cach_wam_nonformal_screens/token_ledgers",
+          "/DATA/share/sana_cach_wam_nonformal_screens/token_ledgers/c73a943047295338cd9de14e6e53199b463ea66ae92b99d4b0b3393f5ec34030"
+        ],
+        "observed_absent_at_card_freeze": true,
+        "creation_authorized_by_this_card": false,
+        "future_authority_must_explicitly_allow_creation": true,
+        "expected_owner": "zch:sharegrp",
+        "creation_mode_then_verify": "02775",
+        "base_parent": "/DATA/share/sana_cach_wam_nonformal_screens",
+        "base_parent_observed_mode_owner": "02775 zch:sharegrp",
+        "lstat_every_ancestor_and_reject_symlink_or_non_directory": true,
+        "exclusive_creation_in_declared_order": true,
+        "creation_timing": "AFTER_VALID_PROVISIONAL_ROOT_FREEZE_AND_FINAL_VERDICT_COMPUTATION_IMMEDIATELY_BEFORE_ATOMIC_CLAIM",
+        "invalid_blocked_oom_compile_resource_or_harness_failure_creates_these_parents": false,
+        "unexpected_eexist_or_race": "FAIL_CLOSED_NO_CLAIM_NO_ARCHITECTURE_VERDICT",
+        "fsync_each_new_directory_and_its_parent": true,
+        "successful_claim_file_mode": "0444",
+        "successful_claim_leaf_directory_final_mode": "0555",
+        "successful_claim_durability_sequence": [
+          "WRITE_CANONICAL_JSON_THROUGH_O_CREAT_O_EXCL_O_NOFOLLOW_REGULAR_FILE_DESCRIPTOR",
+          "FSYNC_CLAIM_FILE_CONTENT",
+          "FCHMOD_CLAIM_FILE_0444",
+          "FSYNC_CLAIM_FILE_AFTER_FCHMOD",
+          "FSYNC_LEDGER_LEAF_DIRECTORY_FOR_DIRECTORY_ENTRY",
+          "FCHMOD_LEDGER_LEAF_DIRECTORY_0555",
+          "FSYNC_LEDGER_LEAF_DIRECTORY_AFTER_FCHMOD",
+          "FSYNC_LEDGER_PARENT_AND_ANY_NEWLY_CREATED_ANCESTOR_IN_REVERSE_ORDER"
+        ]
+      },
+      "provisional_root_typed_state": "VALID_REVIEW_PROVISIONAL_NO_VERDICT",
+      "claim_timing": "ONLY_AFTER_REVIEW_RUN_HAS_A_FROZEN_VALID_REVIEW_PROVISIONAL_NO_VERDICT_RESULT_AND_AFTER_FINAL_TYPED_VERDICT_IS_COMPUTED",
+      "claim_payload_required_bindings": [
+        "token_id_and_selected_choice",
+        "this_full_card_path_and_sha256",
+        "predecessor_full_card_result_raw_evidence_and_receipt_pins",
+        "materialized_review300_source_pins",
+        "new_exact_root_and_nonce",
+        "fresh_initialization_digest",
+        "current_frozen_provisional_result_path_and_sha256",
+        "current_raw_evidence_path_and_sha256",
+        "current_freeze_receipt_path_and_sha256",
+        "new_choice_authority_artifact_path_and_full_sha256",
+        "new_source_and_execution_authority_run_context_artifact_path_and_full_sha256",
+        "choice_source_and_execution_authority_statement_bytes_and_sha256",
+        "final_exact_typed_verdict_and_all_final_metrics"
+      ],
+      "claim_payload_serialization": "CANONICAL_UTF8_JSON_SORTED_KEYS_COMPACT_SEPARATORS_SINGLE_TRAILING_NEWLINE_NO_BOM",
+      "claim_path_preopen_lstat_must_be_absent": true,
+      "claim_postwrite_must_be_regular_non_symlink_complete_schema_valid_and_hash_reverified": true,
+      "successful_complete_claim_is_only_consumed_chain_head_and_final_immutable_review_result": true,
+      "no_postclaim_verdict_or_root_write": true,
+      "invalid_blocked_oom_compile_resource_or_harness_failure_attempts_claim": false,
+      "claim_race_loser_state": "HARNESS_REJECTED_TOKEN_CLAIM_CONFLICT_NO_ARCHITECTURE_VERDICT",
+      "second_or_forked_claim": "FAIL_CLOSED",
+      "incomplete_or_noncanonical_claim": "TOKEN_LEDGER_CORRUPT_FAIL_CLOSED_NO_VERDICT_NO_SECOND_CLAIM_WITHOUT_EXPLICIT_RECOVERY_AUTHORITY",
+      "post_provisional_preclaim_failure": {
+        "external_typed_state": "FROZEN_PROVISIONAL_CLAIM_PENDING_RECOVERY_NO_VERDICT",
+        "root_remains": "VALID_REVIEW_PROVISIONAL_NO_VERDICT_FROZEN_AND_IMMUTABLE",
+        "model_optimizer_or_data_rerun": false,
+        "automatic_claim_retry": false,
+        "future_exact_claim_only_recovery_authority_may_reverify_frozen_root_and_complete_absent_canonical_claim": true,
+        "canonical_claim_partial_present_requires_separate_explicit_ledger_recovery_authority": true,
+        "claim_io_failure_or_race_must_not_modify_frozen_root": true,
+        "caller_transcript_event_and_platform_pin_required": true
+      }
+    },
+    "bounded_review_basis": {
+      "observation_action_target_alignment_and_masks": "NO_CLEAR_BUG_FOUND",
+      "shared_initialization_data_order_and_steps": "NO_CLEAR_BUG_FOUND",
+      "action_seam_gradient_and_update_liveness": "PASSED",
+      "loss_metric_copy_baseline_and_shuffle_implementation": "NO_CLEAR_BUG_FOUND",
+      "dtype_range_underflow_overflow": "PASSED",
+      "learning_rate_observation": "OSCILLATORY_ENDPOINT_BUT_NOT_A_CONFIRMED_IMPLEMENTATION_BUG",
+      "proxy_key_operator_preservation": "PASSED_FOR_DECLARED_VENDOR_SINGLE_CALL_SCOPE",
+      "reason_for_choice": "NO_CONFIRMED_BUG_AND_200_STEP_FINAL_ENDPOINT_IS_PHASE_SENSITIVE"
+    }
+  },
+  "verdict_contract": {
+    "initial_state": "NOT_RUN",
+    "observed_verdict": null,
+    "preclaim_valid_root_state": "VALID_REVIEW_PROVISIONAL_NO_VERDICT",
+    "provisional_result_must_bind": [
+      "exact_typed_state_VALID_REVIEW_PROVISIONAL_NO_VERDICT",
+      "operator_level_VENDOR_KERNEL",
+      "integration_path_EXPERIMENTAL_PATH",
+      "synthetic_single_batch_single_call_vendor_operator_scope",
+      "single_call_chunk_causal_semantics_and_explicit_non_assessed_scope",
+      "selected_NO_BUG_300_choice_and_rejected_BUG_FIX_200_choice",
+      "this_successor_card_path_and_full_sha256",
+      "predecessor_av1b_card_root_nonce_result_raw_evidence_and_freeze_receipt_full_pins",
+      "all_materialized_review300_bridge_config_runner_test_full_sha256_before_and_after_execution",
+      "all_predecessor_source_and_vendor_closure_full_sha256",
+      "choice_authority_card_artifact_path_and_full_sha256",
+      "source_and_execution_authority_RUN_CONTEXT_artifact_path_and_full_sha256",
+      "choice_source_and_execution_authority_statement_bytes_and_sha256",
+      "gpu_physical_index_uuid_name_and_both_prelaunch_plus_immediate_launch_snapshots",
+      "exact_root_nonce_and_root_lifecycle",
+      "RAW_EVIDENCE_path_and_full_sha256",
+      "RAW_METRICS_path_and_full_sha256",
+      "THETA0_MANIFESTS_path_and_full_sha256_plus_normalized_predecessor_equivalence",
+      "LOSS_TRACE_path_and_full_sha256_with_301_points_per_arm",
+      "JIT_INVENTORY_path_and_full_sha256",
+      "FINAL_PARAMETER_DIGESTS_path_and_full_sha256",
+      "PROGRESS_EVENTS_path_and_full_sha256",
+      "FREEZE_RECEIPT_expected_path_and_rule_that_receipt_binds_this_provisional_result_full_sha256",
+      "all_validity_flags_all_final_metrics_and_all_go_plus_strong_stop_boolean_inputs_without_final_verdict",
+      "review_token_id_UNCONSUMED_and_canonical_claim_path_absent_at_root_freeze",
+      "real_data_checkpoint_fallback_full2b_formal_admission_deploy_av2_and_global_stage3_all_false"
+    ],
+    "provisional_result_forbidden": [
+      "FINAL_OPERATOR_GO_STOP_OR_INCONCLUSIVE_VERDICT",
+      "TOKEN_CONSUMED_CLAIM",
+      "STAGE_UNLOCK",
+      "POST_FREEZE_MUTATION"
+    ],
+    "provisional_result_full_sha256_must_be_bound_by_freeze_receipt_and_successful_claim": true,
+    "successful_claim_final_verdicts": {
+      "all_go_conditions": "OPERATOR_GO",
+      "all_strong_stop_conditions": "OPERATOR_STOP",
+      "valid_neither_all_go_nor_all_strong_stop": "OPERATOR_INCONCLUSIVE_REVIEW_EXHAUSTED"
+    },
+    "review_once_after_valid_review": "FORBIDDEN",
+    "invalid_or_blocked_states": [
+      "AUTH_BLOCKED",
+      "ENV_BLOCKED",
+      "HARNESS_REJECTED",
+      "INVALID_RUN",
+      "IMPLEMENTATION_INVALID",
+      "NUMERICAL_INVALID",
+      "TOKEN_LEDGER_CORRUPT"
+    ],
+    "invalid_or_blocked_consumes_token": false,
+    "invalid_or_blocked_is_architecture_negative": false,
+    "operator_go_effect": "MAY_REQUEST_AV2_AUTHORITY_ONLY",
+    "operator_stop_effect": "STOP_REDUCED_OPERATOR_BRANCH_NO_AV2_FULL_ARCHITECTURE_NOT_ASSESSED",
+    "operator_inconclusive_effect": "NO_AV2_NO_MORE_REVIEW_TOKEN_FULL_ARCHITECTURE_NOT_ASSESSED",
+    "global_gate_effect": "NONE",
+    "formal_admission_effect": "NONE",
+    "claim_is_final_result_publication": true,
+    "root_result_remains_provisional_and_immutable_after_successful_claim": true
+  },
+  "current_effect": {
+    "scope": "THIS_SUCCESSOR_CARD_FREEZE_ONLY",
+    "selected_review_choice": "NO_BUG_BUDGET_EXTENSION_FRESH_ROOT_FRESH_INITIALIZATION_300_STEPS",
+    "successor_card_frozen": true,
+    "successor_card_parent_directory_created": true,
+    "successor_card_parent_directory_mode_owner": "0775 zch:zch",
+    "planned_root_created": false,
+    "run_or_token_namespace_parent_directories_created": false,
+    "review300_non_card_files_written": false,
+    "gpu_reserved_or_used": false,
+    "cuda_or_jit_executed": false,
+    "torch_vendor_or_model_imported": false,
+    "model_or_test_executed": false,
+    "optimizer_parameter_update_or_training_executed": false,
+    "real_data_or_checkpoint_accessed": false,
+    "review_token_state": "UNCONSUMED",
+    "canonical_claim_created": false,
+    "scientific_eligible": false,
+    "formal_admission_evidence": false,
+    "global_gates_unchanged": true,
+    "next_action": "REQUEST_EXPLICIT_REVIEW300_SOURCE_IMPLEMENTATION_AUTHORITY_BOUND_TO_THIS_CARD_FULL_SHA256_AND_THE_FOUR_EXACT_NEW_PATHS"
+  }
+}

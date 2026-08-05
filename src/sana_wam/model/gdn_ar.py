@@ -108,6 +108,7 @@ class DualSystemGDNARArchitecture(DualSystemCrossAttnArchitecture):
         seq_lens: Optional[Tensor] = None,
         proprio_state: Optional[Tensor] = None,
         action_freqs: Optional[Tensor] = None,
+        action_condition: Optional[Tensor] = None,
         save_kv_cache: bool = True,
         frame_index: Optional[Tensor] = None,
         use_gradient_checkpointing: bool = False,
@@ -151,6 +152,7 @@ class DualSystemGDNARArchitecture(DualSystemCrossAttnArchitecture):
             save_kv_cache=save_kv_cache,
             frame_index=frame_index,
             bridge_layers=self._bridge_layers,
+            action_condition=action_condition,
         )
 
         if noisy_actions is None or ab is None:

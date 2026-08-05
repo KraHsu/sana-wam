@@ -31,7 +31,9 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
 sys.path.insert(0, str(_ROOT / "third_party" / "Sana"))
 
-from sana_wam.deploy.policy_server import build_server_from_config  # noqa: E402
+from sana_wam.train.cach_stage0_guard import (  # noqa: E402
+    reject_cach_stage0_base_config,
+)
 
 
 def _deployment_source_identity(config_path: str, overrides: list[str]) -> dict:
@@ -62,7 +64,13 @@ def main():
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-    cfg = OmegaConf.merge(OmegaConf.load(args.deploy_config), OmegaConf.from_dotlist(overrides))
+    base_cfg = OmegaConf.load(args.deploy_config)
+    reject_cach_stage0_base_config(base_cfg, entrypoint="scripts/deploy.py")
+    cfg = OmegaConf.merge(base_cfg, OmegaConf.from_dotlist(overrides))
+
+    # Importing the policy server reaches torch/model code.  Keep it strictly
+    # after the raw-base reserved-marker denial above.
+    from sana_wam.deploy.policy_server import build_server_from_config
 
     ckpt_name = args.ckpt_name or OmegaConf.select(cfg, "checkpoint_name", default=None)
     server = build_server_from_config(

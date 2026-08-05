@@ -17,6 +17,13 @@ ROBOTWIN_POLICY_CONFIG_PATH="${ROBOTWIN_POLICY_CONFIG_PATH:-${ROOT}/benchmarks/r
     exit 2
 }
 
+PYTHONDONTWRITEBYTECODE=1 \
+"${SANA_WAM_GUARD_PYTHON:-${ROOT}/.venv/bin/python}" \
+    "${ROOT}/scripts/check_cach_stage0_reserved_config.py" \
+    "${ROBOTWIN_POLICY_CONFIG_PATH}" \
+    --entrypoint "scripts/eval_ar_lownoise_seedfixed.sh policy config" \
+    || exit 2
+
 mkdir -p \
     "${RUN_DIR}/robotwin_runtime" \
     "${RUN_DIR}/tmp" \

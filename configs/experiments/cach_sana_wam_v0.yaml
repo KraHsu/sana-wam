@@ -1,0 +1,117 @@
+# CACH-SANA-WAM v0 Stage-0 schema draft.
+#
+# EXECUTION IS INTENTIONALLY BLOCKED:
+# - architecture.variant is not registered in src/sana_wam/model/__init__.py;
+# - no output_dir, dataset manifest, seed, optimizer, budget, root or endpoint exists;
+# - the draft authority has decision=deny_execution.
+#
+# Do not pass this file to scripts/train.py. Stage 1 must first add an explicit,
+# fail-closed architecture dispatch and config validator under separate authority.
+
+cach_stage0:
+  schema_version: cach-sana-wam-config-draft-v1
+  status: draft_blocked
+  execution_enabled: false
+  scientific_eligible: false
+  plan: docs/CAUSAL_ACTION_CONDITIONED_HYBRID_SANA_WAM_DEVELOPMENT_PLAN_20260731.md
+  source_manifest: docs/cach_sana_wam/stage0/SOURCE_MANIFEST.draft.json
+  candidate_spec: docs/cach_sana_wam/stage0/CACH_A_CANDIDATE_SPEC.draft.json
+
+model:
+  architecture:
+    framework: dual_system
+    variant: cach_sana_wam_v0
+    action_dim: 20
+    state_dim: 20
+    use_proprioception: true
+    proprio_per_chunk: true
+    proprio_boundary: layout_committed_boundary_v1
+    frame_chunk_size: 3
+    episode_bootstrap: first_frame_pinned
+    observed_prefix_chunks: 0
+    action_condition:
+      enabled: true
+      public_name: action_condition
+      internal_vendor_seam: use_delta_pose_additive
+      initialization: zero
+    causal_softmax_anchors:
+      enabled: false
+      indices: []
+    block_attn_res:
+      enabled: false
+    self_forcing:
+      enabled: false
+    initialization_mode: complete_random_v1
+  video_backbone:
+    name: sana_video_2b
+    model_path: null
+    init_dit_from: null
+    vae_type: ltx2
+    vae_path: /DATA/share/SANA-WM_streaming/ltx2_causal_vae
+    text_encoder_name: /DATA/share/gemma-2-2b-it
+    freeze: false
+    attn_kernel: gdn
+    chunk_size: 3
+    fp32_attention: true
+    use_first_frame_cond: true
+    flow_shift: null
+  action_backbone:
+    dim: 1152
+    ffn_dim: 4608
+
+dataloader:
+  type: robotwin
+  dataset_dir: /DATA/share/RoboTwin2.0/dataset
+  dataset_manifest: null
+  row_rate_manifest: null
+  robot: aloha-agilex
+  variant: null
+  action_mode: eef
+  # CACH-A v0 uses absolute EEF targets.  This must not depend on the legacy
+  # RoboTwinDataset default because it defines conditioner and ACK values.
+  delta_action: false
+  vae_type: ltx2
+  temporal_compression: 8
+  causal_temporal: true
+  video_stride: 1
+  height: 384
+  width: 320
+  multiview: true
+  camera_layout: [head_camera, left_camera, right_camera]
+  # CACH v0 requires episode-origin rows but forbids legacy growing-history
+  # clean prefixes. Stage 1 must implement and validate this new sampler seam.
+  growing_history: false
+  episode_origin_only: true
+  reject_nonzero_row_start: true
+
+training:
+  output_dir: null
+  init_checkpoint: null
+  init_checkpoint_sha256: null
+  max_steps: null
+  save_steps: null
+  keep_last_k: null
+  batch_size: null
+  gradient_accumulation_steps: null
+  num_workers: null
+  video_lr: null
+  action_lr: null
+  weight_decay: null
+  grad_clip: null
+  warmup_steps: null
+  lambda_video: 1.0
+  lambda_action: 1.0
+  # These are the exact registered module paths, not `_pipe` implementation
+  # aliases. Stage 1 must additionally prove the per-parameter frozen inventory.
+  freeze:
+    - video_backbone.vae
+    - video_backbone.text_encoder
+  seed: null
+
+admission:
+  authority: docs/cach_sana_wam/stage0/CACH_A_AUTHORITY.draft.json
+  allow_launch: false
+  allow_test: false
+  allow_training: false
+  allow_evaluation: false
+  allow_capture: false

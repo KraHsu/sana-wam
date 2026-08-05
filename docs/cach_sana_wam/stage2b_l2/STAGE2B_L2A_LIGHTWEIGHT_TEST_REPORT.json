@@ -1,0 +1,91 @@
+{
+  "artifact_state_at_lightweight_test_time": {
+    "source_manifest_created": false,
+    "stage2b_l2a_source_bundle_created": false
+  },
+  "authority": {
+    "capture_authorized": false,
+    "deploy_authorized": false,
+    "evaluation_authorized": false,
+    "formal_filesystem_admission": false,
+    "full_gate_s2_claimed": false,
+    "l2b_authorized": false,
+    "l3_authorized": false,
+    "scientific_eligible": false,
+    "training_authorized": false
+  },
+  "canonical_host": "H200",
+  "canonical_worktree": "/home/zch/workspace/sana-wam",
+  "limitations": {
+    "l2b_manager_facade": "not_implemented",
+    "l3_restart_state_install": "not_implemented",
+    "multi_process_writer_fencing": "not_admitted",
+    "parent_mount_and_power_loss_semantics": "not_admitted",
+    "retained_immutable_execution_evidence": "not_created",
+    "runtime_source_and_dynamic_import_closure": "not_established",
+    "transitive_runtime_closure": false,
+    "upstream_teacher_proof_and_tensor_preimage_reconstruction": "outside_l2a_trust_boundary"
+  },
+  "predecessor_pins": {
+    "stage2b_source_bundle_sha256": "0feb797618cb9e02150abd52b357c03d2a4986177fc1e8ebeca626ee808389d2",
+    "stage2b_source_manifest_sha256": "87a5f36d13e06cdd5d951cf1dd96f4e353edc50fc555c96b3269d19859126c0a",
+    "stage2b_verifier_sha256": "a9a2a58c0dbc831f886e43a0c299a52a59683e443f05dcd646dc99a41ff5a1fe",
+    "verification_replayed_by_this_report": false
+  },
+  "prohibited_actions_attestation": {
+    "checkpoint_loaded": false,
+    "dataset_accessed": false,
+    "evaluation_started": false,
+    "formal_ledger_root_created": false,
+    "gpu_used": false,
+    "optimizer_created": false,
+    "training_started": false
+  },
+  "recorded_on": "2026-07-31",
+  "results": {
+    "focused_l2a_cpu": {
+      "command": ".venv/bin/python -m pytest -q tests/test_cach_stage2b_offline_ledger.py",
+      "deselected": 0,
+      "duration_seconds": 2.49,
+      "evidence_kind": "live_lightweight_rerun_not_retained_execution_evidence",
+      "failed": 0,
+      "passed": 82,
+      "skipped": 0,
+      "test_function_count": 38
+    },
+    "full_cach_cpu_regression": {
+      "command": ".venv/bin/python -m pytest -q tests/test_cach_*.py --deselect tests/test_cach_config_schema.py::test_stage1_artifact_set_is_internally_pinned_but_not_registered",
+      "deselected": 1,
+      "diagnostic_only": true,
+      "duration_seconds": 9.17,
+      "evidence_kind": "live_lightweight_rerun_not_retained_execution_evidence",
+      "failed": 0,
+      "known_deselected_node_id": "tests/test_cach_config_schema.py::test_stage1_artifact_set_is_internally_pinned_but_not_registered",
+      "passed": 397,
+      "skipped": 0,
+      "warnings": 13
+    },
+    "py_compile": {
+      "selection": [
+        "src/sana_wam/cach/stage2b_offline_ledger.py",
+        "tests/test_cach_stage2b_offline_ledger.py"
+      ],
+      "status": "passed"
+    },
+    "ruff": {
+      "selection": [
+        "src/sana_wam/cach/stage2b_offline_ledger.py",
+        "tests/test_cach_stage2b_offline_ledger.py"
+      ],
+      "status": "passed"
+    }
+  },
+  "retained_stage2b_l2a_evidence": null,
+  "schema": "cach.stage2b_l2a.live_lightweight_report.v1",
+  "scope": "synthetic_cpu_single_process_offline_stage2b_l2a_only",
+  "status": "bounded_l2a_lightweight_green_no_p0_p1_not_filesystem_admitted_non_scientific",
+  "tested_source_pins": {
+    "src/sana_wam/cach/stage2b_offline_ledger.py": "030a67332310d695395729161de7eb26999e391d469ff24b9c2d532666e77da6",
+    "tests/test_cach_stage2b_offline_ledger.py": "0c342390bef912c2f00e9840aa9dbb79393e7ca12ae9137df6a6939746483407"
+  }
+}

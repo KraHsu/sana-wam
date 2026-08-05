@@ -1,0 +1,62 @@
+{
+  "schema": "cach.cach_a4.av2_tiny_real_data_overfit.scaffold_config.v1",
+  "state": "SCAFFOLD_ONLY_AV2_EXECUTION_NOT_AUTHORIZED",
+  "architecture_id": "CACH-A4-STATE-CONDITIONED-CAUSAL-EXACT-ODD-DELTA-STREAM-v1",
+  "operator_class": "VENDOR_KERNEL",
+  "integration_path": "EXPERIMENTAL_PATH",
+  "data_contract": {
+    "batch_size": 8,
+    "train_window_count": 8,
+    "heldout_window_count": 8,
+    "raw_rows": 33,
+    "action_transitions": 32,
+    "latent_frames": 5,
+    "action_dim": 20,
+    "latent_channels": 3,
+    "selector_state": "UNBOUND_NO_DATA_ACCESS"
+  },
+  "training_contract": {
+    "seed": 2026080601,
+    "optimizer": "AdamW",
+    "max_steps_per_arm": 1000,
+    "max_wall_clock_minutes": 60,
+    "serial_arms": true,
+    "fresh_initialization": true,
+    "checkpoint_load": false,
+    "checkpoint_save": false,
+    "final_screen_state_save_authorized": false
+  },
+  "thresholds": {
+    "min_action_variance": 1e-08,
+    "min_shuffle_mse": 1e-08,
+    "min_motion_mse": 1e-08,
+    "candidate_heldout_decrease_min": 0.05,
+    "correct_vs_shuffle_improvement_min": 0.05,
+    "correct_vs_no_action_improvement_min": 0.05,
+    "candidate_vs_reference_noninferiority_ratio_max": 1.0
+  },
+  "authority": {
+    "av2_execution": false,
+    "real_data_read": false,
+    "single_gpu_vendor": false,
+    "optimizer_updates": false,
+    "immutable_root_creation": false,
+    "execution_statement_sha256": null
+  },
+  "forbidden": [
+    "REAL_DATA_ACCESS_IN_SCAFFOLD",
+    "DATA_SELECTION_OR_RUN_ROOT_CREATION",
+    "GPU_CUDA_TRITON_OR_VENDOR_EXECUTION",
+    "OPTIMIZER_OR_PARAMETER_UPDATE",
+    "TRAINING_OR_EVALUATION",
+    "CHECKPOINT_LOAD_OR_SAVE",
+    "FULL_2B",
+    "FORMAL_ADMISSION",
+    "AV3",
+    "GLOBAL_STAGE3",
+    "DEPLOY",
+    "TOKEN_OR_CLAIM_OPERATION",
+    "AUTOMATIC_RERUN",
+    "FROZEN_PREDECESSOR_MUTATION"
+  ]
+}

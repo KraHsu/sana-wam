@@ -1,0 +1,216 @@
+{
+  "base_lineage": {
+    "sana_afcc_handoff_head": "9586486f2a9f5172d57b325e32093a3e018d34c0",
+    "sana_head": "16b9cec673e3335724ba2d8db25de7f9ed229292",
+    "sana_wam_head": "605f1c134b4c983ff80f8489c4bc8847036329e2",
+    "stage1_source_bundle": {
+      "mode": "0444",
+      "path": "/DATA/share/sana_cach_source_bundles/cach_stage1_a6e7849b91464b6e939db6ac676ca8e0d139a8e889e2b6fedb730457d3ee31dc_20260731.tar",
+      "sha256": "a6e7849b91464b6e939db6ac676ca8e0d139a8e889e2b6fedb730457d3ee31dc",
+      "size_bytes": 870400
+    }
+  },
+  "canonical_host": "H200",
+  "canonical_worktree": "/home/zch/workspace/sana-wam",
+  "created_at": "2026-07-31T11:02:26.241106837Z",
+  "execution_evidence": {
+    "files": [
+      {
+        "mode": "0400",
+        "name": "COMMANDS.txt",
+        "sha256": "8762ffad597f3223dd235d4dcd2636cb811fc3907430fe88338540059dba4c8f",
+        "size_bytes": 1274
+      },
+      {
+        "mode": "0400",
+        "name": "ENVIRONMENT.txt",
+        "sha256": "00df008de268efc079f0f3f5f010198991d4fd4852780ba126d296935f612447",
+        "size_bytes": 951
+      },
+      {
+        "mode": "0400",
+        "name": "EVIDENCE_VALIDATE_SCRIPT.py",
+        "sha256": "4cac0b086c243795a97ea7ef6a4d65b6a9fa6a7defc6cc3f40ac6b474965d907",
+        "size_bytes": 2588
+      },
+      {
+        "mode": "0400",
+        "name": "EVIDENCE_VALIDATION.log",
+        "sha256": "64c25f34161518f8966ea3ff359b7d961cbe33bbbdaea31b68286018200b69c4",
+        "size_bytes": 62
+      },
+      {
+        "mode": "0400",
+        "name": "GIT_STATE.txt",
+        "sha256": "46d8e3f9cac6b022b5ec22fccf2817fe5cfb263cb651b22ac26719d58d968ad7",
+        "size_bytes": 517
+      },
+      {
+        "mode": "0400",
+        "name": "RESULTS.json",
+        "sha256": "be8c78dd185cfe98974cb04f32fc7bce0a64377507f9fc64c7448e29cd273768",
+        "size_bytes": 1045
+      },
+      {
+        "mode": "0400",
+        "name": "SHA256SUMS",
+        "sha256": "98ae1c1d8e9549d6f0437d6896595ed8f3133b4330c447960f3a54e3d68b6904",
+        "size_bytes": 1190
+      },
+      {
+        "mode": "0400",
+        "name": "SOURCE_SELECTION.sha256",
+        "sha256": "1c9f9373604e7d9bba2dd614010096a8b73bca85c2a5a1a19f3019e99768d459",
+        "size_bytes": 1425
+      },
+      {
+        "mode": "0400",
+        "name": "STATIC_CHECKS.log",
+        "sha256": "d2215b7323d255c3cff8fcbf7400cd6f95af8da70541a1a95702d52c3565c667",
+        "size_bytes": 29
+      },
+      {
+        "mode": "0400",
+        "name": "STATIC_CHECK_SCRIPT.py",
+        "sha256": "71464a7d9e0a798d5239aea2a2ff1e101d316879fd2803d1c2ee7117b547ceb3",
+        "size_bytes": 1189
+      },
+      {
+        "mode": "0400",
+        "name": "TEST_SELECTION.txt",
+        "sha256": "ac425bc26d942ee611c9cbfd94b179de28412b15d43e8f1419cc6f7c86cbd679",
+        "size_bytes": 302
+      },
+      {
+        "mode": "0400",
+        "name": "cpu_regression.log",
+        "sha256": "d03ede51b69f377d987d8660fa686e44e3b32fc193a0a22b5d334c269d1f8b6d",
+        "size_bytes": 37044
+      },
+      {
+        "mode": "0400",
+        "name": "cpu_regression.xml",
+        "sha256": "fea7a6db15444b2c39e39adf531a800f001664661f7727295a372ad517ee3b91",
+        "size_bytes": 44828
+      },
+      {
+        "mode": "0400",
+        "name": "stage2_pytest.log",
+        "sha256": "51ece666183330987eede54bcc74cdc97e26262c424ff026c40d0094de53ce33",
+        "size_bytes": 14254
+      },
+      {
+        "mode": "0400",
+        "name": "stage2_pytest.xml",
+        "sha256": "8d278479c275804e3f4406e8ae47a7b96993dca678f1f75cc0938cbb3fe6de27",
+        "size_bytes": 12743
+      }
+    ],
+    "root_mode": "0500",
+    "root_path": "/DATA/share/sana_cach_stage2_evidence/stage2_offline_subset_20260731_JKYEkuCw"
+  },
+  "files": [
+    {
+      "path": "docs/CAUSAL_ACTION_CONDITIONED_HYBRID_SANA_WAM_DEVELOPMENT_PLAN_20260731.md",
+      "sha256": "969d9668ffed07176844fcbd84062825f9d5f0af0325959b0068c38fe481f0dd"
+    },
+    {
+      "path": "docs/cach_sana_wam/stage2/README.md",
+      "sha256": "807b968f636f1be9d274148be8c36454b6818d85a901bbe7b97c6b5d2f0f851d"
+    },
+    {
+      "path": "docs/cach_sana_wam/stage2/STAGE2_MINI_ADMISSION_REPORT.json",
+      "sha256": "f063cba600468b1670e09fa345a878d76bec466e925cfbdd0d38a7cb98384915"
+    },
+    {
+      "path": "docs/cach_sana_wam/stage2/STAGE2_MINI_GDN_ADMISSION_20260731.md",
+      "sha256": "715cf65ded91117b2d9e6e54e3e1e8fbf1ca12b03f44b85edbee4d4fa97d79cf"
+    },
+    {
+      "path": "docs/cach_sana_wam/stage2/STAGE2_SOURCE_FILES.txt",
+      "sha256": "8a2c1d5cc1603532e41db20ad77ebb4be6851b26f8e9bcdb62e74b992860bcf5"
+    },
+    {
+      "path": "scripts/verify_cach_stage2.py",
+      "sha256": "1a2961770b3004e9b481a68fd92b724e2505c31253a170d8c40a8d5582bcf6ea"
+    },
+    {
+      "path": "src/sana_wam/cach/applied_action_ack.py",
+      "sha256": "ebbdd58af189cdbef7ac828e628792b5f710f468ca44e894ff8dc576e784b5ae"
+    },
+    {
+      "path": "src/sana_wam/cach/prefix_compaction.py",
+      "sha256": "1a2f12f38bb9699c65af7e4ea72183f9d122b6f81aae4d9628129040a3cfcdb7"
+    },
+    {
+      "path": "src/sana_wam/cach/stage2_failure_evidence.py",
+      "sha256": "eef771a2ca0d1b423cdcced62ff7acf627bba8a852233cc3ffd9c4ce7658a03b"
+    },
+    {
+      "path": "src/sana_wam/model/video_backbone/sana/adapter.py",
+      "sha256": "fdda391181e6f30455cf54fe1559b4bd2ee33bc9274b42712f0f5e826aef58d5"
+    },
+    {
+      "path": "src/sana_wam/model/video_backbone/sana/hybrid_cache_codec.py",
+      "sha256": "563454779c5e45ceee4dbae9a99f2636114cc7645a5492fab2b487e05f59e638"
+    },
+    {
+      "path": "tests/test_cach_action_to_video_conditioning.py",
+      "sha256": "da532651b0a02b125c9b292e70e5a6a740eec884164ca96b22dad3ac67e4a677"
+    },
+    {
+      "path": "tests/test_cach_stage2_applied_action_ack.py",
+      "sha256": "58b3ce314f959c2424c86b60d3dd79e676cd04f463c3199604529340d4090958"
+    },
+    {
+      "path": "tests/test_cach_stage2_failure_evidence.py",
+      "sha256": "107a2b8cab225eb7439eba94698ee9a4a1a54ca3c31390665f752eac141bf93a"
+    },
+    {
+      "path": "tests/test_cach_stage2_hybrid_cache_codec.py",
+      "sha256": "a15c9da9b35e364243d3c169a875cbfd29fd2726123e789a68aea9a7ec688b7b"
+    },
+    {
+      "path": "tests/test_cach_stage2_mini_gdn.py",
+      "sha256": "74a8ec04d51a655e31f7763690bb08ae4908a6360ce0803a1668b6c0cb5c6ab7"
+    },
+    {
+      "path": "tests/test_cach_stage2_paired_mini_gdn.py",
+      "sha256": "75ca8db0d4cd7a930dec2e70808b1806a6750f6be4cf4002cc243e04e3697206"
+    },
+    {
+      "path": "tests/test_cach_stage2_prefix_compaction.py",
+      "sha256": "d111f29136239aae1b4da88a7744e66d641c620afb088fbd7547e62047dc1b78"
+    }
+  ],
+  "protected_worktree_state": {
+    "phase6_candidate_eligibility_binary_diff_sha256": "283414a3ac1e49bcec916431cc948b3a15f61ca7961fed819abc9c7abc45fbac",
+    "phase6_candidate_eligibility_worktree_sha256": "a784d31886d361f135b8ed59b23610c69c2b71aed96f8131b27f934817d0992f",
+    "stage0_config_guard_cli_sha256": "2b45bbb5c0b2fd0eb9ba99c938e7f81c8175b17f55546c8a3cf7277cc6ebd42a",
+    "stage0_config_guard_sha256": "7a2b4a89a5dec3a7c11970bd3a3f68140ac35f7150fc7feb2bd8547acdbe8748"
+  },
+  "retained_failure_evidence": {
+    "receipt": {
+      "mode": "0400",
+      "name": "FAILURE.json",
+      "sha256": "23c08337dd99c45ae3aaf2a314ca23afc6646b7241707c0819ff0d71758be9ed",
+      "size_bytes": 910
+    },
+    "root_mode": "0500",
+    "root_path": "/DATA/share/sana_cach_stage2_failure_evidence/stage2_failure_20260731_20260731T105154989919953Z"
+  },
+  "schema": "cach.stage2.source_manifest.v1",
+  "scope": {
+    "file_count": 18,
+    "kind": "stage2_delta_subset_over_stage1_bundle",
+    "source_manifest_excluded_to_avoid_self_reference": true,
+    "transitive_runtime_closure": false
+  },
+  "stage2_source_bundle": {
+    "mode": "0444",
+    "path": "/DATA/share/sana_cach_source_bundles/cach_stage2_71e73b3f2b1efb125f0b57f8c47913bab47d492920310f0a53848fe7903c229c_20260731.tar",
+    "sha256": "71e73b3f2b1efb125f0b57f8c47913bab47d492920310f0a53848fe7903c229c",
+    "size_bytes": 327680
+  },
+  "status": "offline_teacher_forcing_subset_passed_full_gate_s2_blocked"
+}

@@ -1,0 +1,97 @@
+{
+  "authority": {
+    "capture_authorized": false,
+    "deploy_authorized": false,
+    "evaluation_authorized": false,
+    "full_gate_s2_claimed": false,
+    "scientific_eligible": false,
+    "stage3_authorized": false,
+    "training_authorized": false
+  },
+  "artifact_state_at_lightweight_test_time": {
+    "source_manifest_created": false,
+    "stage2b_source_bundle_created": false
+  },
+  "canonical_host": "H200",
+  "canonical_worktree": "/home/zch/workspace/sana-wam",
+  "limitations": {
+    "git_recovery_bundles": "absent_on_canonical_h200",
+    "l2_l3_ledger_and_restart_replay": "blocked_not_implemented",
+    "retained_immutable_stage2b_evidence": "not_created",
+    "runtime_source_and_dynamic_import_closure": "not_established",
+    "transitive_runtime_closure": false
+  },
+  "prohibited_actions_attestation": {
+    "checkpoint_loaded": false,
+    "dataset_accessed": false,
+    "evaluation_started": false,
+    "formal_root_created": false,
+    "gpu_used": false,
+    "optimizer_created": false,
+    "training_started": false
+  },
+  "recorded_on": "2026-07-31",
+  "results": {
+    "focused_stage2b_cpu": {
+      "canonical_raw_descriptor": {
+        "bf16_edge_bit_patterns": "covered",
+        "big_endian_descriptor": "rejected_fail_closed",
+        "bool_encode_decode_symmetry": "covered",
+        "byte_order": "little"
+      },
+      "deselected": 0,
+      "evidence_kind": "live_lightweight_rerun",
+      "failed": 0,
+      "passed": 63,
+      "selection": [
+        "tests/test_cach_stage2b_committed_action_history.py",
+        "tests/test_cach_stage2b_production_core.py",
+        "tests/test_cach_stage2b_receipt_store.py",
+        "tests/test_cach_stage2b_state_snapshot.py"
+      ],
+      "skipped": 0
+    },
+    "full_cach_cpu_regression": {
+      "deselected": 1,
+      "diagnostic_only": true,
+      "evidence_kind": "live_lightweight_rerun",
+      "failed": 0,
+      "known_deselected_node_id": "tests/test_cach_config_schema.py::test_stage1_artifact_set_is_internally_pinned_but_not_registered",
+      "passed": 305,
+      "selection": "tests/test_cach_*.py",
+      "skipped": 10
+    },
+    "predecessor_stage2_verifier": {
+      "execution_replayed": false,
+      "manifest_sha256": "8333c74d9bc8115937f98d9fc12a60da62cab49dd8895cd403047027315052fb",
+      "source_bundle_sha256": "71e73b3f2b1efb125f0b57f8c47913bab47d492920310f0a53848fe7903c229c",
+      "status": "passed"
+    },
+    "ruff": {
+      "evidence_kind": "live_lightweight_rerun",
+      "selection": [
+        "src/sana_wam/cach/committed_action_history.py",
+        "src/sana_wam/cach/stage2b_receipt_store.py",
+        "src/sana_wam/cach/stage2b_state_snapshot.py",
+        "src/sana_wam/cach/staging_variant.py",
+        "src/sana_wam/model/cach_numerical_core.py",
+        "src/sana_wam/model/cach_paired_stager.py",
+        "src/sana_wam/model/video_backbone/sana/hybrid_cache_stage2b.py",
+        "tests/test_cach_stage2b_committed_action_history.py",
+        "tests/test_cach_stage2b_production_core.py",
+        "tests/test_cach_stage2b_receipt_store.py",
+        "tests/test_cach_stage2b_state_snapshot.py"
+      ],
+      "status": "passed"
+    }
+  },
+  "retained_stage2b_evidence": {
+    "immutable_root": null,
+    "junit_xml": null,
+    "logs": [],
+    "sha256sums": null
+  },
+  "schema": "cach.stage2b.live_lightweight_report.v1",
+  "scope": "synthetic_cpu_offline_stage2b_canonical_little_endian_raw_codec",
+  "status": "live_lightweight_l0_l1_passed_l2_l3_blocked_non_scientific"
+}

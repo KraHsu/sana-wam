@@ -1,0 +1,233 @@
+{
+  "artifact_role": "cach_stage0_source_manifest_draft",
+  "blockers": [
+    "H200 runtime package inventory is not frozen; the venv has no pip module",
+    "RoboTwin episode-level content manifest and rate provenance are not frozen",
+    "CACH Stage 0 source remains an uncommitted draft and has no reviewed recovery bundle",
+    "Declared repository_files is a denial-review subset, not a reviewed transitive executable import closure",
+    "Stage 0 verifier/launcher self-check runs after Python startup and relies on an unpinned git executable; it is a review aid, not an independent trust root",
+    "Episode-origin/no-clean-prefix sampling and layout-derived per-chunk proprio selection are not implemented",
+    "Reserved-marker guards do not cover every legacy probe, AFCC/Phase-6 launcher, or direct Trainer construction surface",
+    "Machine-readable REF-GDN-CORRECTED spec/config/authority is absent",
+    "No registered executable CACH authority or launcher exists"
+  ],
+  "dataset": {
+    "episode_counts": {
+      "aloha-agilex_clean_50": 2500,
+      "aloha-agilex_randomized_500": 25000
+    },
+    "file_count": 110852,
+    "full_content_sha256": null,
+    "hdf5_timestamp_field_observed": false,
+    "rate_provenance_receipt": null,
+    "realpath": "/DATA/share/RoboTwin2.0/dataset",
+    "task_directory_count": 50,
+    "tree_size_human_snapshot": "896G"
+  },
+  "documents": {
+    "deep_research_report": {
+      "path": "/home/zch/workspace/sana-wam/deep-research-report.md",
+      "sha256": "4bd78d3c37970ed4c3fc9c05a82faef44fbeac079a6541a694fa496e9d858010"
+    },
+    "development_plan": {
+      "path": "/home/zch/workspace/sana-wam/docs/CAUSAL_ACTION_CONDITIONED_HYBRID_SANA_WAM_DEVELOPMENT_PLAN_20260731.md",
+      "sha256": "969d9668ffed07176844fcbd84062825f9d5f0af0325959b0068c38fe481f0dd"
+    },
+    "handoff": {
+      "path": "/home/zch/workspace/sana-wam/docs/agent_handoff/AGENT_HANDOFF_20260730.md",
+      "sha256": "76f251fde90cde1a2b970f6360d95f4dc51074f41579baebe130a283a4ab7920"
+    },
+    "root_agents": {
+      "path": "/home/zch/workspace/sana-wam/AGENTS.md",
+      "sha256": "646ea39906ea3bc75af3b360187eb2c5aebac4c04c62ec5df108c0ec35e006ae"
+    },
+    "root_start_here": {
+      "path": "/home/zch/workspace/sana-wam/START_HERE_20260730.md",
+      "sha256": "e85fa5be9f0d1941725cd356298493b9003ed2339d1a5cc00d5688ed8e51c061"
+    }
+  },
+  "external_models": {
+    "ltx2_causal_vae": {
+      "causal_first_frame_contract": "first_frame_latent_then_8_frame_groups",
+      "decoder_causal": true,
+      "encoder_causal": true,
+      "files": [
+        {
+          "path": "config.json",
+          "sha256": "7508ef605225e540be4cf0a2098fdd5d34cb3d7622d94acda021d5ba1bee8eb5",
+          "size_bytes": 1362
+        },
+        {
+          "path": "diffusion_pytorch_model.safetensors",
+          "sha256": "3694526c1da964fcf1ebccb70edb09895bf9e0a723b3ac48e0b5adf5bf97cc4a",
+          "size_bytes": 4889942004
+        }
+      ],
+      "frozen": true,
+      "latent_channels": 128,
+      "realpath": "/DATA/share/SANA-WM_streaming/ltx2_causal_vae",
+      "spatial_compression_ratio": 32,
+      "temporal_compression_ratio": 8
+    },
+    "text_encoder": {
+      "files": [
+        {
+          "path": ".msc",
+          "sha256": "55f8965513cbef670fb3ed0aed0825a6b53d07c16d6640dd8b19a5c1c563fb06",
+          "size_bytes": 849
+        },
+        {
+          "path": ".mv",
+          "sha256": "69516261e64a48dbcbca212a5ca8fa615ad110660b13ba492bc5dc8e489c70aa",
+          "size_bytes": 36
+        },
+        {
+          "path": "README.md",
+          "sha256": "bb52a3f239a1e7b24907644c29e51ff3159fcff5488333d75b1056ddfdd74950",
+          "size_bytes": 29091
+        },
+        {
+          "path": "config.json",
+          "sha256": "eacec6c5ca317a87ed2c46789d9705b9274db5027e7ba59da739bfae23addb55",
+          "size_bytes": 838
+        },
+        {
+          "path": "configuration.json",
+          "sha256": "f888421726665e8a84b738eed42a64875aed79de8be7daade851ac8bf4c0cef9",
+          "size_bytes": 73
+        },
+        {
+          "path": "generation_config.json",
+          "sha256": "a543a5d299bc2b20c52bd87ed174f561266510b57a392e12b5b5d758d798ce05",
+          "size_bytes": 187
+        },
+        {
+          "path": "model-00001-of-00002.safetensors",
+          "sha256": "532d792c9178805064170a3ec485b7dedbfccc6fd297b92c31a6091b6c7e41bf",
+          "size_bytes": 4988025760
+        },
+        {
+          "path": "model-00002-of-00002.safetensors",
+          "sha256": "6d6d9ce84db398fb6e0191f91542e5da0a73da2cb695e172a24edc2146dc8d20",
+          "size_bytes": 240691728
+        },
+        {
+          "path": "model.safetensors.index.json",
+          "sha256": "ada0043f3e3b2e5ab2f445cad9c0fbbf9d91ad444675e6a82b822591c63abf5a",
+          "size_bytes": 24223
+        },
+        {
+          "path": "special_tokens_map.json",
+          "sha256": "baec30ea10906f16adb8c18af7a34023002c1746542612b8b41c9f09e1351351",
+          "size_bytes": 636
+        },
+        {
+          "path": "tokenizer.json",
+          "sha256": "3f289bc05132635a8bc7aca7aa21255efd5e18f3710f43e3cdb96bcd41be4922",
+          "size_bytes": 17525357
+        },
+        {
+          "path": "tokenizer.model",
+          "sha256": "61a7b147390c64585d6c3543dd6fc636906c9af3865a5548f27f31aee1d4c8e2",
+          "size_bytes": 4241003
+        },
+        {
+          "path": "tokenizer_config.json",
+          "sha256": "cb32b7929c62608d46572e813112b3ad8a841fb98fdd6a4da8559e368a951c89",
+          "size_bytes": 46996
+        }
+      ],
+      "frozen": true,
+      "model_type": "gemma2",
+      "realpath": "/DATA/share/gemma-2-2b-it"
+    }
+  },
+  "forbidden_initial_inputs": [
+    {
+      "path": "/DATA/share/SANA-WM_streaming/sana_dit/model.pt",
+      "reason": "CACH v0 initial training rejects pretrained video-DiT",
+      "size_bytes": 31950734339
+    }
+  ],
+  "observed_at_utc": "2026-07-31T06:22:29Z",
+  "repository": {
+    "additional_research_tree": {
+      "handoff_path": "AGENT_HANDOFF_20260730.md",
+      "handoff_sha256": "76f251fde90cde1a2b970f6360d95f4dc51074f41579baebe130a283a4ab7920",
+      "head": "9586486f2a9f5172d57b325e32093a3e018d34c0",
+      "path": "/home/zch/workspace/sana-afcc-handoff"
+    },
+    "branch": "handoff/sana-wam-20260730",
+    "head": "605f1c134b4c983ff80f8489c4bc8847036329e2",
+    "path": "/home/zch/workspace/sana-wam",
+    "protected_modified_file": {
+      "head_sha256": "f0668dd4a125947854da1a170ad80283359be41f805cf7a8e3e1da5c47d2eff7",
+      "path": "tests/test_phase6_candidate_eligibility.py",
+      "worktree_diff_sha256": "283414a3ac1e49bcec916431cc948b3a15f61ca7961fed819abc9c7abc45fbac",
+      "worktree_sha256": "a784d31886d361f135b8ed59b23610c69c2b71aed96f8131b27f934817d0992f"
+    },
+    "sana_head": "16b9cec673e3335724ba2d8db25de7f9ed229292",
+    "stage0_start_status_entry_count_uall": 387,
+    "stage0_start_status_sha256_porcelain_v1_z_uall": "07b79900262b11bc55a180475ef133a99cc2a08e9a66eff492c582ace673d758"
+  },
+  "repository_files": {
+    "benchmarks/robotwin/eval_policy_wrapper.py": "f4df840ef511ba9fdf86b96ec61369c3583dea9074fb1a2e5ec511e4f3ada469",
+    "benchmarks/robotwin/sana_wam2robotwin_interface.py": "667ac4019dfccb87a94304fd5dc162fff8284aacdcfe142179c9d949544c4dbd",
+    "benchmarks/robotwin/single_eval.sh": "b487c384acffad9098cbb30435917634d95eb40910b72283228f422038784f62",
+    "benchmarks/utils/action_conversion.py": "d8299c840c853281e1f35512ef63444907b9cc784e97ad69ac01a4248cba8e3f",
+    "benchmarks/utils/client.py": "1c0d2d8f42128908206d80bebaa8137777b0389ebc4391a5236dbe2e55f2b583",
+    "configs/deploy_gdn_ar.yaml": "fe7341ce5d7d35c6a9b676af78c59cb4d096de2bb92ce3e393fec44396f62aec",
+    "configs/train_gdn_ar.yaml": "9804f0368e5e3d6dcdb55601c37dc2ae9f80c4454c1bf5dea380329d6231efe5",
+    "configs/train_sana_wm_gdn_ar.yaml": "9311107bb5f3593853bd13fc40116312b4dbf17f5540ba758b733a474865f406",
+    "scripts/check_cach_stage0_reserved_config.py": "2b45bbb5c0b2fd0eb9ba99c938e7f81c8175b17f55546c8a3cf7277cc6ebd42a",
+    "scripts/deploy.py": "57fad8d2ff660237116d2d9151f8270bc22facb8a37caa805a01cbf396d25d5d",
+    "scripts/eval_ar_lownoise_seedfixed.sh": "0e9ca84065d7e94ff9de883f633a2fa4096d1b0c840e3e81c38334c569176aca",
+    "scripts/precompute_vae_latents.py": "21039267b5e65d68750c39a8288b87ffbf3286b766421af3185dc5c9a839d459",
+    "scripts/run_ar_lownoise_paired_arm.sh": "b24829121e0cff3f4112ccd7a261db6bedb4e9a4216180e056cd8d66a051433d",
+    "scripts/smoke_ar_lownoise_gpu.py": "dec851922e5f02714ec1aee06f612660ecfce94263ee45045eebd0d29fee1cd8",
+    "scripts/train.py": "a7c1288e10c8a6c98fc8bc8b62e09e5088d3d8414dfbb729ecfd76e42d3bd813",
+    "src/sana_wam/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "src/sana_wam/config.py": "ff40484c2d53d2b6bfbdb0cf287837a09a5eab5b5be4d7caeaafda7cfb1ee6d1",
+    "src/sana_wam/dataloader/robotwin_dataset.py": "a7db73364f260b693e376f16783576d383ad88c3ee9f8258135acd91e81c1445",
+    "src/sana_wam/dataloader/robotwin_stats_computation.py": "0aa8ead706af4e14241ee885951b19eebcb038b1722f33ae67dcd1da71b7e1c7",
+    "src/sana_wam/deploy/__init__.py": "c903634193a99486ec04448fb2a390c8ff22d3cab5447f799d80d2c4726085ed",
+    "src/sana_wam/deploy/gdn_ar_engine.py": "886815fc78a433f8813d159ae6acc59f03866c383c17d4a0cdb861952e4c539d",
+    "src/sana_wam/deploy/model_loader.py": "a886790cfa87fb5dfc8a9634cc64ca20684ae6f4a16b6801084f78cca14f4a95",
+    "src/sana_wam/deploy/policy.py": "f73405f54cd750fd8798995f37fe38b33dc45345f79283ca161c9b58c06c454d",
+    "src/sana_wam/deploy/policy_server.py": "2e89da14e2b52444f2bb59fb3d259dd742d46cacb5173176801b3c23769790f7",
+    "src/sana_wam/model/__init__.py": "4814fd49896658e1ee80b15b27b4bd594cd4f45dd82d4f01e2bb8acf517b48bd",
+    "src/sana_wam/model/base.py": "9754d27e7916c941293174afece950606d01cf5f97c2826d6310db1c5a398ebe",
+    "src/sana_wam/model/gdn_ar.py": "15a75585a0a4e33b7b83c65dd5d40333c1d5ad05c1862b21412ce302dbadd08c",
+    "src/sana_wam/model/video_backbone/sana/adapter.py": "6ef2b6c21119b1357c8cab938e0351df428a71992ea0e92f25460b1b0a05d1cf",
+    "src/sana_wam/model/video_backbone/sana/pipeline_builder.py": "905cdf95239206b2fef8ff484d8cbe4de551735af56cf970f0cad8540b35a981",
+    "src/sana_wam/train/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "src/sana_wam/train/cach_stage0_guard.py": "7a2b4a89a5dec3a7c11970bd3a3f68140ac35f7150fc7feb2bd8547acdbe8748",
+    "src/sana_wam/train/checkpointing.py": "a5ecfe688e46e7ce0c8f0047fad169ec046000bc803c187602c6f8bcefe046a7",
+    "src/sana_wam/train/trainer.py": "715236acec1269f1f672aafacc99bf37afcf4ca6eadca5a6ca941e85821f3496",
+    "third_party/Sana/diffusion/model/nets/basic_modules.py": "f5b8345d7ba35a32f612ebc2e98976d1707198bb8e24ccd95dfbfa3b4a77e2ca",
+    "third_party/Sana/diffusion/model/nets/sana_gdn_blocks.py": "ef15578c63f9815d670dc3ef4cf2876c4f236754bfdfb0d2070da387048a495e",
+    "third_party/Sana/diffusion/model/nets/sana_gdn_camctrl_blocks.py": "6e6859c0e35a810538f2c046a285e88d06978c56df17451b62a508ec56154de7",
+    "third_party/Sana/diffusion/model/nets/sana_multi_scale_video_camctrl.py": "bfbd72dfb22a44e2843f1985049ecfbb1f887f5e5f5ed852905c4670e2029fbe",
+    "third_party/Sana/diffusion/model/ops/fused_gdn.py": "863cbbb601ddebc5666179e2b209b777d5dc213c94a1450cde695a33b0a8aded",
+    "third_party/Sana/diffusion/model/ops/fused_streaming.py": "4775d1ea1101d7075d087428cf2f8bb2643a7de922fd241e15b65e3c4f4ea206",
+    "third_party/Sana/diffusion/scheduler/self_forcing_flow_euler_sampler.py": "8c246685cb2a7e9cf5c8954afdc7b39973876fe403a662929764788406bec023"
+  },
+  "runtime": {
+    "cuda_build": "12.8",
+    "diffusers": "0.38.0",
+    "driver": "570.211.01",
+    "h5py": "3.16.0",
+    "numpy": "2.4.6",
+    "omegaconf": "2.3.1",
+    "package_inventory_sha256": null,
+    "python": "3.12.13",
+    "python_executable_realpath": "/home/zch/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12",
+    "python_executable_sha256": "339de109f072e52523066d97a2b3372e358a10cc00c6a9df62c28a6618061900",
+    "torch": "2.7.1+cu128",
+    "transformers": "5.12.1",
+    "venv_pip_available": false
+  },
+  "schema_version": "cach-stage0-source-manifest-draft-v1",
+  "scientific_eligible": false,
+  "status": "draft_blocked"
+}

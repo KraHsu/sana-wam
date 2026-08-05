@@ -1,0 +1,1025 @@
+{
+  "schema": "cach.cach_a2_r1.zero_anchor_vendor_gdn_bridge.config.v1",
+  "identity": {
+    "canonical_ssh_alias": "H200",
+    "expected_platform_node": "huaxiyun",
+    "canonical_worktree": "/home/zch/workspace/sana-wam",
+    "run_card": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a2_r1/CACH_A2_R1_RUN_CARD.json",
+      "sha256": "c7b710177defda6d44066c7b7b25c4b32d11ec106a92662b0701ca5f87f3401e"
+    },
+    "architecture_decision": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a2_r1/CACH_A2_R1_LAUNCHER_FIX_DECISION.md",
+      "sha256": "db51c2d2fca6b0327a1466595d7297630a39a6091dfc45bc2f9633b10d283c23"
+    },
+    "governing_plan": {
+      "path": "docs/cach_sana_wam/global_stage3/post_phase_c_planning/ARCHITECTURE_VALIDATION_FIRST_PLAN_20260803_v1.md",
+      "sha256": "06f5d09127f8bc2a945cdbdc095054f40b1fe8d9757a90eccbdf0604ea89e079"
+    },
+    "repository_heads": {
+      "sana_wam": "605f1c134b4c983ff80f8489c4bc8847036329e2",
+      "third_party_sana": "16b9cec673e3335724ba2d8db25de7f9ed229292",
+      "sana_afcc_handoff": "9586486f2a9f5172d57b325e32093a3e018d34c0"
+    },
+    "planned_runtime": {
+      "resolved_root": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a2_r1/06f5d09127f8/cach-a2-r1-launcher-fix-dc17cb7bdbd70955ea4b91212f0d4ac3",
+      "run_nonce": "dc17cb7bdbd70955ea4b91212f0d4ac3",
+      "run_namespace_parents": [
+        "/DATA/share/sana_cach_wam_nonformal_screens/cach_a2_r1",
+        "/DATA/share/sana_cach_wam_nonformal_screens/cach_a2_r1/06f5d09127f8"
+      ],
+      "root_or_namespace_create_authorized_at_source_materialization": false
+    },
+    "generated_paths": {
+      "bridge": {
+        "path": "src/sana_wam/model/cach_av1b_a2_zero_anchor_vendor_gdn_bridge_r1.py",
+        "sha256": "SOURCE_MATERIALIZATION_BIND_FULL_SHA256_OUT_OF_BAND"
+      },
+      "config": {
+        "path": "configs/experiments/cach_av1b_a2_zero_anchor_vendor_gdn_bridge_r1.yaml",
+        "sha256": "SELF_OUT_OF_BAND_FULL_LITERAL_SHA256"
+      },
+      "runner": {
+        "path": "scripts/run_cach_av1b_a2_zero_anchor_vendor_gdn_bridge_r1.py",
+        "sha256": "SOURCE_MATERIALIZATION_BIND_FULL_SHA256_OUT_OF_BAND"
+      },
+      "test": {
+        "path": "tests/test_cach_av1b_a2_zero_anchor_vendor_gdn_bridge_r1.py",
+        "sha256": "SOURCE_MATERIALIZATION_BIND_FULL_SHA256_OUT_OF_BAND"
+      }
+    },
+    "predecessor": {
+      "av0_card": {
+        "path": "docs/cach_sana_wam/architecture_validation/av1/AV0_RUN_CARD.json",
+        "sha256": "c73a943047295338cd9de14e6e53199b463ea66ae92b99d4b0b3393f5ec34030"
+      },
+      "av1b": {
+        "card": {
+          "path": "docs/cach_sana_wam/architecture_validation/av1b/AV1B_RUN_CARD.json",
+          "sha256": "c0e15bcb8c20441d7d989ec6d375284e45f24962c98e15b984dbbbbd198248fb"
+        },
+        "root": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3",
+        "nonce": "1a9a3a6ca4b18fac904fdb806c2a8fb3",
+        "result": {
+          "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/RESULT.json",
+          "sha256": "d33e2e6bdf59cc1d2ffe51b32d48ce22daa4da1a902e3e9bded28cce29adb5de"
+        },
+        "freeze_receipt": {
+          "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/FREEZE_RECEIPT.json",
+          "sha256": "2949acd034ffc6f59038d2ba3b2501854fcb0b94c11a8675d96d0ab40907f677"
+        }
+      },
+      "review300": {
+        "card": {
+          "path": "docs/cach_sana_wam/architecture_validation/av1b_review300/AV1B_REVIEW300_RUN_CARD.json",
+          "sha256": "a552522a951384996aa8f18ce9cb8a5e6e130ac4d2db68515b5ea6303c6722bc"
+        },
+        "root": "/DATA/share/sana_cach_wam_nonformal_screens/av1b_review300/06f5d09127f8/av1b-review300-bd32b08576c9d598c629b90286331b87",
+        "nonce": "bd32b08576c9d598c629b90286331b87",
+        "typed_verdict": "OPERATOR_INCONCLUSIVE_REVIEW_EXHAUSTED",
+        "result": {
+          "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b_review300/06f5d09127f8/av1b-review300-bd32b08576c9d598c629b90286331b87/RESULT.json",
+          "sha256": "3ca4ac673893923d29f60b999879132a93d515382f94bdaa462d91d3cdd1786d"
+        },
+        "raw_evidence": {
+          "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b_review300/06f5d09127f8/av1b-review300-bd32b08576c9d598c629b90286331b87/RAW_EVIDENCE.json",
+          "sha256": "e527b8084d1f13d06557de947646ab92d5e947a598602b9bb4550c6d3eed2823"
+        },
+        "raw_metrics": {
+          "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b_review300/06f5d09127f8/av1b-review300-bd32b08576c9d598c629b90286331b87/RAW_METRICS.json",
+          "sha256": "3c9326540be7256f21ea5b38b0661363fb5f319eaa9325c8ddce16801b308eb4"
+        },
+        "loss_trace": {
+          "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b_review300/06f5d09127f8/av1b-review300-bd32b08576c9d598c629b90286331b87/LOSS_TRACE.json",
+          "sha256": "99f7d0eb97d4e5cd1f6653a54ebfc6f15adaded8bb505d0bce3faeb0fc6e9139"
+        },
+        "theta0_manifests": {
+          "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b_review300/06f5d09127f8/av1b-review300-bd32b08576c9d598c629b90286331b87/THETA0_MANIFESTS.json",
+          "sha256": "5b1c3f8db83987da31bb3d0719e9ef495ec317f9bdb7d3df68f5c770db135539",
+          "normalized_theta0_digest": "33978259c1552b2482f2e7651a3ecefa3531064f523374e64cdfaf89235f2b46"
+        },
+        "run_context": {
+          "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b_review300/06f5d09127f8/av1b-review300-bd32b08576c9d598c629b90286331b87/RUN_CONTEXT.json",
+          "sha256": "01846ef526eac2e8c8e8b524ae41f06e510cae9d53bc560165b5afb10a0a74e1"
+        },
+        "freeze_receipt": {
+          "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1b_review300/06f5d09127f8/av1b-review300-bd32b08576c9d598c629b90286331b87/FREEZE_RECEIPT.json",
+          "sha256": "cbcc626e587d6b9b3efab5aa50171ef9de95110b6eb2fca0a9a1959036aa2a24"
+        },
+        "consumed_claim": {
+          "path": "/DATA/share/sana_cach_wam_nonformal_screens/token_ledgers/c73a943047295338cd9de14e6e53199b463ea66ae92b99d4b0b3393f5ec34030/cadfd92f1c72ebd9cc9aa8bfad029ddc6f0e72d9f7942f34e74629ca1ae37252.claim.json",
+          "sha256": "e7c355d3c4e8bfb942f8baa8a5511fb5964c2c7f2d6c975ef5aec0daa458a91f",
+          "token_id": "cadfd92f1c72ebd9cc9aa8bfad029ddc6f0e72d9f7942f34e74629ca1ae37252",
+          "top_level_token_state": "CONSUMED"
+        },
+        "predecessor_pin_manifest_sha256": "866f9e02a1fe1f9be61614e072872ced241f7d49e73a1fd4aae32b52a81db6bb"
+      },
+      "cach_a2_r0": {
+        "card": {
+          "path": "docs/cach_sana_wam/architecture_validation/cach_a2/CACH_A2_ZERO_ANCHOR_RUN_CARD.json",
+          "sha256": "9d3c3973234df8a9593b254161ca07bf72f343c4475d9985e2901153b82a9713"
+        },
+        "architecture_decision": {
+          "path": "docs/cach_sana_wam/architecture_validation/cach_a2/CACH_A2_ZERO_ANCHOR_ARCHITECTURE_DECISION.md",
+          "sha256": "280e17b6e9a7433e64b20ceed587e998ab0ef1322fe7cc7467ee6a56f9589363"
+        },
+        "planned_root_observed_absent_before_r1_freeze": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a2/06f5d09127f8/cach-a2-zero-anchor-ed3e6dabfbdb836136cb9d24bf9e7a78"
+      }
+    },
+    "source_pins": {
+      "cach_a2_r0_decision": {
+        "path": "docs/cach_sana_wam/architecture_validation/cach_a2/CACH_A2_ZERO_ANCHOR_ARCHITECTURE_DECISION.md",
+        "sha256": "280e17b6e9a7433e64b20ceed587e998ab0ef1322fe7cc7467ee6a56f9589363"
+      },
+      "cach_a2_r0_card": {
+        "path": "docs/cach_sana_wam/architecture_validation/cach_a2/CACH_A2_ZERO_ANCHOR_RUN_CARD.json",
+        "sha256": "9d3c3973234df8a9593b254161ca07bf72f343c4475d9985e2901153b82a9713"
+      },
+      "cach_a2_r0_bridge": {
+        "path": "src/sana_wam/model/cach_av1b_a2_zero_anchor_vendor_gdn_bridge.py",
+        "sha256": "a535003429c3cc06a7dc969de28622db47f6b71974afb967cf199e4f40c95744"
+      },
+      "cach_a2_r0_config": {
+        "path": "configs/experiments/cach_av1b_a2_zero_anchor_vendor_gdn_bridge.yaml",
+        "sha256": "4803b8ec5065b31c701ccda4a71b713da7345ea711038fafbd3fe259490c013c"
+      },
+      "cach_a2_r0_runner": {
+        "path": "scripts/run_cach_av1b_a2_zero_anchor_vendor_gdn_bridge.py",
+        "sha256": "b203de02eeeeaf5a8e9b1899e6d70cc4e7013fb585eaad4e909e9a7414616921"
+      },
+      "cach_a2_r0_test": {
+        "path": "tests/test_cach_av1b_a2_zero_anchor_vendor_gdn_bridge.py",
+        "sha256": "bbb44cfe2fe6e6dc25a5bd46863fc46b0ddfec162c2a9f83c4e220c3b7c8bdd6"
+      },
+      "development_plan": {
+        "path": "docs/CAUSAL_ACTION_CONDITIONED_HYBRID_SANA_WAM_DEVELOPMENT_PLAN_20260731.md",
+        "sha256": "969d9668ffed07176844fcbd84062825f9d5f0af0325959b0068c38fe481f0dd"
+      },
+      "phase_c_fixed_member_list": {
+        "path": "docs/cach_sana_wam/global_stage3/phase_c_production_path_mini/PHASE_C_SOURCE_FILES.txt",
+        "sha256": "59ff254f82f546a8f0102d7fa03a340392da4a879a46ae8e267357db762cb216"
+      },
+      "action_reducer": {
+        "path": "src/sana_wam/cach/action_conditioning.py",
+        "sha256": "8323efa1544d5c0520e13192b55ed5f2e85490d03ac21c558d6009db38ee11c6"
+      },
+      "typed_layout": {
+        "path": "src/sana_wam/model/action_chunk_layout.py",
+        "sha256": "8e6521a93614b4ce7e43ba51d2af4f67d2650b03cc60e7d7a152e36dfa3c8e39"
+      },
+      "review300_bridge": {
+        "path": "src/sana_wam/model/cach_av1b_vendor_gdn_bridge_review300.py",
+        "sha256": "bb9adee19ba35efc4ec1142f4bebf64165c4497193fe39a6c4d28e3f730077f8"
+      },
+      "review300_config": {
+        "path": "configs/experiments/cach_av1b_vendor_gdn_bridge_review300.yaml",
+        "sha256": "2286d39346539ff9839c5ea2db1ae6cde7743610635d523263cf76720d4a8fd5"
+      },
+      "review300_runner": {
+        "path": "scripts/run_cach_av1b_vendor_gdn_bridge_review300.py",
+        "sha256": "0152637c6557d6d9c82dcbf0cab7cde3fa0ca1a6eb800909e9a2513ab06cbe2a"
+      },
+      "review300_test": {
+        "path": "tests/test_cach_av1b_vendor_gdn_bridge_review300.py",
+        "sha256": "b21de947c178cca9169157112e2f54cfba21db2e51d106703204b2c2b858d764"
+      },
+      "vendor_base_gdn": {
+        "path": "third_party/Sana/diffusion/model/nets/sana_gdn_blocks.py",
+        "sha256": "ef15578c63f9815d670dc3ef4cf2876c4f236754bfdfb0d2070da387048a495e"
+      },
+      "vendor_triton_gdn": {
+        "path": "third_party/Sana/diffusion/model/nets/sana_gdn_blocks_triton.py",
+        "sha256": "0ae10e7a09005c60cfac1fcb1035ff3495f80024cfb2e3f01b96b84e0adf3933"
+      },
+      "vendor_autograd_kernel": {
+        "path": "third_party/Sana/diffusion/model/ops/fused_gdn.py",
+        "sha256": "863cbbb601ddebc5666179e2b209b777d5dc213c94a1450cde695a33b0a8aded"
+      },
+      "vendor_chunk_utility": {
+        "path": "third_party/Sana/diffusion/utils/chunk_utils.py",
+        "sha256": "b1b4185b2ebfdb550cbea45dd104c956260ce99e2eeb097896bab80cd1b546ef"
+      },
+      "production_action_seam_observed_not_modified": {
+        "path": "third_party/Sana/diffusion/model/nets/sana_multi_scale_video_camctrl.py",
+        "sha256": "bfbd72dfb22a44e2843f1985049ecfbb1f887f5e5f5ed852905c4670e2029fbe"
+      },
+      "transition_proxy_task_dependency": {
+        "path": "src/sana_wam/model/cach_av1_transition_proxy.py",
+        "sha256": "fa01453769dec24927bdb31b42147e1ecd3e1a77700aaf686b0ce964a77eebcf"
+      },
+      "hybrid_cache_digest_dependency": {
+        "path": "src/sana_wam/model/video_backbone/sana/hybrid_cache.py",
+        "sha256": "5b61ab6492670e8021b3603f965e9f3e8921e9d7f0ea77b49e40d92a77f78a74"
+      },
+      "prefix_compaction_dependency": {
+        "path": "src/sana_wam/cach/prefix_compaction.py",
+        "sha256": "1a2f12f38bb9699c65af7e4ea72183f9d122b6f81aae4d9628129040a3cfcdb7"
+      },
+      "staging_variant_dependency": {
+        "path": "src/sana_wam/cach/staging_variant.py",
+        "sha256": "99da23af8c5cd62fa2a7e468b6b372a298900608be22a18c4634b82ef0dea220"
+      },
+      "action_dit_dependency": {
+        "path": "src/sana_wam/model/action_backbone/joint_action_dit.py",
+        "sha256": "e0f2fcde9914688e467a209346f9796af87335220754bca763065fa1d8960290"
+      }
+    },
+    "direct_import_dependency_manifest": {
+      "schema": "cach.cach_a2_r1.direct_import_dependency_manifest.v1",
+      "scope": "ALL_AND_ONLY_REPO_LOCAL_IMPORTS_IN_MATERIALIZED_BRIDGE_AST_INCLUDING_FUNCTION_LOCAL_IMPORTFROM",
+      "entries": [
+        {
+          "module": "diffusion.model.nets.sana_gdn_blocks_triton",
+          "path": "third_party/Sana/diffusion/model/nets/sana_gdn_blocks_triton.py",
+          "sha256": "0ae10e7a09005c60cfac1fcb1035ff3495f80024cfb2e3f01b96b84e0adf3933",
+          "source_pin_label": "vendor_triton_gdn",
+          "import_scope": "FUNCTION_LOCAL_RUNTIME_IMPORTFROM"
+        },
+        {
+          "module": "sana_wam.cach.action_conditioning",
+          "path": "src/sana_wam/cach/action_conditioning.py",
+          "sha256": "8323efa1544d5c0520e13192b55ed5f2e85490d03ac21c558d6009db38ee11c6",
+          "source_pin_label": "action_reducer",
+          "import_scope": "MODULE_IMPORTFROM"
+        },
+        {
+          "module": "sana_wam.cach.prefix_compaction",
+          "path": "src/sana_wam/cach/prefix_compaction.py",
+          "sha256": "1a2f12f38bb9699c65af7e4ea72183f9d122b6f81aae4d9628129040a3cfcdb7",
+          "source_pin_label": "prefix_compaction_dependency",
+          "import_scope": "MODULE_IMPORTFROM"
+        },
+        {
+          "module": "sana_wam.cach.staging_variant",
+          "path": "src/sana_wam/cach/staging_variant.py",
+          "sha256": "99da23af8c5cd62fa2a7e468b6b372a298900608be22a18c4634b82ef0dea220",
+          "source_pin_label": "staging_variant_dependency",
+          "import_scope": "MODULE_IMPORTFROM"
+        },
+        {
+          "module": "sana_wam.model.action_backbone.joint_action_dit",
+          "path": "src/sana_wam/model/action_backbone/joint_action_dit.py",
+          "sha256": "e0f2fcde9914688e467a209346f9796af87335220754bca763065fa1d8960290",
+          "source_pin_label": "action_dit_dependency",
+          "import_scope": "MODULE_IMPORTFROM"
+        },
+        {
+          "module": "sana_wam.model.action_chunk_layout",
+          "path": "src/sana_wam/model/action_chunk_layout.py",
+          "sha256": "8e6521a93614b4ce7e43ba51d2af4f67d2650b03cc60e7d7a152e36dfa3c8e39",
+          "source_pin_label": "typed_layout",
+          "import_scope": "MODULE_IMPORTFROM"
+        },
+        {
+          "module": "sana_wam.model.cach_av1_transition_proxy",
+          "path": "src/sana_wam/model/cach_av1_transition_proxy.py",
+          "sha256": "fa01453769dec24927bdb31b42147e1ecd3e1a77700aaf686b0ce964a77eebcf",
+          "source_pin_label": "transition_proxy_task_dependency",
+          "import_scope": "MODULE_IMPORTFROM"
+        },
+        {
+          "module": "sana_wam.model.video_backbone.sana.hybrid_cache",
+          "path": "src/sana_wam/model/video_backbone/sana/hybrid_cache.py",
+          "sha256": "5b61ab6492670e8021b3603f965e9f3e8921e9d7f0ea77b49e40d92a77f78a74",
+          "source_pin_label": "hybrid_cache_digest_dependency",
+          "import_scope": "MODULE_IMPORTFROM"
+        }
+      ],
+      "repo_local_module_names_sorted": [
+        "diffusion.model.nets.sana_gdn_blocks_triton",
+        "sana_wam.cach.action_conditioning",
+        "sana_wam.cach.prefix_compaction",
+        "sana_wam.cach.staging_variant",
+        "sana_wam.model.action_backbone.joint_action_dit",
+        "sana_wam.model.action_chunk_layout",
+        "sana_wam.model.cach_av1_transition_proxy",
+        "sana_wam.model.video_backbone.sana.hybrid_cache"
+      ],
+      "vendor_transitive_support_pins": [
+        "vendor_base_gdn",
+        "vendor_autograd_kernel",
+        "vendor_chunk_utility"
+      ],
+      "external_runtime_imports_without_repo_file_pin": [
+        "torch",
+        "triton"
+      ],
+      "unmanifested_repo_local_import": "IMPLEMENTATION_INVALID"
+    }
+  },
+  "authority": {
+    "statement_sha256_rule": "SHA256_UTF8_WITHOUT_TRAILING_NEWLINE",
+    "source_statement": "修复",
+    "source_statement_utf8_bytes": 6,
+    "source_statement_sha256": "37a6939250543f0aad3e9c0c4067e40e48e4453cca242ad2ad6750c34e1575cb",
+    "preceding_execution_authority_statement": "授权，不要让我再重复一堆文字了,我说了我授权,你就继续工作就好了",
+    "preceding_execution_authority_statement_sha256": "25fee8a651f8bd16690aa6c9eaa3ec71eda7a3a35b0e66868d357cd394cfb262",
+    "runtime_authority_schema": "cach.cach_a2_r1.runtime_execution_authority.v1",
+    "runtime_authority_operation": "EXECUTE_CACH_A2_R1_ONCE",
+    "source_statement_interpretation": {
+      "policy": "EXACT_TWO_BUG_FRESH_REVISION_THEN_EXECUTE_PREVIOUSLY_AUTHORIZED_SCREEN",
+      "effective_write_allowlist": [
+        "docs/cach_sana_wam/architecture_validation/cach_a2_r1/CACH_A2_R1_LAUNCHER_FIX_DECISION.md",
+        "docs/cach_sana_wam/architecture_validation/cach_a2_r1/CACH_A2_R1_RUN_CARD.json",
+        "src/sana_wam/model/cach_av1b_a2_zero_anchor_vendor_gdn_bridge_r1.py",
+        "configs/experiments/cach_av1b_a2_zero_anchor_vendor_gdn_bridge_r1.yaml",
+        "scripts/run_cach_av1b_a2_zero_anchor_vendor_gdn_bridge_r1.py",
+        "tests/test_cach_av1b_a2_zero_anchor_vendor_gdn_bridge_r1.py"
+      ],
+      "fixes": [
+        "SEPARATE_CANONICAL_SSH_ALIAS_H200_FROM_EXPECTED_PLATFORM_NODE_HUAXIYUN",
+        "COMPARE_TORCH_DISTRIBUTION_FULL_LOCAL_VERSION_2_7_1_PLUS_CU128_WITHOUT_SUFFIX_STRIP"
+      ],
+      "architecture_budget_metric_threshold_or_verdict_delta": false,
+      "effective_denied": [
+        "TOKEN_CREATE_DERIVE_RESET_OR_CONSUME",
+        "REAL_DATA",
+        "CHECKPOINT_LOAD_OR_SAVE",
+        "AV2_FORMAL_EVALUATION_OR_GLOBAL_STAGE3"
+      ],
+      "no_silent_normalization_of_source_statement_bytes": true
+    },
+    "plan_deviation": {
+      "user_named_cach_a2_successor_explicitly_accepted": true,
+      "r1_is_launcher_bugfix_not_architecture_or_budget_extension": true,
+      "predecessor_review_token_state": "CONSUMED",
+      "new_review_token_created_implied_or_consumed": false
+    },
+    "execution_statement": "FUTURE_RUNTIME_BIND_VERBATIM_EXECUTION_AUTHORITY_FROM_STDIN",
+    "execution_statement_sha256": "FUTURE_RUNTIME_BIND_SHA256_UTF8_WITHOUT_TRAILING_NEWLINE",
+    "execution_authority_state": "AUTHORIZED_REQUIRES_CANONICAL_DYNAMIC_GPU_AND_FROZEN_SHA_BINDING",
+    "future_execution_must_bind": [
+      "RUN_CARD_PATH_AND_FULL_LITERAL_SHA256",
+      "ARCHITECTURE_DECISION_PATH_AND_SHA256",
+      "SOURCE_AUTHORITY_STATEMENT_BYTES_AND_SHA256",
+      "EXPLICIT_PLAN_DEVIATION_ACCEPTANCE_AND_NO_NEW_REVIEW_TOKEN",
+      "ALL_PREDECESSOR_CARD_SOURCE_RESULT_ROOT_AND_CONSUMED_CLAIM_PINS",
+      "MATERIALIZED_QUARTET_PATHS_AND_FULL_SHA256",
+      "EXACT_ROOT_AND_NONCE",
+      "EXACT_IDLE_SINGLE_GPU_PHYSICAL_INDEX_AND_UUID",
+      "EXACT_BUDGET_OPTIMIZER_METRICS_THRESHOLDS_AND_VERDICT",
+      "CUDA_TRITON_JIT_VENDOR_AUTOGRAD_FORWARD_BACKWARD_LOCAL_JVP_SYNTHETIC_300_STEP_CAPABILITIES",
+      "DIRECT_TERMINAL_RESULT_ROOT_FREEZE_AND_NO_POST_FREEZE_MUTATION"
+    ],
+    "unlisted_capability_default": "DENIED"
+  },
+  "classification": {
+    "architecture_id": "CACH-A2-ZERO-ANCHORED-BIAS-FREE-v1",
+    "pair": [
+      "REF-GDN-CORRECTED",
+      "CACH-A2"
+    ],
+    "predecessor_architecture": "CACH-A",
+    "change_class": "LAUNCHER_PREFLIGHT_BUG_FIX_FRESH_REVISION_NO_ARCHITECTURE_OR_BUDGET_DELTA",
+    "model_semantics": "BYTE_NORMALIZED_EQUIVALENT_TO_PINNED_CACH_A2_R0",
+    "operator_level": "VENDOR_KERNEL",
+    "integration_path": "EXPERIMENTAL_PATH",
+    "experiment_kind": "SYNTHETIC_SINGLE_BATCH_ACTION_MECHANISM_SCREEN",
+    "result_scope": "SYNTHETIC_SINGLE_BATCH_SINGLE_CALL_VENDOR_OPERATOR_ONLY",
+    "architecture_conclusion_scope": "ACTUAL_VENDOR_GDN_ZERO_ANCHORED_SEAM_LEARNABILITY_ACTION_DEPENDENCE_AND_COMMON_DELTA_DECOMPOSITION_ONLY",
+    "reference_action_path": "STRUCTURAL_IDENTITY_BYPASS_READS_NEITHER_ACTION_ANCHOR_NOR_MASK",
+    "vendor_entry_class": "diffusion.model.nets.sana_gdn_blocks_triton.ChunkCausalGDNTriton",
+    "proxy_or_reference_operator_fallback": "FORBIDDEN",
+    "cross_call_persistent_state": "NOT_ASSESSED",
+    "full_architecture_state": "NOT_ASSESSED",
+    "formal_admission_effect": "NONE",
+    "global_stage3_effect": "NONE"
+  },
+  "runtime": {
+    "canonical_ssh_alias": "H200",
+    "expected_platform_node": "huaxiyun",
+    "device": "cuda:0",
+    "dtype": "float32",
+    "single_process": true,
+    "distributed_or_context_parallel": false,
+    "gpu_binding": {
+      "state_at_source_materialization": "DEFERRED_TO_FUTURE_EXECUTION_AUTHORITY",
+      "count": 1,
+      "physical_index": null,
+      "uuid": null,
+      "cuda_logical_index_after_uuid_filter": 0,
+      "future_selection_policy": "EXECUTION_AUTHORITY_MUST_BIND_ONE_EXACT_IDLE_PHYSICAL_INDEX_AND_UUID_AFTER_READ_ONLY_AVAILABILITY_CHECK",
+      "change_after_execution_authority": "AUTH_BLOCKED_BEFORE_ROOT_CREATE_OR_CUDA_IMPORT"
+    },
+    "expected_toolchain_when_execution_is_authorized": {
+      "python": "3.12.13",
+      "torch": "2.7.1+cu128",
+      "triton": "3.5.1",
+      "cuda_toolkit": "12.8",
+      "nvcc": "12.8.61",
+      "driver": "570.211.01"
+    },
+    "environment_template_before_any_torch_or_vendor_import": {
+      "CUDA_VISIBLE_DEVICES": "FUTURE_EXECUTION_AUTHORITY_EXACT_GPU_UUID",
+      "CUDA_DEVICE_ORDER": "PCI_BUS_ID",
+      "GDN_DISABLE_COMPILE": "1",
+      "TORCHDYNAMO_DISABLE": "1",
+      "FUSED_GDN_PRECISION": "0",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "PYTHONPATH": "/home/zch/workspace/sana-wam/src:/home/zch/workspace/sana-wam/third_party/Sana",
+      "TRITON_CACHE_DIR": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a2_r1/06f5d09127f8/cach-a2-r1-launcher-fix-dc17cb7bdbd70955ea4b91212f0d4ac3/triton_cache"
+    },
+    "fused_gdn_precision_interpretation": "IEEE_FP32_DOTS_AND_FP32_STATE",
+    "gpu_preflight_snapshot_window_seconds": 120,
+    "gpu_preflight_required_observations": [
+      "AUTHORITY_UUID_TO_PHYSICAL_INDEX_MAPPING_MATCHES",
+      "H200_DEVICE_IDENTITY_MATCHES",
+      "MEMORY_USED_IS_ZERO_AT_BOTH_SNAPSHOTS",
+      "UTILIZATION_IS_ZERO_AT_BOTH_SNAPSHOTS",
+      "NVIDIA_SMI_COMPUTE_APPS_EMPTY",
+      "NVIDIA_SMI_PMON_EMPTY",
+      "NO_EXTERNAL_FUSER_PROCESS_ON_DEVICE",
+      "IMMEDIATE_PRECREATE_PREIMPORT_RECHECK_CLEAR"
+    ],
+    "standard_library_only_before_preflight_complete": true,
+    "frozen_quartet_sha_reverify_before_root_create_and_after_execution": true,
+    "failure_trap_before_first_root_mutation": true,
+    "cuda_cache_disable_must_be_unset": true,
+    "allow_dependency_install": false,
+    "allow_network": false,
+    "allow_real_data": false,
+    "allow_checkpoint": false,
+    "allow_full_2b": false,
+    "allow_proxy_or_reference_fallback": false
+  },
+  "architecture": {
+    "candidate_formula": "PHI_A=W2_SILU_W1_A; DELTA_L=U_L_TIMES_(PHI_A_MINUS_PHI_A0); H_PLUS=WHERE(ACTION_PRESENT_MASK,H_POST_VENDOR_PLUS_DELTA_L,H_POST_VENDOR)",
+    "zero_anchor": {
+      "value": "EXACT_ALL_ZERO_ACTION_DIM_20",
+      "storage": "IMMUTABLE_UPDATE_FREE_BUFFER",
+      "phi_zero_is_exact_zero": true,
+      "active_runtime_form": "U_L_TIMES_PHI_A_BECAUSE_PHI_A0_IS_PROVEN_EXACT_ZERO",
+      "extra_anchor_forward_or_detached_anchor_branch": false
+    },
+    "bias_policy": {
+      "action_conditioner_linear_bias": false,
+      "per_block_action_output_projection_bias": false,
+      "candidate_only_linear_bias_attributes_must_be_none": true,
+      "candidate_only_non_none_bias_parameter_buffer_or_state_dict_key": "FORBIDDEN"
+    },
+    "candidate_only_trainable_name_patterns": [
+      "action_conditioner.0.weight",
+      "action_conditioner.2.weight",
+      "blocks.{0..19}.action_output_projection.weight"
+    ],
+    "initialization": {
+      "all_per_block_action_output_projection_weights_exact_zero": true,
+      "conditioner_named_deterministic_fresh_initialization": true,
+      "common_reference_candidate_parameter_and_buffer_bytes_equal": true,
+      "fresh_constructor_only": true,
+      "checkpoint_or_predecessor_state_continuation": false
+    },
+    "injection_position": "AFTER_EACH_VENDOR_GDN_RECURRENCE_BEFORE_FFN",
+    "action_presence_mask": {
+      "source": "TYPED_ACTION_LAYOUT_PROVENANCE_ONLY_NOT_ACTION_NUMERIC_VALUE",
+      "shape_before_hidden_broadcast": [
+        8,
+        5,
+        1
+      ],
+      "correct_expected_row": [
+        false,
+        true,
+        true,
+        true,
+        true
+      ],
+      "shuffle_expected_row": [
+        false,
+        true,
+        true,
+        true,
+        true
+      ],
+      "no_action_expected_row": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "numeric_zero_action_still_present": true,
+      "bootstrap_no_committed_action": false,
+      "padding_or_invalid": false,
+      "full_no_action_mode": false
+    },
+    "inactive_semantics": {
+      "mixed_call_algorithm": "GATHER_ACTIVE_ACTION_INDICES_RUN_CONDITIONER_AND_PROJECTIONS_ON_GATHERED_VALUES_SCATTER_RESIDUAL_THEN_DIRECT_WHERE_SELECT_UNMODIFIED_POST_VENDOR_FOR_INACTIVE",
+      "per_token": "DIRECT_WHERE_SELECTION_OF_UNMODIFIED_POST_VENDOR_HIDDEN",
+      "full_no_action": "DO_NOT_READ_OR_EXECUTE_CONDITIONER_OR_OUTPUT_PROJECTION",
+      "masked_zero_addition_as_identity": "FORBIDDEN",
+      "actual_vendor_padding_claim": "FORBIDDEN_BECAUSE_PADDING_IS_REMOVED_BEFORE_VENDOR_CONCATENATION",
+      "seam_disabled_is_diagnostic_not_training_arm": true
+    }
+  },
+  "topology": {
+    "batch_size": 8,
+    "counterfactual_pair_count": 4,
+    "latent_channels": 3,
+    "spatial_height": 1,
+    "spatial_width": 1,
+    "valid_raw_count": 33,
+    "valid_latent_count": 5,
+    "valid_action_count": 32,
+    "action_dim": 20,
+    "context_dim": 4,
+    "vendor_hidden_dim": 64,
+    "vendor_heads": 2,
+    "vendor_head_dim": 32,
+    "vendor_gdn_depth": 20,
+    "vendor_conv_kernel_size": 0,
+    "vendor_k_conv_only": true,
+    "vendor_qk_norm": true,
+    "vendor_use_output_gate": true,
+    "vendor_use_autograd_kernel": true,
+    "frame_count": 5,
+    "HW": [
+      5,
+      1,
+      1
+    ],
+    "chunk_count": 2,
+    "chunk_boundaries": [
+      0,
+      3,
+      5
+    ],
+    "chunk_size": null,
+    "chunk_split_strategy": "uniform",
+    "chunk_valid_latent_counts": [
+      3,
+      2
+    ],
+    "temporal_compression": 8,
+    "video_stride": 1,
+    "scored_future_horizons": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "primary_horizons": [
+      1,
+      2,
+      4
+    ],
+    "ffn_hidden_dim": 128,
+    "action_conditioner": "BIAS_FREE_LINEAR_20_TO_64_SILU_BIAS_FREE_LINEAR_64_TO_20",
+    "action_output_projection": "BIAS_FREE_LINEAR_20_TO_64_ZERO_INIT_AFTER_VENDOR_GDN_BEFORE_FFN",
+    "action_presence_mask_correct_or_shuffle": [
+      false,
+      true,
+      true,
+      true,
+      true
+    ],
+    "action_presence_mask_no_action_or_seam_disabled": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "inactive_algorithm": "GATHER_ACTIVE_CONDITION_PROJECT_SCATTER_THEN_DIRECT_WHERE_IDENTITY",
+    "frozen_action_backbone": "REAL_ACTIONDIT_JOINT_CROSS_ATTN_DEPTH20_DIAGNOSTIC_ONLY",
+    "action_prediction_loss_weight": 0.0,
+    "frame_valid_mask": null,
+    "persistent_state_input_or_output": false,
+    "every_forward_is_one_complete_five_frame_vendor_call": true,
+    "forward_direction_state_within_call": "PERSISTS_ACROSS_CHUNKS",
+    "reverse_direction_state_within_call": "RESETS_AT_INTERIOR_BOUNDARY_3",
+    "future_chunk_to_past_chunk_influence": "FORBIDDEN",
+    "past_chunk_to_future_chunk_influence": "ALLOWED"
+  },
+  "recipe": {
+    "source": "BYTE_AND_FORMULA_EQUIVALENT_TO_PINNED_REVIEW300_TASK",
+    "task_recipe_sha256": "9d2a749d722775324ee233862772def530fbffe0ea9e55aeea87c160b87a51e4",
+    "slice_id": "synthetic_counterfactual_pairs_0000_0003",
+    "shuffle_permutation": [
+      1,
+      0,
+      3,
+      2,
+      5,
+      4,
+      7,
+      6
+    ],
+    "shuffle_permutation_sha256": "93a9a618e0482688c85f8fc786cbaf7f845f69d5f48c356dd71881fb05d80dfd",
+    "end_of_bin_action_indices": [
+      7,
+      15,
+      23,
+      31
+    ],
+    "anchor_action_condition": "IMMUTABLE_EXACT_ZERO_ACTION_DIM_20",
+    "correct_mode": "TYPED_PRESENT_REDUCER_SELECTED_ACTION",
+    "shuffle_mode": "TYPED_PRESENT_FIXED_PAIRED_ROW_PERMUTATION",
+    "no_action_mode": "FULL_DIRECT_BYPASS_ACTION_PATH_UNREAD",
+    "seam_disabled_mode": "SAME_CANDIDATE_COMMON_WEIGHT_STATE_DIAGNOSTIC_DIRECT_BYPASS_ONLY",
+    "non_action_video_context_noise_target_bytes_equal_across_modes": true,
+    "target_visibility": "TARGET_BYTES_ENTER_LOSS_ONLY",
+    "no_clean_action_or_future_video_side_channel": true,
+    "task_tensor_digest_manifest_required_before_model_construct": true,
+    "real_data": false
+  },
+  "initialization": {
+    "seed0": 202608033,
+    "shared_named_seed": 2026080331,
+    "candidate_only_seed": 2026080421,
+    "initializer_revision": "cach-a2-zero-anchored-bias-free-v1",
+    "common_method": "NAMED_DETERMINISTIC_FRESH_COMMON_TEMPLATE_DEEPCOPY_BYTES_INTO_BOTH_ARMS",
+    "candidate_only_method": "PER_EXACT_PARAMETER_NAME_DETERMINISTIC_GENERATOR_FROM_CANDIDATE_ONLY_SEED",
+    "zero_candidate_action_output_projection_weight": true,
+    "candidate_only_bias_exists": false,
+    "zero_anchor_frozen_exact_zero": true,
+    "common_theta0_parameter_and_buffer_bytes_equal": true,
+    "fresh_initialization": true,
+    "continuation_from_predecessor_parameters_optimizer_rng_or_checkpoint": false,
+    "common_parameter_manifest_required_before_forward": true,
+    "candidate_only_manifest_required_before_forward": true,
+    "arm_execution_order": [
+      "REF-GDN-CORRECTED",
+      "CACH-A2"
+    ],
+    "data_order": "SINGLE_FIXED_FULL_BATCH_NO_SHUFFLE",
+    "predecessor_theta0_equivalence_required": false
+  },
+  "optimizer": {
+    "name": "AdamW",
+    "learning_rate": 0.003,
+    "betas": [
+      0.9,
+      0.99
+    ],
+    "epsilon": 1e-8,
+    "weight_decay": 0.0,
+    "gradient_clip_global_l2": 1.0,
+    "optimizer_steps_per_arm": 300,
+    "max_optimizer_steps_total": 600,
+    "metric_steps": [
+      0,
+      300
+    ],
+    "loss_trace_points_per_arm": 301,
+    "best_step_selection": false,
+    "intermediate_checkpoint_selection": false,
+    "write_optimizer_state": false,
+    "automatic_budget_extension": false,
+    "reference_parameter_scope": "ALL_AND_ONLY_COMMON_TRAINABLE_NAMES",
+    "candidate_parameter_scope": "IDENTICAL_COMMON_NAMES_PLUS_EXACT_BIAS_FREE_CANDIDATE_ACTION_SEAM_NAMES",
+    "unlisted_trainable_parameter_allowed": false
+  },
+  "budget": {
+    "max_wall_seconds_total": 1350,
+    "max_gpu_memory_bytes": 17179869184,
+    "max_process_rss_bytes": 17179869184,
+    "max_root_bytes": 536870912,
+    "minimum_free_bytes_before_root_create": 107374182400,
+    "max_optimizer_steps_total": 600,
+    "exact_optimizer_steps_per_arm": 300,
+    "automatic_budget_extension": false,
+    "completion_rule": "BOTH_ARMS_EXACTLY_300_STEPS_AND_ALL_REQUIRED_DIAGNOSTICS",
+    "budget_failure_state": "HARNESS_REJECTED_NO_AUTOMATIC_RERUN"
+  },
+  "diagnostics": {
+    "required_execution": [
+      "THETA0_FORWARD",
+      "BACKWARD_AT_STEP0",
+      "300_ADAMW_STEPS_PER_ARM",
+      "FINAL_SAME_THETA_CORRECT_SHUFFLE_NO_ACTION_SEAM_DISABLED_METRICS",
+      "NO_ACTION_CANDIDATE_ONLY_GRADIENT_ALL_NONE_THETA0_AND_FINAL",
+      "NO_ACTION_RAW_ACTION_LOCAL_JVP_EXACT_ZERO_THETA0_AND_FINAL",
+      "CORRECT_RAW_ACTION_LOCAL_JVP_STEP300",
+      "ACTUAL_CALL_BOOTSTRAP_POST_SEAM_IDENTITY_PER_BLOCK_THETA0_AND_FINAL",
+      "SEAM_HELPER_PADDING_INACTIVE_IDENTITY_THETA0_AND_FINAL",
+      "PER_BLOCK_CORRECT_AND_NO_ACTION_RESIDUAL_RMS",
+      "PAIRED_COMMON_AND_HALF_DELTA_DECOMPOSITION",
+      "TRAILING_25_AND_50_LOSS_WINDOW_STATISTICS",
+      "FIRST_CHUNK_PREFIX_INVARIANCE_CHECK",
+      "TARGET_PERTURBATION_AND_REVERSE_GRADIENT_LEAKAGE_CHECK",
+      "FINITE_OUTPUT_LOSS_GRADIENT_UPDATE_OPTIMIZER_AND_METRICS",
+      "FINAL_PARAMETER_DIGESTS"
+    ],
+    "vendor_identity": {
+      "exact_class": "diffusion.model.nets.sana_gdn_blocks_triton.ChunkCausalGDNTriton",
+      "use_autograd_kernel": true,
+      "actual_vendor_forward_call_count_strictly_positive": true,
+      "HW": [
+        5,
+        1,
+        1
+      ],
+      "normalized_chunk_boundaries": [
+        0,
+        3,
+        5
+      ],
+      "fused_gdn_precision": 0
+    },
+    "local_jvp": {
+      "vendor_primal_outside_forward_mode_transform": true,
+      "detached_last_block_post_vendor_hidden": true,
+      "pure_torch_tail_only": true,
+      "vendor_custom_autograd_forward_mode_claim": false,
+      "correct_step300_action_tangent": "FIXED_UNIT_NONZERO_ON_H1_H2_H3_H4_ACTION_SLOTS",
+      "no_action_theta0_and_final_tangent": "SAME_FIXED_NONZERO_RAW_ACTION_TANGENT_FULL_BYPASS_OUTPUT_EXACT_ZERO",
+      "post_vendor_hidden_digest_required": true
+    },
+    "zero_anchor": {
+      "same_arm_no_action_vs_seam_disabled_theta0_and_final": true,
+      "actual_call_bootstrap_identity_per_block_theta0_and_final": true,
+      "padding_helper_hidden_shape": [
+        1,
+        3,
+        64
+      ],
+      "padding_helper_action_shape": [
+        1,
+        3,
+        20
+      ],
+      "padding_helper_mask_row": [
+        true,
+        false,
+        false
+      ],
+      "padding_helper_vendor_used": false,
+      "full_no_action_conditioner_and_projection_call_count_expected": 0
+    },
+    "target_leakage": {
+      "target_bytes_enter_loss_only": true,
+      "target_perturbation_must_not_change_prediction_or_post_vendor_hidden": true,
+      "prediction_target_reverse_gradient_must_be_zero_or_unused": true
+    },
+    "cross_call_state_or_commit": "NOT_ASSESSED_BY_DESIGN",
+    "compile_oom_missing_kernel_import_or_resource_failure": "HARNESS_REJECTED_OR_ENV_BLOCKED_NOT_ARCHITECTURE_NEGATIVE"
+  },
+  "metrics": {
+    "accumulator_dtype": "float64",
+    "epsilon": 1e-12,
+    "train_loss_formula": "EQUAL_WEIGHT_MEAN_OF_CORRECT_ACTION_VIDEO_MSE_AT_FUTURE_HORIZONS_1_2_3_4",
+    "primary_formula": "0.20*MSE_H1+0.30*MSE_H2+0.50*MSE_H4",
+    "primary_horizon_weights": {
+      "1": 0.2,
+      "2": 0.3,
+      "4": 0.5
+    },
+    "same_theta_same_batch_modes": [
+      "correct",
+      "shuffle",
+      "no_action",
+      "seam_disabled"
+    ],
+    "counterfactual_delta_nmse_formula": "SUM_SQUARED_PAIR_DELTA_ERROR_DIV_MAX_SUM_SQUARED_PAIR_DELTA_TARGET_EPSILON",
+    "loss_drop_rel_formula": "(CANDIDATE_CORRECT_TRAIN_LOSS_STEP0-CANDIDATE_CORRECT_TRAIN_LOSS_STEP300)/MAX(CANDIDATE_CORRECT_TRAIN_LOSS_STEP0,EPSILON)",
+    "shuffle_gap_rel_formula": "(PRIMARY_SHUFFLE-PRIMARY_CORRECT)/MAX(PRIMARY_SHUFFLE,EPSILON)",
+    "no_action_gap_rel_formula": "(PRIMARY_NO_ACTION-PRIMARY_CORRECT)/MAX(PRIMARY_NO_ACTION,EPSILON)",
+    "candidate_gain_vs_reference_formula": "(PRIMARY_REFERENCE-PRIMARY_CANDIDATE_CORRECT)/MAX(PRIMARY_REFERENCE,EPSILON)",
+    "paired_common_formula": "COMMON_HAT=(PRED_PLUS+PRED_MINUS)/2; COMMON_TARGET=(TARGET_PLUS+TARGET_MINUS)/2; COMMON_MSE=MEAN_ELEMENTWISE_SQUARED_ERROR",
+    "paired_half_delta_formula": "DELTA_HAT=(PRED_PLUS-PRED_MINUS)/2; DELTA_TARGET=(TARGET_PLUS-TARGET_MINUS)/2",
+    "half_delta_mse_formula": "MEAN_ELEMENTWISE_SQUARED_ERROR_OF_DELTA_HAT_MINUS_DELTA_TARGET",
+    "half_delta_nmse_formula": "SUM_SQUARED_DELTA_ERROR/MAX(SUM_SQUARED_DELTA_TARGET,EPSILON)",
+    "half_delta_energy_ratio_formula": "SUM_SQUARED_DELTA_HAT/MAX(SUM_SQUARED_DELTA_TARGET,EPSILON)",
+    "half_delta_alignment_cosine_formula": "SUM_DELTA_HAT_TIMES_DELTA_TARGET/MAX(SQRT(SUM_SQUARED_DELTA_HAT_TIMES_SUM_SQUARED_DELTA_TARGET),EPSILON)",
+    "target_total_energy_formula": "MEAN_ELEMENTWISE_SQUARED_TARGET",
+    "paired_common_mse_div_target_total_energy_formula": "PAIRED_COMMON_MSE/MAX(TARGET_TOTAL_ENERGY,EPSILON)",
+    "correct_mse_div_target_total_energy_formula": "CANDIDATE_CORRECT_MSE/MAX(TARGET_TOTAL_ENERGY,EPSILON)",
+    "no_action_gradient_formula": "AUTOGRAD_GRAD_ALLOW_UNUSED_TRUE_OVER_ALL_CANDIDATE_ONLY_PARAMETERS_MUST_RETURN_ALL_NONE_AT_THETA0_AND_FINAL; REPORT_ALL_NONE_TRUE_AND_CANONICAL_RMS_0_0; ANY_RETURNED_TENSOR_EVEN_EXACT_ZERO_IS_VALIDITY_FAILURE",
+    "no_action_jvp_formula": "TORCH_FUNC_JVP_OF_DETACHED_LAST_BLOCK_POST_VENDOR_PURE_TORCH_TAIL_IN_FULL_NO_ACTION_MODE_WITH_RESPECT_TO_RAW_ACTION_PRIMAL_SHAPE_8_5_20_AND_FIXED_UNIT_NONZERO_TANGENT_ON_H1_H2_H3_H4_ACTION_SLOTS; RMS_MUST_BE_EXACT_0_0_AT_THETA0_AND_FINAL",
+    "correct_action_jvp_formula": "SAME_LOCAL_TAIL_JVP_SCOPE_IN_CORRECT_MODE_AT_STEP300_ONLY; THETA0_IS_REPORTED_EXPECTED_ZERO_BECAUSE_ALL_U_L_ARE_ZERO_BUT_IS_NOT_LIVENESS_THRESHOLD_INPUT",
+    "seam_grad_rms_step0_formula": "RMS_OVER_ALL_CANDIDATE_PER_BLOCK_ACTION_OUTPUT_PROJECTION_WEIGHT_GRADIENTS",
+    "seam_update_rms_final_formula": "RMS_OVER_STEP300_MINUS_STEP0_FOR_SAME_WEIGHTS",
+    "last_block_local_action_condition_jvp_rms_step300_formula": "RMS_OF_TRAINED_LAST_BLOCK_PURE_TORCH_TAIL_ACTION_DIRECTIONAL_JVP",
+    "prefix_invariance_max_abs_formula": "MAX_ABS_FIRST_CHUNK_OUTPUT_DIFFERENCE_AFTER_ONLY_SECOND_CHUNK_INPUT_PERTURBATION",
+    "aggregation_rule": "AGGREGATE_SUMS_ALL_SQUARED_OR_DOT_TERMS_OVER_ALL_4_PAIRS_H1_H2_H3_H4_AND_CHANNEL_SPATIAL_ELEMENTS_BEFORE_DIVISION; PER_HORIZON_USES_THE_SAME_RULE_RESTRICTED_TO_THAT_HORIZON",
+    "loss_window_policy": "FIXED_TRAILING_25_AND_50_POINTS_DIAGNOSTIC_ONLY_NO_SELECTION",
+    "p90_formula": "SORT_ASCENDING_AND_SELECT_ZERO_BASED_INDEX_EQUALS_CEIL(0.90*N)-1_NEAREST_RANK_NO_INTERPOLATION",
+    "candidate_gain_formula": "(PRIMARY_REFERENCE-PRIMARY_CANDIDATE_CORRECT)/MAX(PRIMARY_REFERENCE,EPSILON)",
+    "shuffle_gap_formula": "(PRIMARY_SHUFFLE-PRIMARY_CORRECT)/MAX(PRIMARY_SHUFFLE,EPSILON)",
+    "no_action_gap_formula": "(PRIMARY_NO_ACTION-PRIMARY_CORRECT)/MAX(PRIMARY_NO_ACTION,EPSILON)",
+    "required_metrics": {
+      "legacy_comparable": [
+        "candidate_gain_vs_reference",
+        "loss_drop_rel",
+        "shuffle_gap_rel_aggregate_and_H1_H2_H4",
+        "no_action_gap_rel_aggregate_and_H1_H2_H4",
+        "counterfactual_delta_nmse_aggregate_and_H1_H2_H4",
+        "seam_gradient_and_update_rms",
+        "correct_action_local_jvp_rms"
+      ],
+      "zero_anchor": [
+        "same_arm_no_action_vs_seam_disabled_bitwise_equal_theta0_and_final",
+        "same_arm_no_action_vs_seam_disabled_max_abs_theta0_and_final",
+        "actual_call_per_block_bootstrap_post_seam_vs_same_invocation_post_vendor_bitwise_equal_and_max_abs_theta0_and_final",
+        "seam_helper_padding_fixture_inactive_output_vs_input_bitwise_equal_and_max_abs_theta0_and_final",
+        "no_action_candidate_only_parameter_gradients_all_none_theta0_and_final",
+        "no_action_action_input_local_jvp_rms_exact_zero_theta0_and_final",
+        "full_no_action_conditioner_and_projection_call_count",
+        "per_block_correct_and_no_action_residual_rms"
+      ],
+      "common_delta_decomposition": [
+        "paired_prediction_common_mse_aggregate_and_by_horizon",
+        "paired_half_delta_mse_nmse_energy_ratio_and_cosine_aggregate_and_by_horizon",
+        "target_total_energy_aggregate_and_by_horizon",
+        "paired_common_mse_div_target_total_energy_aggregate_and_by_horizon",
+        "correct_mse_div_target_total_energy_aggregate_and_by_horizon"
+      ],
+      "stability": [
+        "last25_train_loss_mean_median_p90_min_max_per_arm",
+        "last50_train_loss_mean_median_p90_min_max_per_arm",
+        "final_over_trace_min_ratio_per_arm"
+      ]
+    },
+    "final_step_primary": true,
+    "final_step_only": true,
+    "best_step_forbidden": true
+  },
+  "thresholds": {
+    "validity": {
+      "all_required": [
+        "CARD_DECISION_AND_ALL_PREDECESSOR_PINS_MATCH",
+        "FUTURE_MATERIALIZED_QUARTET_PINS_MATCH_BEFORE_AND_AFTER_EXECUTION",
+        "EXACT_VENDOR_IDENTITY_AND_POSITIVE_FORWARD_COUNT",
+        "COMMON_THETA0_PARAMETER_AND_BUFFER_BYTES_EQUAL",
+        "ALL_CANDIDATE_ONLY_LINEAR_BIAS_ATTRIBUTES_NONE_AND_NO_NON_NONE_BIAS_PARAMETER_BUFFER_OR_STATE_DICT_KEY",
+        "ALL_U_L_WEIGHTS_EXACT_ZERO_AT_THETA0",
+        "ACTION_PRESENT_MASK_MATCHES_TYPED_LAYOUT_TRUTH_TABLE",
+        "FULL_NO_ACTION_READS_OR_EXECUTES_NO_ACTION_MODULE",
+        "SAME_ARM_NO_ACTION_AND_SEAM_DISABLED_BITWISE_EQUAL_AT_THETA0_AND_FINAL",
+        "NO_ACTION_VS_SEAM_DISABLED_MAX_ABS_THETA0_AND_FINAL_EXACT_ZERO",
+        "ACTUAL_CALL_PER_BLOCK_BOOTSTRAP_POST_SEAM_VS_SAME_INVOCATION_POST_VENDOR_BITWISE_IDENTITY_THETA0_AND_FINAL",
+        "SEAM_HELPER_PADDING_FIXTURE_INACTIVE_OUTPUT_VS_INPUT_BITWISE_IDENTITY_THETA0_AND_FINAL_NO_VENDOR_PADDING_CLAIM",
+        "NO_ACTION_CANDIDATE_ONLY_PARAMETER_GRADIENTS_ALL_NONE_THETA0_AND_FINAL",
+        "NO_ACTION_ACTION_INPUT_LOCAL_JVP_EXACT_ZERO_THETA0_AND_FINAL",
+        "CORRECT_ACTION_LOCAL_JVP_STEP300_STRICTLY_GREATER_THAN_1E-8",
+        "SEAM_WEIGHT_GRADIENT_STEP0_STRICTLY_GREATER_THAN_1E-8",
+        "SEAM_WEIGHT_UPDATE_FINAL_STRICTLY_GREATER_THAN_1E-6",
+        "VENDOR_COMMON_PARAMETER_GRADIENT_STEP0_STRICTLY_GREATER_THAN_1E-8",
+        "EXACTLY_300_OPTIMIZER_STEPS_PER_ARM",
+        "FINITE_OUTPUTS_LOSSES_GRADIENTS_UPDATES_OPTIMIZER_AND_METRICS",
+        "FIRST_CHUNK_PREFIX_INVARIANCE_MAX_ABS_AND_REL_AT_MOST_1E-4",
+        "TARGET_PERTURBATION_DOES_NOT_CHANGE_PREDICTION_OR_HIDDEN",
+        "NO_REAL_DATA_CHECKPOINT_FALLBACK_FULL2B_OR_FORMAL_PATH"
+      ],
+      "all_card_decision_predecessor_and_quartet_pins_match": true,
+      "exact_vendor_identity_and_positive_forward_count": true,
+      "common_theta0_parameter_and_buffer_bytes_equal": true,
+      "candidate_only_bias_attributes_all_none_and_no_bias_state_key": true,
+      "all_per_block_projection_weights_exact_zero_theta0": true,
+      "typed_action_presence_mask_truth_table_matches": true,
+      "full_no_action_action_module_call_count": 0,
+      "same_arm_no_action_vs_seam_disabled_bitwise_equal_theta0_and_final": true,
+      "same_arm_no_action_vs_seam_disabled_max_abs_theta0_and_final": 0.0,
+      "actual_call_bootstrap_post_seam_bitwise_identity_theta0_and_final": true,
+      "padding_helper_inactive_bitwise_identity_theta0_and_final": true,
+      "no_action_candidate_only_parameter_gradients_all_none_theta0_and_final": true,
+      "no_action_action_input_local_jvp_rms_theta0_and_final": 0.0,
+      "correct_action_local_jvp_rms_step300_gt": 1e-8,
+      "seam_weight_gradient_rms_step0_gt": 1e-8,
+      "seam_weight_update_rms_final_gt": 1e-6,
+      "vendor_common_parameter_gradient_rms_step0_gt": 1e-8,
+      "exactly_300_optimizer_steps_completed_per_arm": true,
+      "finite_all": true,
+      "prefix_invariance_max_abs": 0.0001,
+      "prefix_invariance_max_rel": 0.0001,
+      "target_perturbation_changes_prediction_or_hidden": false,
+      "real_data_checkpoint_fallback_full2b_or_formal_path_used": false
+    },
+    "operator_go": {
+      "candidate_gain_vs_reference_min": 0.5,
+      "loss_drop_rel_min": 0.8,
+      "counterfactual_delta_nmse_correct_max": 0.25,
+      "counterfactual_delta_nmse_correct_h1_h2_h4_max_each": 0.35,
+      "shuffle_gap_rel_min": 0.5,
+      "shuffle_gap_rel_h1_h2_h4_min_each": 0.25,
+      "no_action_gap_rel_min": 0.5,
+      "no_action_gap_rel_h1_h2_h4_min_each": 0.25,
+      "same_arm_no_action_bypass_bitwise_equal": true,
+      "same_arm_no_action_vs_seam_disabled_max_abs": 0.0,
+      "no_action_candidate_only_parameter_gradients_all_none_theta0_and_final": true,
+      "no_action_action_input_local_jvp_rms_theta0_and_final": 0.0,
+      "correct_action_local_jvp_rms_step300_strictly_greater_than": 1e-8,
+      "seam_gradient_rms_step0_strictly_greater_than": 1e-8,
+      "seam_update_rms_final_strictly_greater_than": 1e-6
+    },
+    "delta_live_common_mode_blocked": {
+      "all_validity": true,
+      "all_operator_go": false,
+      "same_arm_no_action_bypass_bitwise_equal": true,
+      "counterfactual_delta_nmse_correct_max": 0.25,
+      "counterfactual_delta_nmse_correct_h1_h2_h4_max_each": 0.35,
+      "half_delta_energy_ratio_min": 0.5,
+      "half_delta_energy_ratio_max": 1.5,
+      "half_delta_alignment_cosine_min": 0.8,
+      "paired_common_mse_div_target_total_energy_strictly_greater_than": 1.0,
+      "failed_operator_go_requires_shuffle_or_no_action_separation_failure": true
+    },
+    "operator_strong_stop": {
+      "candidate_gain_vs_reference_max": 0.05,
+      "loss_drop_rel_max": 0.1,
+      "counterfactual_delta_nmse_correct_min": 0.9,
+      "shuffle_gap_rel_max": 0.05,
+      "no_action_gap_rel_max": 0.05,
+      "seam_gradient_rms_step0_strictly_greater_than": 1e-8,
+      "seam_update_rms_final_strictly_greater_than": 1e-6
+    },
+    "post_result_threshold_or_formula_change": false
+  },
+  "verdict": {
+    "initial_state": "NOT_RUN",
+    "classification_order": [
+      "INVALID_OR_BLOCKED_BEFORE_ARCHITECTURE_VERDICT",
+      "VALID_ALL_OPERATOR_GO",
+      "VALID_DELTA_LIVE_COMMON_MODE_BLOCKED",
+      "VALID_ALL_STRONG_STOP",
+      "VALID_MATCHING_NONE"
+    ],
+    "valid_all_operator_go": {
+      "typed_verdict": "OPERATOR_GO",
+      "diagnostic_subclassification": null
+    },
+    "valid_delta_live_common_mode_blocked": {
+      "typed_verdict": "OPERATOR_INCONCLUSIVE_REVIEW_EXHAUSTED",
+      "diagnostic_subclassification": "A2_DELTA_LIVE_COMMON_MODE_BLOCKED"
+    },
+    "valid_all_strong_stop": {
+      "typed_verdict": "OPERATOR_STOP",
+      "diagnostic_subclassification": null
+    },
+    "valid_matching_none": {
+      "typed_verdict": "OPERATOR_INCONCLUSIVE_REVIEW_EXHAUSTED",
+      "diagnostic_subclassification": "A2_VALID_NEITHER"
+    },
+    "invalid_or_blocked_states": [
+      "AUTH_BLOCKED",
+      "ENV_BLOCKED",
+      "HARNESS_REJECTED",
+      "INVALID_RUN",
+      "IMPLEMENTATION_INVALID",
+      "NUMERICAL_INVALID"
+    ],
+    "valid_result_publication": "DIRECT_FINAL_RESULT_INSIDE_ROOT_BEFORE_SINGLE_TERMINAL_FREEZE",
+    "provisional_result_or_external_claim": false,
+    "operator_go_effect": "MAY_REQUEST_EXPLICIT_PLAN_DEVIATION_ACCEPTANCE_AND_AV2_AUTHORITY_ONLY_NO_AUTOMATIC_AV2_UNLOCK",
+    "all_other_valid_verdict_effect": "NO_AV2_NO_AUTOMATIC_RERUN_FULL_ARCHITECTURE_NOT_ASSESSED",
+    "formal_admission_effect": "NONE",
+    "global_stage3_effect": "NONE"
+  },
+  "predecessor_token_policy": {
+    "predecessor_review_token_id": "cadfd92f1c72ebd9cc9aa8bfad029ddc6f0e72d9f7942f34e74629ca1ae37252",
+    "predecessor_top_level_state": "CONSUMED",
+    "consumed_claim": {
+      "path": "/DATA/share/sana_cach_wam_nonformal_screens/token_ledgers/c73a943047295338cd9de14e6e53199b463ea66ae92b99d4b0b3393f5ec34030/cadfd92f1c72ebd9cc9aa8bfad029ddc6f0e72d9f7942f34e74629ca1ae37252.claim.json",
+      "sha256": "e7c355d3c4e8bfb942f8baa8a5511fb5964c2c7f2d6c975ef5aec0daa458a91f",
+      "verification": "READ_ONLY_TOP_LEVEL_TOKEN_STATE_AND_FULL_SHA256"
+    },
+    "a2_review_or_budget_extension_token": null,
+    "create_token_or_ledger_namespace": false,
+    "derive_reset_replace_or_consume_token": false,
+    "atomic_claim_or_claim_recovery": false,
+    "review_exhausted_suffix_origin": "INHERITED_GLOBAL_TOKEN_STATE_FROM_PREDECESSOR_REVIEW300",
+    "predecessor_claim_path_may_appear_only_as_read_only_pin": true
+  },
+  "artifacts": {
+    "root_label": "NON_FORMAL_ARCHITECTURE_SUCCESSOR_SCREEN_IMMUTABLE_NOT_ADMISSION_EVIDENCE",
+    "resolved_root": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a2_r1/06f5d09127f8/cach-a2-r1-launcher-fix-dc17cb7bdbd70955ea4b91212f0d4ac3",
+    "run_nonce": "dc17cb7bdbd70955ea4b91212f0d4ac3",
+    "root_preflight_must_not_exist_or_be_symlink": true,
+    "root_or_namespace_create_authorized_at_source_materialization": false,
+    "future_execution_exclusive_root_create": true,
+    "run_namespace_paths_in_creation_order": [
+      "/DATA/share/sana_cach_wam_nonformal_screens/cach_a2_r1",
+      "/DATA/share/sana_cach_wam_nonformal_screens/cach_a2_r1/06f5d09127f8"
+    ],
+    "namespace_creation_mode": "02775",
+    "namespace_expected_owner": "zch:sharegrp",
+    "namespace_lstat_every_ancestor_and_reject_symlink": true,
+    "triton_cache_inside_root": true,
+    "write_model_checkpoint": false,
+    "write_optimizer_state": false,
+    "required_if_root_created": [
+      "RUN_CONTEXT.json",
+      "PROGRESS_EVENTS.json",
+      "THETA0_MANIFESTS.json",
+      "LOSS_TRACE.json",
+      "RAW_METRICS.json",
+      "RAW_EVIDENCE.json",
+      "FINAL_PARAMETER_DIGESTS.json",
+      "JIT_INVENTORY.json",
+      "RESULT.json",
+      "FREEZE_RECEIPT.json"
+    ],
+    "valid_result_timing": "COMPUTE_FINAL_TYPED_VERDICT_AND_DIAGNOSTIC_SUBCLASSIFICATION_BEFORE_RESULT_WRITE_AND_ROOT_FREEZE",
+    "valid_result_terminal_without_claim_ledger": true,
+    "provisional_result": false,
+    "freeze_root_on_every_postcreate_terminal": true,
+    "chmod_frozen_mode": "0555_DIRECTORIES_AND_0444_FILES",
+    "delete_after_creation": false,
+    "modify_after_freeze": false,
+    "reuse": false,
+    "automatic_model_rerun": false,
+    "retry_requires_fresh_root_nonce_and_new_explicit_authority": true,
+    "formal_promotion": false
+  }
+}

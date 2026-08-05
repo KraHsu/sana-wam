@@ -42,6 +42,9 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
 sys.path.insert(0, str(_ROOT / "third_party" / "Sana"))
 
+from sana_wam.train.cach_stage0_guard import (  # noqa: E402
+    reject_cach_stage0_base_config,
+)
 
 
 def _is_formal_phase6(cfg) -> bool:
@@ -64,6 +67,7 @@ def main():
     args, overrides = ap.parse_known_args()
 
     base_cfg = OmegaConf.load(args.config)
+    reject_cach_stage0_base_config(base_cfg, entrypoint="scripts/train.py")
     is_formal_phase6 = _is_formal_phase6(base_cfg)
     launch_context = None
     if is_formal_phase6:

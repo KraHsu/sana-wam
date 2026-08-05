@@ -1,0 +1,695 @@
+{
+  "schema": "cach.architecture_validation.av1b_run_card.v1",
+  "schema_policy": {
+    "all_listed_keys_required": true,
+    "reject_unknown_keys_in_every_object": true,
+    "duplicate_key_rejecting_json_loader_required": true,
+    "repo_paths_must_be_relative_without_parent_segments": true,
+    "sha256_pattern": "^[0-9a-f]{64}$",
+    "self_pin_policy": "OUT_OF_BAND_FULL_LITERAL_SHA256_AFTER_SERIALIZATION",
+    "runner_must_match_full_card_sha256_before_root_create_or_import": true
+  },
+  "card_id": "cach-av1b-vendor-gdn-single-call-v1",
+  "card_state": "FROZEN_CARD_ONLY_EXECUTION_NOT_AUTHORIZED",
+  "identity": {
+    "canonical_host": "H200",
+    "canonical_worktree": "/home/zch/workspace/sana-wam",
+    "created_on": "2026-08-03",
+    "self_path": "docs/cach_sana_wam/architecture_validation/av1b/AV1B_RUN_CARD.json",
+    "self_sha256": null,
+    "self_sha256_binding": "THE_CALLER_MUST_PUBLISH_THE_FULL_LITERAL_SHA256_AFTER_THE_FINAL_BYTES_ARE_SYNCED_TO_H200; FUTURE_AUTHORITY_RUNNER_RESULT_AND_RECEIPT_MUST_BIND_PATH_PLUS_FULL_SHA256",
+    "governing_plan": {
+      "path": "docs/cach_sana_wam/global_stage3/post_phase_c_planning/ARCHITECTURE_VALIDATION_FIRST_PLAN_20260803_v1.md",
+      "sha256": "06f5d09127f8bc2a945cdbdc095054f40b1fe8d9757a90eccbdf0604ea89e079"
+    },
+    "repository_heads": {
+      "sana_wam": "605f1c134b4c983ff80f8489c4bc8847036329e2",
+      "third_party_sana": "16b9cec673e3335724ba2d8db25de7f9ed229292",
+      "sana_afcc_handoff": "9586486f2a9f5172d57b325e32093a3e018d34c0"
+    },
+    "predecessor_av0_card": {
+      "path": "docs/cach_sana_wam/architecture_validation/av1/AV0_RUN_CARD.json",
+      "sha256": "c73a943047295338cd9de14e6e53199b463ea66ae92b99d4b0b3393f5ec34030"
+    },
+    "predecessor_av1_root": "/DATA/share/sana_cach_wam_nonformal_screens/av1/06f5d09127f8/c73a94304729-d755b67c667d9a22686c8d90d187832d",
+    "predecessor_av1_artifacts": {
+      "result": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1/06f5d09127f8/c73a94304729-d755b67c667d9a22686c8d90d187832d/RESULT.json",
+        "sha256": "b7b23642d5772efb09e3c0ff09cb1aead3d5834b70b325ddc8b1c10d7438303e"
+      },
+      "raw_evidence": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1/06f5d09127f8/c73a94304729-d755b67c667d9a22686c8d90d187832d/RAW_EVIDENCE.json",
+        "sha256": "e6fd480994ee7768366e76881162c9929283185c3e8b2e1ffb4e0caaa3e21357"
+      },
+      "raw_metrics": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1/06f5d09127f8/c73a94304729-d755b67c667d9a22686c8d90d187832d/RAW_METRICS.json",
+        "sha256": "dcd188ddb74e6c09049f7df57fb16c07a5045d25550ae9cc33daca6236f41b0f"
+      },
+      "run_context": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1/06f5d09127f8/c73a94304729-d755b67c667d9a22686c8d90d187832d/RUN_CONTEXT.json",
+        "sha256": "78fbaa9c91a3efe06409118a152cfb8f457bc9ca0a5ad24143cbd373287c3cc4"
+      },
+      "freeze_receipt": {
+        "path": "/DATA/share/sana_cach_wam_nonformal_screens/av1/06f5d09127f8/c73a94304729-d755b67c667d9a22686c8d90d187832d/FREEZE_RECEIPT.json",
+        "sha256": "c093b2b067c6390f2439c6132b08a31ab6e04869ec314b7ebc4c164673c9c774"
+      }
+    },
+    "predecessor_av1_typed_state": "PROXY_GO",
+    "predecessor_av1_scope": "PROXY_ONLY_ACTUAL_ARCHITECTURE_NOT_ASSESSED"
+  },
+  "authority": {
+    "statement": "授权在 H200 仅新增并冻结 docs/cach_sana_wam/architecture_validation/av1b/AV1B_RUN_CARD.json，固定 AV‑1B 的新增文件列表、VENDOR_KERNEL/EXPERIMENTAL_PATH、单次调用 chunk-causal 语义、前序证据 SHA、GPU 7 UUID、运行预算与阈值、唯一 root/nonce 及未消费 review token；本轮禁止创建运行 root、使用 GPU/CUDA/JIT、执行模型或测试、参数更新、训练、真实数据和 checkpoint。",
+    "statement_sha256": "52e996ad4395712e8a644589058c04d389318bd7b7678fcb163805d2fbc7b676",
+    "statement_sha256_rule": "SHA256_UTF8_WITHOUT_TRAILING_NEWLINE",
+    "interpretation": "AV1B_SUCCESSOR_CARD_FREEZE_ONLY",
+    "inheritance": "NONE",
+    "documentation_write_exact_path_only": true,
+    "freeze_this_card": true,
+    "code_write": false,
+    "screen_root_create": false,
+    "gpu_reservation_or_use": false,
+    "cuda_or_jit": false,
+    "python_or_vendor_import": false,
+    "model_construct_or_execute": false,
+    "forward_backward_or_jvp": false,
+    "optimizer_construct": false,
+    "parameter_update": false,
+    "training": false,
+    "lightweight_tests": false,
+    "diagnostic_execution": false,
+    "real_data_access": false,
+    "checkpoint_load": false,
+    "checkpoint_save": false,
+    "full_2b": false,
+    "formal_or_capability_or_scientific_evaluation": false,
+    "deployment_or_capture": false,
+    "global_stage3": false,
+    "av1b_execution_state": "NOT_AUTHORIZED",
+    "future_execution_authority_must_bind": [
+      "this_card_path_and_full_literal_sha256",
+      "all_four_non_card_exact_additive_paths",
+      "exact_resolved_root_and_run_nonce",
+      "gpu_physical_index_7_and_uuid_GPU-41c95a43-ce96-fff3-33e0-739a3931d603",
+      "single_reserved_gpu",
+      "cuda_and_triton_jit",
+      "vendor_autograd_kernel",
+      "model_construct_and_execute",
+      "forward_backward_and_jvp",
+      "optimizer_construct_and_200_step_parameter_update",
+      "synthetic_nonformal_training",
+      "lightweight_tests",
+      "operator_qualification_and_diagnostic_metrics"
+    ],
+    "future_unlisted_capability_default": "DENIED"
+  },
+  "classification": {
+    "pair": [
+      "REF-GDN-CORRECTED",
+      "CACH-A"
+    ],
+    "only_semantic_delta": "CACH-A_ONLY_ACTION_TO_VIDEO_SEAM",
+    "reference_action_path": "STRUCTURAL_IDENTITY_BYPASS_THAT_READS_NEITHER_ACTION_TENSOR_NOR_NO_ACTION_TENSOR",
+    "candidate_action_path": "END_OF_BIN_ACTION_CONDITION_THROUGH_REDUCER_AND_ACTION_CONDITIONER_THEN_PER_VENDOR_GDN_BLOCK_ZERO_INITIALIZED_ACTION_OUTPUT_PROJECTION_AFTER_GDN_RECURRENCE_BEFORE_FFN",
+    "operator_level": "VENDOR_KERNEL",
+    "integration_path": "EXPERIMENTAL_PATH",
+    "experiment_kind": "TEACHER_ACTION_MECHANISM_SCREEN",
+    "result_scope": "SYNTHETIC_SINGLE_BATCH_SINGLE_CALL_VENDOR_OPERATOR_ONLY",
+    "architecture_conclusion_scope": "ACTUAL_VENDOR_GDN_LEARNABILITY_AND_ACTION_DEPENDENCE_ONLY_NOT_FULL_ARCHITECTURE_OR_PRODUCTION_PARITY",
+    "proxy_or_reference_operator_fallback": "FORBIDDEN",
+    "vendor_entry_class": "diffusion.model.nets.sana_gdn_blocks_triton.ChunkCausalGDNTriton",
+    "vendor_constructor_requirement": "use_autograd_kernel=True",
+    "vendor_autograd_call_chain": "ChunkCausalGDNTriton.forward -> fused_bigdn_forward_with_grad -> FusedBiGDNFunction",
+    "single_call_chunk_causal_semantics": {
+      "input_temporal_frames": 5,
+      "HW": [
+        5,
+        1,
+        1
+      ],
+      "chunk_index": [
+        0,
+        3,
+        5
+      ],
+      "chunk_size": null,
+      "chunk_split_strategy": "uniform",
+      "forward_direction_state": "PERSISTS_ACROSS_THE_TWO_CHUNKS_INSIDE_ONE_VENDOR_CALL",
+      "reverse_direction_state": "RESETS_AT_INTERIOR_BOUNDARY_3_VIA_BETA_BWD_AND_DECAY_BWD_MASKING",
+      "future_chunk_to_past_chunk_influence": "FORBIDDEN",
+      "past_chunk_to_future_chunk_influence": "ALLOWED",
+      "frame_valid_mask": null
+    },
+    "explicitly_not_assessed": [
+      "CROSS_CALL_INIT_STATE_OR_FINAL_STATE_IO",
+      "TWO_CALL_DIFFERENTIABLE_SCRATCH_STATE_CONTINUATION",
+      "LIVE_CACHE_COMMIT_OR_CONTENT_TIME",
+      "PUBLIC_WRAPPER_DISPATCHER_OR_OWNER_PARITY",
+      "STATEFUL_CHUNKWISE_FORWARD_BACKWARD_QUALIFICATION",
+      "REAL_DATA_OR_CLOSED_LOOP_CAPABILITY",
+      "FULL_2B"
+    ],
+    "semantic_non_equivalence_warning": "SINGLE_CALL_CHUNK_INDEX_MASKING_MUST_NOT_BE_REPORTED_AS_CROSS_CALL_PERSISTENT_STATE_CONTINUATION"
+  },
+  "additive_policy": {
+    "exact_additive_paths_scope": "AV1B_V1_ONLY",
+    "exact_additive_paths": [
+      "docs/cach_sana_wam/architecture_validation/av1b/AV1B_RUN_CARD.json",
+      "src/sana_wam/model/cach_av1b_vendor_gdn_bridge.py",
+      "configs/experiments/cach_av1b_vendor_gdn_bridge.yaml",
+      "scripts/run_cach_av1b_vendor_gdn_bridge.py",
+      "tests/test_cach_av1b_vendor_gdn_bridge.py"
+    ],
+    "current_authority_write_subset": [
+      "docs/cach_sana_wam/architecture_validation/av1b/AV1B_RUN_CARD.json"
+    ],
+    "all_five_paths_observed_absent_before_card_write": true,
+    "four_non_card_paths_currently_authorized": false,
+    "modify_existing_repo_file": false,
+    "modify_phase_c_fixed_member": false,
+    "modify_av0_or_av1_predecessor": false,
+    "delete_or_overwrite_any_existing_file": false,
+    "future_execution_may_write_only_the_four_non_card_paths_plus_the_exact_new_root": true,
+    "successor_revision_rule": "ANY_CHANGE_TO_FROZEN_CARD_BYTES_EXACT_PATHS_SEMANTICS_BUDGET_THRESHOLDS_GPU_OR_ROOT_REQUIRES_A_NEW_SUCCESSOR_CARD_PATH_AND_NEW_AUTHORITY"
+  },
+  "source_pins": {
+    "development_plan": {
+      "path": "docs/CAUSAL_ACTION_CONDITIONED_HYBRID_SANA_WAM_DEVELOPMENT_PLAN_20260731.md",
+      "sha256": "969d9668ffed07176844fcbd84062825f9d5f0af0325959b0068c38fe481f0dd"
+    },
+    "av1_transition_proxy": {
+      "path": "src/sana_wam/model/cach_av1_transition_proxy.py",
+      "sha256": "fa01453769dec24927bdb31b42147e1ecd3e1a77700aaf686b0ce964a77eebcf"
+    },
+    "av1_config": {
+      "path": "configs/experiments/cach_av1_transition_proxy.yaml",
+      "sha256": "e12f052ee63d3e93c69ddc58146b1ee18d1d1eef39c8e85b2fa38e11f91c6361"
+    },
+    "av1_runner": {
+      "path": "scripts/run_cach_av1_transition_proxy.py",
+      "sha256": "d0714ea1e09436980c72f477d131a1350e94eef89c564de4a90068c7ce905a4a"
+    },
+    "av1_test": {
+      "path": "tests/test_cach_av1_transition_proxy.py",
+      "sha256": "2cb3e0578a72abd2cf9fe283740590fb3529397f870e421e704f3a58ef29c8d6"
+    },
+    "action_reducer": {
+      "path": "src/sana_wam/cach/action_conditioning.py",
+      "sha256": "8323efa1544d5c0520e13192b55ed5f2e85490d03ac21c558d6009db38ee11c6"
+    },
+    "phase_c_fixed_member_list": {
+      "path": "docs/cach_sana_wam/global_stage3/phase_c_production_path_mini/PHASE_C_SOURCE_FILES.txt",
+      "sha256": "59ff254f82f546a8f0102d7fa03a340392da4a879a46ae8e267357db762cb216"
+    },
+    "typed_layout": {
+      "path": "src/sana_wam/model/action_chunk_layout.py",
+      "sha256": "8e6521a93614b4ce7e43ba51d2af4f67d2650b03cc60e7d7a152e36dfa3c8e39"
+    },
+    "vendor_base_gdn": {
+      "path": "third_party/Sana/diffusion/model/nets/sana_gdn_blocks.py",
+      "sha256": "ef15578c63f9815d670dc3ef4cf2876c4f236754bfdfb0d2070da387048a495e"
+    },
+    "vendor_triton_gdn": {
+      "path": "third_party/Sana/diffusion/model/nets/sana_gdn_blocks_triton.py",
+      "sha256": "0ae10e7a09005c60cfac1fcb1035ff3495f80024cfb2e3f01b96b84e0adf3933"
+    },
+    "vendor_chunk_boundary_utility": {
+      "path": "third_party/Sana/diffusion/utils/chunk_utils.py",
+      "sha256": "b1b4185b2ebfdb550cbea45dd104c956260ce99e2eeb097896bab80cd1b546ef"
+    },
+    "vendor_autograd_kernel": {
+      "path": "third_party/Sana/diffusion/model/ops/fused_gdn.py",
+      "sha256": "863cbbb601ddebc5666179e2b209b777d5dc213c94a1450cde695a33b0a8aded"
+    },
+    "vendor_stateful_chunkwise_observed_not_used": {
+      "path": "third_party/Sana/diffusion/model/ops/fused_gdn_chunkwise.py",
+      "sha256": "3af972561f924f76c2af10ff2ac34debf386f4011703c41d8403e80ee9a0f558"
+    },
+    "production_action_seam": {
+      "path": "third_party/Sana/diffusion/model/nets/sana_multi_scale_video_camctrl.py",
+      "sha256": "bfbd72dfb22a44e2843f1985049ecfbb1f887f5e5f5ed852905c4670e2029fbe"
+    },
+    "non_reference_v2v_family": {
+      "path": "third_party/Sana/diffusion/model/nets/sana_v2v_attn_blocks.py",
+      "sha256": "a7b7a32482760518868b7d82dd97c6da6d91d24cc4440d00139e37480d48e689",
+      "classification": "DIFFERENT_V2V_BLOCK_FAMILY_NOT_REFERENCE_OPERATOR"
+    },
+    "hybrid_cache_digest_utility": {
+      "path": "src/sana_wam/model/video_backbone/sana/hybrid_cache.py",
+      "sha256": "5b61ab6492670e8021b3603f965e9f3e8921e9d7f0ea77b49e40d92a77f78a74"
+    },
+    "future_generated_files_pin_policy": "THE_RUNNER_MUST_MATERIALIZE_AND_BIND_FULL_SHA256_FOR_ALL_FOUR_NEW_NON_CARD_PATHS_BEFORE_ROOT_CREATE_OR_VENDOR_IMPORT",
+    "transitive_runtime_closure_claimed": false
+  },
+  "gpu_contract": {
+    "canonical_host": "H200",
+    "physical_index_at_card_freeze": 7,
+    "uuid": "GPU-41c95a43-ce96-fff3-33e0-739a3931d603",
+    "model": "NVIDIA H200",
+    "compute_capability": "9.0",
+    "logical_index_after_visibility_filter": 0,
+    "reservation_state": "NOT_ACQUIRED_CARD_ONLY",
+    "future_authority_must_explicitly_reserve_exact_uuid": true,
+    "no_fallback_gpu": true,
+    "exclude_physical_indices_with_stale_runner_text": [
+      0,
+      1
+    ],
+    "preflight_snapshot_window_seconds": 120,
+    "preflight_required_observations": [
+      "UUID_TO_PHYSICAL_INDEX_MAPPING_MATCHES",
+      "MEMORY_USED_IS_ZERO_AT_BOTH_SNAPSHOTS",
+      "UTILIZATION_IS_ZERO_AT_BOTH_SNAPSHOTS",
+      "NVIDIA_SMI_COMPUTE_APPS_EMPTY",
+      "NVIDIA_SMI_PMON_EMPTY",
+      "NO_EXTERNAL_FUSER_PROCESS_ON_DEVICE"
+    ],
+    "immediate_launch_time_recheck_required": true,
+    "external_process_or_mapping_change_rule": "FAIL_CLOSED_BEFORE_ROOT_CREATE_OR_CUDA_IMPORT",
+    "reservation_is_not_implied_by_this_card": true
+  },
+  "launcher_contract": {
+    "expected_environment": {
+      "python": "3.12.13",
+      "torch": "2.7.1+cu128",
+      "triton": "3.5.1",
+      "cuda_toolkit": "12.8",
+      "nvcc": "12.8.61",
+      "driver": "570.211.01"
+    },
+    "environment_must_be_set_before_any_torch_or_vendor_import": {
+      "CUDA_VISIBLE_DEVICES": "GPU-41c95a43-ce96-fff3-33e0-739a3931d603",
+      "CUDA_DEVICE_ORDER": "PCI_BUS_ID",
+      "GDN_DISABLE_COMPILE": "1",
+      "TORCHDYNAMO_DISABLE": "1",
+      "FUSED_GDN_PRECISION": "0",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "PYTHONPATH": "/home/zch/workspace/sana-wam/src:/home/zch/workspace/sana-wam/third_party/Sana",
+      "TRITON_CACHE_DIR": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/triton_cache"
+    },
+    "precision_interpretation": "FUSED_GDN_PRECISION_0_MEANS_IEEE_FP32_DOTS_AND_FP32_STATE",
+    "cuda_device_zero_must_match_uuid": "GPU-41c95a43-ce96-fff3-33e0-739a3931d603",
+    "single_process": true,
+    "distributed_or_context_parallel": false,
+    "network_access": false,
+    "allow_dependency_install": false,
+    "allow_checkpoint": false,
+    "allow_real_data": false,
+    "allow_full_2b": false,
+    "allow_cpu_proxy_or_reference_fallback": false,
+    "cuda_cache_disable_must_be_unset": true,
+    "source_and_environment_preflight_before_root_create": true,
+    "card_and_authority_preflight_before_root_create": true,
+    "gpu_recheck_before_root_create_and_import": true,
+    "failure_trap_before_first_root_mutation": true,
+    "planned_command_template_not_authorized": "env CUDA_VISIBLE_DEVICES=GPU-41c95a43-ce96-fff3-33e0-739a3931d603 CUDA_DEVICE_ORDER=PCI_BUS_ID GDN_DISABLE_COMPILE=1 TORCHDYNAMO_DISABLE=1 FUSED_GDN_PRECISION=0 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/home/zch/workspace/sana-wam/src:/home/zch/workspace/sana-wam/third_party/Sana TRITON_CACHE_DIR=/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3/triton_cache ./.venv/bin/python scripts/run_cach_av1b_vendor_gdn_bridge.py --config configs/experiments/cach_av1b_vendor_gdn_bridge.yaml --card docs/cach_sana_wam/architecture_validation/av1b/AV1B_RUN_CARD.json --card-sha256 FUTURE_FULL_LITERAL_CARD_SHA256 --root /DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3 --nonce 1a9a3a6ca4b18fac904fdb806c2a8fb3"
+  },
+  "root_contract": {
+    "label": "NON_FORMAL_ARCHITECTURE_SCREEN / IMMUTABLE / NOT_ADMISSION_EVIDENCE",
+    "resolved_root": "/DATA/share/sana_cach_wam_nonformal_screens/av1b/06f5d09127f8/av1b-1a9a3a6ca4b18fac904fdb806c2a8fb3",
+    "namespace_basis": "GOVERNING_PLAN_SHA256_12_AND_LITERAL_AV1B_PREFIX_AVOIDS_SELF_HASH_CIRCULARITY",
+    "run_nonce": "1a9a3a6ca4b18fac904fdb806c2a8fb3",
+    "run_nonce_pattern": "^[0-9a-f]{32}$",
+    "nonexistence_observed_at_card_freeze": true,
+    "created": false,
+    "creation_authorized": false,
+    "future_authority_must_bind_exact_root_nonce_and_full_card_sha256": true,
+    "preflight_must_not_exist": true,
+    "exclusive_create_required": true,
+    "capacity_and_owner_check_required": true,
+    "minimum_free_bytes_before_create": 107374182400,
+    "precreate_block_rule": "AUTH_ENV_SOURCE_GPU_RESERVATION_OR_CAPACITY_BLOCK_BEFORE_EXCLUSIVE_CREATE_WRITES_NO_ROOT_AND_USES_CALLER_TRANSCRIPT_ONLY",
+    "triton_cache_must_be_inside_root": true,
+    "created_root_must_freeze_on_every_terminal_state": true,
+    "freeze_modes": "0555_DIRECTORIES_AND_0444_FILES",
+    "delete_after_creation": false,
+    "modify_after_freeze": false,
+    "reuse": false,
+    "retry_requires_new_card_or_successor_attempt_card_AND_NEW_ROOT_NONCE": true,
+    "formal_promotion": false,
+    "required_artifacts_if_root_created": [
+      "RUN_CONTEXT.json",
+      "PROGRESS_EVENTS.json",
+      "THETA0_MANIFESTS.json",
+      "LOSS_TRACE.json",
+      "RAW_METRICS.json",
+      "RAW_EVIDENCE.json",
+      "FINAL_PARAMETER_DIGESTS.json",
+      "JIT_INVENTORY.json",
+      "RESULT.json",
+      "FREEZE_RECEIPT.json"
+    ]
+  },
+  "experiment_contract": {
+    "execution_state": "NOT_RUN",
+    "device": "cuda:0_AFTER_EXACT_UUID_FILTER",
+    "dtype": "float32",
+    "topology": {
+      "batch_size": 8,
+      "counterfactual_pair_count": 4,
+      "latent_channels": 3,
+      "spatial_height": 1,
+      "spatial_width": 1,
+      "valid_raw_count": 33,
+      "valid_latent_count": 5,
+      "valid_action_count": 32,
+      "action_dim": 20,
+      "context_dim": 4,
+      "vendor_hidden_dim": 64,
+      "vendor_heads": 2,
+      "vendor_head_dim": 32,
+      "vendor_gdn_depth": 20,
+      "vendor_conv_kernel_size": 0,
+      "vendor_k_conv_only": true,
+      "vendor_qk_norm": true,
+      "vendor_use_output_gate": true,
+      "vendor_use_autograd_kernel": true,
+      "frame_count": 5,
+      "chunk_count": 2,
+      "chunk_boundaries": [
+        0,
+        3,
+        5
+      ],
+      "chunk_valid_latent_counts": [
+        3,
+        2
+      ],
+      "temporal_compression": 8,
+      "video_stride": 1,
+      "scored_future_horizons": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "primary_horizons": [
+        1,
+        2,
+        4
+      ],
+      "frozen_action_backbone": "REAL_ACTIONDIT_JOINT_CROSS_ATTN_DEPTH20_DIAGNOSTIC_ONLY",
+      "action_prediction_loss_weight": 0.0
+    },
+    "synthetic_recipe": {
+      "source": "REUSE_PINNED_AV1_SYNTHETIC_COUNTERFACTUAL_TASK_BYTES_AND_FORMULAS",
+      "task_recipe_sha256": "9d2a749d722775324ee233862772def530fbffe0ea9e55aeea87c160b87a51e4",
+      "slice_id": "synthetic_counterfactual_pairs_0000_0003",
+      "shuffle_permutation": [
+        1,
+        0,
+        3,
+        2,
+        5,
+        4,
+        7,
+        6
+      ],
+      "shuffle_permutation_sha256": "93a9a618e0482688c85f8fc786cbaf7f845f69d5f48c356dd71881fb05d80dfd",
+      "end_of_bin_action_indices_for_future_horizons_1_2_3_4": [
+        7,
+        15,
+        23,
+        31
+      ],
+      "anchor_action_condition": "MODEL_OWNED_EXACT_ZERO_NO_ACTION_SLOT",
+      "correct_mode": "PINNED_VALID_ACTION_TENSOR_AT_REAL_CANDIDATE_SEAM",
+      "shuffle_mode": "PINNED_PAIRED_ROW_PERMUTATION_AT_THE_SAME_SEAM_ONLY",
+      "no_action_mode": "MODEL_OWNED_EXACT_ZERO_AT_EVERY_VALID_SEAM_SLOT",
+      "non_action_video_context_noise_target_bytes_equal_across_modes": true,
+      "target_visibility": "TARGET_BYTES_ENTER_LOSS_ONLY",
+      "no_clean_action_or_future_video_side_channel": true,
+      "task_tensor_digest_manifest_required_before_model_construct": true
+    },
+    "architecture_pair": {
+      "shared_initialization_required": true,
+      "theta0_video_outputs_bitwise_equal_all_modes": true,
+      "candidate_action_conditioner": "LINEAR_20_TO_64_SILU_LINEAR_64_TO_20",
+      "candidate_per_block_action_output_projection": "LINEAR_20_TO_64_AFTER_VENDOR_GDN_BEFORE_FFN",
+      "candidate_action_output_projection_initialization": "EXACT_ZERO_WEIGHT_AND_BIAS",
+      "per_block_formula": "NORMALIZED=PARAMETER_FREE_RMS_NORM(HIDDEN); POST_GDN=HIDDEN+ChunkCausalGDNTriton(NORMALIZED,HW=(5,1,1),chunk_index=[0,3,5]); CACH_A_ONLY_POST_GDN=POST_GDN+ACTION_OUTPUT_PROJECTION(ACTION_CONDITION); OUTPUT=POST_GDN_PLUS_OPTIONAL_ACTION+FFN_OUTPUT(SILU(FFN_INPUT(PARAMETER_FREE_RMS_NORM(POST_GDN_PLUS_OPTIONAL_ACTION))))",
+      "ffn_hidden_dim": 128,
+      "reference_structural_bypass": true,
+      "reference_must_not_read_any_action_or_no_action_tensor": true,
+      "no_action_slot_frozen_exact_zero": true,
+      "dropout_or_stochastic_layer": false,
+      "cross_arm_common_parameter_names_shapes_and_theta0_bytes_equal": true
+    },
+    "operator_lifecycle": {
+      "every_model_forward_is_one_complete_five_frame_vendor_call": true,
+      "persistent_state_input_or_output": false,
+      "state_reuse_between_modes_steps_or_arms": false,
+      "vendor_internal_scan_state": "EPHEMERAL_TO_ONE_FORWARD_CALL",
+      "vendor_internal_recurrent_state_observable": false,
+      "target_bytes_may_enter_operator_inputs": false,
+      "no_claim_of_internal_recurrent_state_validation": true
+    },
+    "initialization": {
+      "seed0": 202608033,
+      "shared_named_seed": 2026080331,
+      "candidate_only_seed": 2026080332,
+      "initializer_revision": "cach-av1b-vendor-gdn-bridge-v1",
+      "common_initialization_method": "SET_CPU_AND_CUDA_SEED_TO_SHARED_NAMED_SEED_CONSTRUCT_ONE_COMMON_TEMPLATE_ON_CPU_DEEPCOPY_ITS_PARAMETER_AND_BUFFER_BYTES_INTO_BOTH_ARMS_THEN_MOVE_BOTH_ARMS_TO_THE_RESERVED_CUDA_DEVICE_BEFORE_ANY_FORWARD",
+      "candidate_only_initialization_method": "PER_EXACT_PARAMETER_NAME_DETERMINISTIC_GENERATOR_FROM_CANDIDATE_ONLY_SEED; NON_SEAM_WEIGHTS_USE_AV1_NAMED_UNIFORM_RULE; BIASES_ZERO; EVERY_PER_BLOCK_ACTION_OUTPUT_PROJECTION_WEIGHT_AND_BIAS_EXACT_ZERO",
+      "fresh_initialization": true,
+      "continuation_from_av1_parameters_or_state": false,
+      "continuation_from_checkpoint": false,
+      "common_parameter_manifest_required_before_forward": true,
+      "candidate_only_manifest_required_before_forward": true,
+      "arm_execution_order": [
+        "REF-GDN-CORRECTED",
+        "CACH-A"
+      ],
+      "data_order": "SINGLE_FIXED_FULL_BATCH_NO_SHUFFLE"
+    },
+    "optimizer": {
+      "name": "AdamW",
+      "learning_rate": 0.003,
+      "betas": [
+        0.9,
+        0.99
+      ],
+      "epsilon": 1e-08,
+      "weight_decay": 0.0,
+      "gradient_clip_global_l2": 1.0,
+      "optimizer_steps_per_arm": 200,
+      "metric_steps": [
+        0,
+        200
+      ],
+      "best_step_selection": false,
+      "intermediate_checkpoint_selection": false,
+      "write_optimizer_state": false,
+      "reference_parameter_scope": "ALL_AND_ONLY_GENERATED_COMMON_TRAINABLE_NAMES",
+      "candidate_parameter_scope": "THE_IDENTICAL_COMMON_NAMES_PLUS_ALL_AND_ONLY_GENERATED_CANDIDATE_ACTION_SEAM_NAMES",
+      "unlisted_trainable_parameter_allowed": false
+    },
+    "budget": {
+      "max_wall_seconds_total": 1800,
+      "max_gpu_memory_bytes": 17179869184,
+      "max_process_rss_bytes": 17179869184,
+      "max_root_bytes": 536870912,
+      "max_optimizer_steps_total": 400,
+      "automatic_budget_extension": false,
+      "completion_rule": "BOTH_ARMS_COMPLETE_EXACTLY_200_STEPS_AND_ALL_REQUIRED_DIAGNOSTICS",
+      "budget_failure_state": "HARNESS_REJECTED"
+    }
+  },
+  "diagnostic_contract": {
+    "vendor_identity": [
+      "EXACT_CLASS_IS_ChunkCausalGDNTriton",
+      "use_autograd_kernel_IS_TRUE",
+      "ACTUAL_VENDOR_FORWARD_CALL_COUNT_IS_STRICTLY_POSITIVE",
+      "CUDA_LOGICAL_DEVICE_ZERO_UUID_MATCHES_CARD",
+      "HW_EQUALS_5_1_1",
+      "NORMALIZED_CHUNK_BOUNDARIES_EQUAL_0_3_5",
+      "FUSED_GDN_PRECISION_EQUALS_0"
+    ],
+    "required_execution": [
+      "THETA0_FORWARD",
+      "BACKWARD_AT_STEP0",
+      "LAST_BLOCK_POST_VENDOR_LOCAL_SEAM_PARAMETER_DIRECTIONAL_JVP_AT_THETA0",
+      "LAST_BLOCK_POST_VENDOR_LOCAL_ACTION_CONDITION_DIRECTIONAL_JVP_AT_STEP200",
+      "TARGET_PERTURBATION_AND_REVERSE_GRADIENT_LEAKAGE_CHECK",
+      "200_ADAMW_STEPS_PER_ARM",
+      "FINAL_CORRECT_SHUFFLE_NO_ACTION_METRICS",
+      "FIRST_CHUNK_PREFIX_INVARIANCE_CHECK",
+      "FINITE_OUTPUT_OBSERVABLE_POST_VENDOR_HIDDEN_GRADIENT_AND_UPDATE_CHECK",
+      "FINITE_NONZERO_BACKWARD_GRADIENT_TO_VENDOR_COMMON_PARAMETERS",
+      "FINAL_PARAMETER_DIGESTS"
+    ],
+    "single_call_causality_check": "PERTURB_ONLY_SECOND_CHUNK_VIDEO_OR_ACTION_INPUTS_AND_REQUIRE_FIRST_CHUNK_PREDICTIONS_UNCHANGED_WITHIN_FIXED_TOLERANCE",
+    "jvp_scope": "RUN_THE_VENDOR_PRIMAL_OUTSIDE_THE_FORWARD_MODE_TRANSFORM; DETACH_AND_FIX_THE_LAST_BLOCK_POST_VENDOR_HIDDEN; THEN_RUN_FORWARD_MODE_JVP_ONLY_OVER_THE_PURE_TORCH_LAST_ACTION_SEAM_PLUS_FFN_AND_OUTPUT_TAIL; THIS_DOES_NOT_CLAIM_VENDOR_CUSTOM_AUTOGRAD_FORWARD_MODE_SUPPORT",
+    "jvp_fixed_primal_and_tangent": {
+      "theta0_parameter_primal": "EXACT_ZERO_LAST_BLOCK_ACTION_OUTPUT_PROJECTION_WEIGHT_WITH_CORRECT_MODE_DETACHED_POST_VENDOR_HIDDEN_AND_ACTION_CONDITION",
+      "theta0_parameter_tangent": "UTF8_PARAMETER_ORDER_FLATTENED_ALTERNATING_PLUS_ONE_MINUS_ONE_NORMALIZED_TO_UNIT_L2",
+      "step200_action_condition_primal": "DETACHED_LAST_BLOCK_CORRECT_MODE_VALID_ACTION_CONDITION_WITH_DIGEST_RECORDED",
+      "step200_action_condition_tangent": "FLATTENED_ALTERNATING_PLUS_ONE_MINUS_ONE_ON_VALID_ENTRIES_NORMALIZED_TO_UNIT_L2_WITH_ALL_PADDING_TANGENTS_EXACT_ZERO",
+      "tail_parameters": "FIXED_AT_THE_CORRESPONDING_THETA0_OR_STEP200_DIGEST_AND_NOT_TANGENT_INPUTS",
+      "post_vendor_hidden_digest_required": true
+    },
+    "cross_call_state_or_commit_diagnostic": "NOT_ASSESSED_BY_DESIGN",
+    "vendor_reference_parity": "NOT_REQUIRED_FOR_DIRECT_VENDOR_KERNEL_CLASSIFICATION",
+    "compile_oom_missing_kernel_or_import_failure": "HARNESS_REJECTED_OR_ENV_BLOCKED_NOT_ARCHITECTURE_NEGATIVE",
+    "frame_valid_mask_use": "FORBIDDEN_BECAUSE_VENDOR_PATH_DOES_NOT_SUPPORT_IT"
+  },
+  "metric_contract": {
+    "accumulator_dtype": "float64",
+    "epsilon": 1e-12,
+    "train_loss_formula": "EQUAL_WEIGHT_MEAN_OF_CORRECT_ACTION_VIDEO_MSE_AT_FUTURE_HORIZONS_1_2_3_4",
+    "primary_formula": "0.20*MSE_H1+0.30*MSE_H2+0.50*MSE_H4",
+    "primary_horizon_weights": {
+      "1": 0.2,
+      "2": 0.3,
+      "4": 0.5
+    },
+    "counterfactual_delta_nmse_formula": "SUM_PAIR_HORIZON_CHANNEL_OF_PREDICTED_PAIR_DELTA_MINUS_TARGET_PAIR_DELTA_SQUARED_DIVIDED_BY_TARGET_PAIR_DELTA_SQUARED_PLUS_EPSILON",
+    "loss_drop_rel_formula": "(CANDIDATE_CORRECT_LOSS_STEP0-CANDIDATE_CORRECT_LOSS_STEP200)/MAX(CANDIDATE_CORRECT_LOSS_STEP0,EPSILON)",
+    "shuffle_gap_rel_formula": "(PRIMARY_SHUFFLE_STEP200-PRIMARY_CORRECT_STEP200)/MAX(PRIMARY_SHUFFLE_STEP200,EPSILON)",
+    "no_action_gap_rel_formula": "(PRIMARY_NO_ACTION_STEP200-PRIMARY_CORRECT_STEP200)/MAX(PRIMARY_NO_ACTION_STEP200,EPSILON)",
+    "candidate_gain_vs_reference_formula": "(PRIMARY_REFERENCE_STEP200-PRIMARY_CANDIDATE_CORRECT_STEP200)/MAX(PRIMARY_REFERENCE_STEP200,EPSILON)",
+    "seam_grad_rms_step0_formula": "RMS_OVER_CANDIDATE_PER_BLOCK_ACTION_OUTPUT_PROJECTION_WEIGHT_GRADIENTS_BIASES_EXCLUDED",
+    "seam_update_rms_final_formula": "RMS_OVER_STEP200_MINUS_STEP0_FOR_THE_SAME_WEIGHTS_BIASES_EXCLUDED",
+    "last_block_local_seam_parameter_jvp_rms_theta0_formula": "RMS_OF_THE_LAST_BLOCK_POST_VENDOR_TAIL_OUTPUT_DIRECTIONAL_JVP_FOR_A_FIXED_UNIT_NORM_ALTERNATING_SIGN_DIRECTION_OVER_THAT_BLOCK_ACTION_OUTPUT_PROJECTION_WEIGHTS_ONLY",
+    "last_block_local_action_condition_jvp_rms_step200_formula": "RMS_OF_THE_TRAINED_LAST_BLOCK_POST_VENDOR_TAIL_OUTPUT_DIRECTIONAL_JVP_FOR_A_FIXED_NONZERO_VALID_ACTION_CONDITION_DIRECTION_WITH_PADDING_TANGENTS_EXACT_ZERO",
+    "prefix_invariance_max_abs_formula": "MAX_ABS_FIRST_CHUNK_OUTPUT_DIFFERENCE_AFTER_ONLY_SECOND_CHUNK_INPUT_PERTURBATION",
+    "final_step_only": true,
+    "best_step_forbidden": true
+  },
+  "threshold_contract": {
+    "threshold_kind": "NONFORMAL_SCREENING_NOT_SCIENTIFIC",
+    "validity_all_required": {
+      "finite_all_outputs_losses_observable_post_vendor_hidden_gradients_updates_optimizer_scalars_and_metrics": true,
+      "theta0_reference_candidate_video_output_bitwise_equal_all_modes": true,
+      "reference_correct_shuffle_no_action_video_outputs_bitwise_equal": true,
+      "no_action_candidate_pair_predictions_bitwise_equal": true,
+      "candidate_no_action_slot_remains_exact_zero_and_update_free": true,
+      "common_theta0_parameter_bytes_equal": true,
+      "valid_action_exact_once_and_padding_zero": true,
+      "non_seam_bytes_bitwise_equal_across_correct_shuffle_no_action": true,
+      "target_perturbation_changes_prediction_or_observable_post_vendor_hidden": false,
+      "prediction_target_reverse_gradient_nonzero": false,
+      "single_call_first_chunk_prefix_invariance_max_abs": 0.0001,
+      "single_call_first_chunk_prefix_invariance_max_rel": 0.0001,
+      "exact_vendor_identity_checks_pass": true,
+      "actual_vendor_forward_call_count_strictly_positive": true,
+      "vendor_common_parameter_gradient_rms_step0_strictly_greater_than": 1e-08,
+      "candidate_last_block_local_seam_parameter_jvp_rms_theta0_strictly_greater_than": 1e-08,
+      "candidate_last_block_local_action_condition_jvp_rms_step200_strictly_greater_than": 1e-08,
+      "no_real_data_checkpoint_or_fallback_path_used": true,
+      "cuda_and_jit_inventory_recorded": true,
+      "exactly_200_optimizer_steps_completed_per_arm": true
+    },
+    "operator_go_all_required": {
+      "seam_grad_rms_step0_strictly_greater_than": 1e-08,
+      "seam_update_rms_final_strictly_greater_than": 1e-06,
+      "last_block_local_seam_parameter_jvp_rms_theta0_strictly_greater_than": 1e-08,
+      "last_block_local_action_condition_jvp_rms_step200_strictly_greater_than": 1e-08,
+      "loss_drop_rel_min": 0.8,
+      "counterfactual_delta_nmse_correct_max": 0.25,
+      "counterfactual_delta_nmse_correct_h1_max": 0.35,
+      "counterfactual_delta_nmse_correct_h2_max": 0.35,
+      "counterfactual_delta_nmse_correct_h4_max": 0.35,
+      "shuffle_gap_rel_min": 0.5,
+      "shuffle_gap_rel_h1_min": 0.25,
+      "shuffle_gap_rel_h2_min": 0.25,
+      "shuffle_gap_rel_h4_min": 0.25,
+      "no_action_gap_rel_min": 0.5,
+      "no_action_gap_rel_h1_min": 0.25,
+      "no_action_gap_rel_h2_min": 0.25,
+      "no_action_gap_rel_h4_min": 0.25,
+      "candidate_gain_vs_reference_min": 0.5
+    },
+    "operator_strong_stop_all_required": {
+      "valid_data_implementation_and_numerics": true,
+      "seam_grad_rms_step0_strictly_greater_than": 1e-08,
+      "seam_update_rms_final_strictly_greater_than": 1e-06,
+      "loss_drop_rel_max": 0.1,
+      "counterfactual_delta_nmse_correct_min": 0.9,
+      "shuffle_gap_rel_max": 0.05,
+      "no_action_gap_rel_max": 0.05,
+      "candidate_gain_vs_reference_max": 0.05
+    },
+    "first_run_classification": {
+      "all_validity_and_all_go": "OPERATOR_GO",
+      "valid_and_all_strong_stop_with_unconsumed_token": "REVIEW_ONCE",
+      "valid_matching_neither_all_go_nor_all_strong_stop_with_unconsumed_token": "REVIEW_ONCE",
+      "invalid_implementation_or_numerics": "TYPED_INVALID_STATE_WITH_NO_ARCHITECTURE_VERDICT",
+      "environment_compile_oom_resource_or_harness_failure": "ENV_BLOCKED_OR_HARNESS_REJECTED_WITH_NO_ARCHITECTURE_VERDICT"
+    },
+    "post_result_threshold_change": false
+  },
+  "review_token": {
+    "token_id": "cadfd92f1c72ebd9cc9aa8bfad029ddc6f0e72d9f7942f34e74629ca1ae37252",
+    "chain_scope": "AV1_THROUGH_AV4_EXACTLY_ONCE",
+    "canonical_claim_path": "/DATA/share/sana_cach_wam_nonformal_screens/token_ledgers/c73a943047295338cd9de14e6e53199b463ea66ae92b99d4b0b3393f5ec34030/cadfd92f1c72ebd9cc9aa8bfad029ddc6f0e72d9f7942f34e74629ca1ae37252.claim.json",
+    "claim_path_absent_at_card_freeze": true,
+    "state": "UNCONSUMED",
+    "consumed_by": null,
+    "claim_creation_authorized_by_this_card": false,
+    "first_av1b_execution_must_not_consume": true,
+    "valid_non_go_first_result": "REVIEW_ONCE_WITHOUT_TOKEN_CONSUMPTION",
+    "allowed_future_choices": [
+      "BUG_FIX_FRESH_REVISION_FRESH_ROOT_FRESH_INITIALIZATION_200_STEPS",
+      "NO_BUG_BUDGET_EXTENSION_FRESH_ROOT_FRESH_INITIALIZATION_300_STEPS"
+    ],
+    "both_choices_forbidden": true,
+    "blocked_invalid_or_resource_failure_consumes_token": false,
+    "future_claim_requires_new_exact_authority": true,
+    "second_or_forked_claim": "FAIL_CLOSED"
+  },
+  "verdict_contract": {
+    "initial_state": "NOT_RUN",
+    "observed_verdict": null,
+    "allowed_first_execution_states": [
+      "AUTH_BLOCKED",
+      "ENV_BLOCKED",
+      "HARNESS_REJECTED",
+      "INVALID_RUN",
+      "IMPLEMENTATION_INVALID",
+      "NUMERICAL_INVALID",
+      "OPERATOR_UNVERIFIED",
+      "REVIEW_ONCE",
+      "OPERATOR_GO"
+    ],
+    "operator_stop_forbidden_before_review_token_process": true,
+    "invalid_or_blocked_is_architecture_negative": false,
+    "operator_go_effect": "MAY_REQUEST_AV2_AUTHORITY_ONLY",
+    "review_once_effect": "NO_STAGE_UNLOCK_AND_MAY_REQUEST_ONE_EXACT_REVIEW_AUTHORITY_ONLY",
+    "global_gate_effect": "NONE",
+    "formal_admission_effect": "NONE",
+    "full_architecture_effect": "NOT_ASSESSED",
+    "result_must_bind": [
+      "exact_typed_state",
+      "operator_level_VENDOR_KERNEL",
+      "integration_path_EXPERIMENTAL_PATH",
+      "single_call_semantic_scope",
+      "full_card_path_and_sha256",
+      "all_code_config_runner_test_sha256",
+      "vendor_source_sha256",
+      "authority_statement_and_sha256",
+      "gpu_uuid_and_launch_snapshots",
+      "exact_root_and_nonce",
+      "raw_evidence_sha256",
+      "freeze_receipt_sha256",
+      "review_token_UNCONSUMED"
+    ]
+  },
+  "current_effect": {
+    "scope": "THIS_CARD_FREEZE_ONLY",
+    "card_frozen": true,
+    "root_created": false,
+    "gpu_reserved_or_used": false,
+    "cuda_or_jit_executed": false,
+    "python_vendor_or_model_imported": false,
+    "model_or_test_executed": false,
+    "optimizer_or_parameter_update_executed": false,
+    "training_or_evaluation_executed": false,
+    "real_data_or_checkpoint_accessed": false,
+    "four_non_card_files_written": false,
+    "review_token_state": "UNCONSUMED",
+    "scientific_eligible": false,
+    "formal_admission_evidence": false,
+    "global_gates_unchanged": true,
+    "next_action": "REQUEST_EXPLICIT_AV1B_EXECUTION_AUTHORITY_BOUND_TO_THIS_CARD_FULL_SHA256_EXACT_ROOT_NONCE_AND_GPU_UUID"
+  }
+}

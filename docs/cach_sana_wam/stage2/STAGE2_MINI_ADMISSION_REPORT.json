@@ -1,0 +1,153 @@
+{
+  "canonical_host": "H200",
+  "canonical_worktree": "/home/zch/workspace/sana-wam",
+  "environment": {
+    "gpu": "H200 GPU0",
+    "kernel": "Linux 5.15.0-176-generic x86_64 GNU/Linux",
+    "pytest": "9.1.0",
+    "python": "3.12.13",
+    "torch": "2.7.1+cu128"
+  },
+  "generated_at": "2026-07-31T10:55:01.375271247Z",
+  "gate_status": {
+    "full_gate_s2": "blocked_not_claimed",
+    "offline_test_owned_teacher_forcing_subset": "passed",
+    "scope": "random_mini_models_and_synthetic_tensors_only",
+    "stage3_authorized": false,
+    "training_authorized": false
+  },
+  "initial_numeric_hardening": {
+    "failure_code": "COMMIT_STAGING_FAILED",
+    "reason": "FP32 action timestep supplied to BF16 mini-ActionDiT",
+    "receipt_published": false,
+    "remediation": "construct action t=0 explicitly in model BF16 dtype; keep video t=0 FP32",
+    "state_advanced": false,
+    "tolerance_relaxed": false
+  },
+  "limitations": {
+    "committed_action_identity_and_history_summary": "blocked",
+    "formal_failure_or_run_root": "not_created",
+    "full_model_gradient_jvp_evidence": "blocked",
+    "model_owned_no_action_in_production_stager": "blocked",
+    "production_aborted_ledger": "not_implemented",
+    "production_architecture_and_stager": "not_implemented",
+    "production_deploy_ack_transport_commit_and_durable_replay": "blocked",
+    "production_receipt_publisher": "not_implemented",
+    "retained_immutable_raw_execution_evidence": "retained_read_only_scoped_nonformal_artifact",
+    "scientific_eligible": false,
+    "transitive_runtime_closure": "not_established"
+  },
+  "prohibited_actions_attestation": {
+    "capture_started": false,
+    "checkpoint_loaded": false,
+    "dataset_scanned": false,
+    "evaluation_started": false,
+    "formal_root_created": false,
+    "optimizer_created": false,
+    "training_started": false
+  },
+  "repository_lineage": {
+    "sana_afcc_handoff_head": "9586486f2a9f5172d57b325e32093a3e018d34c0",
+    "sana_head": "16b9cec673e3335724ba2d8db25de7f9ed229292",
+    "sana_wam_head": "605f1c134b4c983ff80f8489c4bc8847036329e2",
+    "stage1_source_bundle_sha256": "a6e7849b91464b6e939db6ac676ca8e0d139a8e889e2b6fedb730457d3ee31dc"
+  },
+  "results": {
+    "gate_s2": "blocked",
+    "scoped_applied_action_ack_verifier": "passed",
+    "scoped_failure_receipt_evidence": "passed",
+    "scoped_paired_forward_cache_admission": "passed"
+  },
+  "schema": "cach.stage2.offline_subset_report.v2",
+  "scoped_contract": {
+    "action_timestep": "BF16 zero",
+    "applied_action_ack": "standalone verifier only; manager/server deploy commit remains hard-disabled",
+    "digest_binding": "same digest-bound synthetic request for paired video/action staging",
+    "geometry": {
+      "K": 3,
+      "L": 8,
+      "action_capacities": [
+        16,
+        24,
+        24
+      ],
+      "r": 8,
+      "valid_action_counts": [
+        16,
+        24,
+        16
+      ],
+      "video_valid_lengths": [
+        3,
+        3,
+        2
+      ]
+    },
+    "receipt": "test-local success receipts plus separately retained read-only synthetic failure receipt; not a production ledger/publisher or formal root",
+    "video_timestep": "FP32 zero"
+  },
+  "status": "offline_teacher_forcing_subset_passed_full_gate_s2_blocked",
+  "verification": [
+    {
+      "capture_root": "/DATA/share/sana_cach_stage2_evidence/stage2_offline_subset_20260731_JKYEkuCw",
+      "capture_status": "final_retained_scoped_nonformal",
+      "command_class": "CUDA_VISIBLE_DEVICES=0 GDN_DISABLE_COMPILE=1 pytest Stage-2 selected suite",
+      "failed": 0,
+      "final_rerun_confirmation_pending": false,
+      "junit": true,
+      "junit_xml_sha256": "8d278479c275804e3f4406e8ae47a7b96993dca678f1f75cc0938cbb3fe6de27",
+      "log_sha256": "51ece666183330987eede54bcc74cdc97e26262c424ff026c40d0094de53ce33",
+      "passed": 75,
+      "result": "retained_final_pass",
+      "retained_raw_log": true,
+      "selected_files": [
+        "tests/test_cach_stage2_prefix_compaction.py",
+        "tests/test_cach_stage2_hybrid_cache_codec.py",
+        "tests/test_cach_stage2_failure_evidence.py",
+        "tests/test_cach_stage2_mini_gdn.py",
+        "tests/test_cach_stage2_paired_mini_gdn.py",
+        "tests/test_cach_action_to_video_conditioning.py",
+        "tests/test_cach_stage2_applied_action_ack.py"
+      ],
+      "warnings": 13
+    },
+    {
+      "capture_root": "/DATA/share/sana_cach_stage2_evidence/stage2_offline_subset_20260731_JKYEkuCw",
+      "capture_status": "final_retained_scoped_nonformal",
+      "command_class": "CUDA_VISIBLE_DEVICES='' affected CPU regression suite",
+      "deselected": 1,
+      "failed": 0,
+      "junit": true,
+      "junit_xml_sha256": "fea7a6db15444b2c39e39adf531a800f001664661f7727295a372ad517ee3b91",
+      "log_sha256": "d03ede51b69f377d987d8660fa686e44e3b32fc193a0a22b5d334c269d1f8b6d",
+      "passed": 264,
+      "result": "retained_final_pass",
+      "retained_raw_log": true,
+      "skipped": 10
+    },
+    {
+      "capture_root": "/DATA/share/sana_cach_stage2_evidence/stage2_offline_subset_20260731_JKYEkuCw",
+      "capture_status": "final_retained_scoped_nonformal",
+      "files": 13,
+      "log_sha256": "d2215b7323d255c3cff8fcbf7400cd6f95af8da70541a1a95702d52c3565c667",
+      "result": "AST_COMPILE_WHITESPACE_OK 13",
+      "retained_raw_log": true,
+      "type": "static_checks"
+    },
+    {
+      "capture_root": "/DATA/share/sana_cach_stage2_evidence/stage2_offline_subset_20260731_pPSovwEo",
+      "capture_status": "CAPTURE_ABORTED",
+      "reason": "post-test metadata quoting failure",
+      "retained_read_only": true,
+      "root_mode": "0500"
+    },
+    {
+      "failure_receipt_sha256": "23c08337dd99c45ae3aaf2a314ca23afc6646b7241707c0819ff0d71758be9ed",
+      "failure_root": "/DATA/share/sana_cach_stage2_failure_evidence/stage2_failure_20260731_20260731T105154989919953Z",
+      "receipt_mode": "0400",
+      "retained_read_only": true,
+      "root_mode": "0500",
+      "scope": "synthetic_scoped_nonformal"
+    }
+  ]
+}

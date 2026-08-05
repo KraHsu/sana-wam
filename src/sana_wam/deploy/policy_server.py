@@ -61,6 +61,8 @@ from typing import Optional
 
 import numpy as np
 
+from sana_wam.train.cach_stage0_guard import reject_cach_stage0_base_config
+
 logger = logging.getLogger(__name__)
 
 
@@ -1015,6 +1017,17 @@ def build_server_from_config(
     inference settings) is merged on top of the training config restored from
     the checkpoint, so deploy-time fields win on overlap.
     """
+    reject_cach_stage0_base_config(
+        {} if cfg is None else cfg,
+        entrypoint="sana_wam.deploy.policy_server.build_server_from_config",
+    )
+    from sana_wam.cach.authority import reject_cach_deploy_before_runtime
+
+    # This check is deliberately before checkpoint discovery/model loading.
+    # It also catches marker-free configs whose CACH variant was introduced by
+    # a deploy-side dotlist merge.
+    reject_cach_deploy_before_runtime({} if cfg is None else cfg)
+
     from omegaconf import OmegaConf
 
     from sana_wam.deploy import build_engine
@@ -1192,18 +1205,25 @@ def main(argv: Optional[list[str]] = None):
     project_root = Path(__file__).resolve().parent.parent.parent
 
     if args.mock:
-        from sana_wam.deploy.mock_engine import MockInferenceEngine
-
         cfg = OmegaConf.create({})
         if args.config:
-            cfg = OmegaConf.merge(OmegaConf.load(args.config), cfg)
+            base_cfg = OmegaConf.load(args.config)
+            reject_cach_stage0_base_config(
+                base_cfg, entrypoint="sana_wam.deploy.policy_server --mock"
+            )
+            cfg = OmegaConf.merge(base_cfg, cfg)
         if args.overrides:
             cfg = OmegaConf.merge(cfg, OmegaConf.from_dotlist(args.overrides))
+        from sana_wam.cach.authority import reject_cach_deploy_before_runtime
+
+        reject_cach_deploy_before_runtime(cfg)
         _apply_compile_mode_override(cfg, args.compile_mode)
         try:
             cfg = _apply_async_cli_overrides(cfg, args)
         except ValueError as exc:
             parser.error(str(exc))
+        from sana_wam.deploy.mock_engine import MockInferenceEngine
+
         engine = MockInferenceEngine(
             cfg=cfg,
             action_dim=args.mock_action_dim,
@@ -1216,6 +1236,9 @@ def main(argv: Optional[list[str]] = None):
             else project_root / "configs" / "deploy.yaml"
         )
         cfg = OmegaConf.load(config_path)
+        reject_cach_stage0_base_config(
+            cfg, entrypoint="sana_wam.deploy.policy_server"
+        )
         if "defaults" in cfg:
             OmegaConf.update(cfg, "defaults", OmegaConf.create([]), merge=False)
         if args.overrides:

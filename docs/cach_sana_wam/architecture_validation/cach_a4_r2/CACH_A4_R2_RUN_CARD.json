@@ -1,0 +1,194 @@
+{
+  "schema": "cach.architecture_validation.cach_a4_r2_diagnostic_mask_shape_fix_run_card.v1",
+  "state": "ONE_IDLE_SINGLE_GPU_FRESH_ROOT_SYNTHETIC_EXECUTION_AUTHORIZED",
+  "card_id": "CACH-A4-R2-DIAGNOSTIC-MASK-SHAPE-FIX-v1",
+  "future_root_namespace_family": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_state_stream_r2/06f5d09127f8",
+  "identity": {
+    "canonical_ssh_alias": "H200",
+    "canonical_worktree": "/home/zch/workspace/sana-wam",
+    "created_on": "2026-08-05",
+    "revision_id": "CACH-A4-R2-DIAGNOSTIC-MASK-SHAPE-FIX-v1",
+    "architecture_id": "CACH-A4-STATE-CONDITIONED-CAUSAL-EXACT-ODD-DELTA-STREAM-v1",
+    "change_class": "POST_TRAINING_DIAGNOSTIC_MASK_SHAPE_FIX_NO_ARCHITECTURE_TASK_SEED_BUDGET_THRESHOLD_OR_VERDICT_DELTA",
+    "decision": {
+      "path": "docs/cach_sana_wam/architecture_validation/cach_a4_r2/CACH_A4_R2_DIAGNOSTIC_MASK_SHAPE_FIX_DECISION.md",
+      "sha256": "74257915c15f4d8c4471470ed1aa265e8797e321f97f615cb5ea98e435c19dfe"
+    },
+    "config": {
+      "path": "configs/experiments/cach_av1b_a4_state_conditioned_causal_odd_stream_r2.yaml",
+      "sha256": "9acf0425fa8370be546686e7ee23e5c764a23a804b70dc125ee25c772e3317ae"
+    }
+  },
+  "predecessor_a4": {
+    "read_only": true,
+    "source_six": {
+      "decision": {"path": "docs/cach_sana_wam/architecture_validation/cach_a4_state_stream/CACH_A4_STATE_CONDITIONED_CAUSAL_STREAM_ARCHITECTURE_DECISION.md", "sha256": "2a2efb3bda76dd36d2d1b98c0d26703de40704bc0744098a93b9820eac0b3a92"},
+      "card": {"path": "docs/cach_sana_wam/architecture_validation/cach_a4_state_stream/CACH_A4_STATE_CONDITIONED_CAUSAL_STREAM_RUN_CARD.json", "sha256": "b069c5fcbfde49e1f2e7a7ae0feb47067910ed680d09b28eb8459deb22ef618d"},
+      "bridge": {"path": "src/sana_wam/model/cach_av1b_a4_state_conditioned_causal_odd_stream.py", "sha256": "54924361009668a5c1cd113799812cc0f3d758b83528bf0aa917efba55a5fa6a"},
+      "config": {"path": "configs/experiments/cach_av1b_a4_state_conditioned_causal_odd_stream.yaml", "sha256": "c49e03ad22a3ed8f79160817309714a674e0c8aa9766a1beb0eb5c8a7dabf835"},
+      "runner": {"path": "scripts/run_cach_av1b_a4_state_conditioned_causal_odd_stream.py", "sha256": "8c106c23b579c8ab0742a9d66a99b886223c063bf876fe3f368067251dcd9cce"},
+      "test": {"path": "tests/test_cach_av1b_a4_state_conditioned_causal_odd_stream.py", "sha256": "892b6e8d673a180a377b74d44a6fdd2818ced8a8b27dfbd64d628569baab0977"}
+    },
+    "mutation_allowed": false
+  },
+  "failed_run_evidence": {
+    "root": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_state_stream/06f5d09127f8/cach-a4-state-stream-ac7fb52eb22be3cce184a60a41f7e98e",
+    "nonce": "ac7fb52eb22be3cce184a60a41f7e98e",
+    "terminal_state": "HARNESS_REJECTED",
+    "typed_verdict": "INVALID_RUN",
+    "optimizer_updates_completed": 0,
+    "failure_type": "BackendCompilerFailed",
+    "result_sha256": "07f5246d1ad0d8b076f60fdb9f41c5ab53a3db8f9c4c9d31524f705b98a26323",
+    "freeze_receipt_sha256": "0f93621d81498ce80187c67d9ce42ae233fa560a36784e401303d102c7403620",
+    "run_context_sha256": "d46213a56f33f02a7a9b61e0c8fcc83f687d4739c50d9d10cbde56f046b331d1",
+    "root_reuse_or_mutation_allowed": false
+  },
+  "predecessor_r1": {
+    "read_only": true,
+    "source_six": {
+      "decision": {"path": "docs/cach_sana_wam/architecture_validation/cach_a4_r1/CACH_A4_R1_LAUNCHER_ENV_FIX_DECISION.md", "sha256": "aa06060c40ea2fe1abad1041dd8ebfb236619ce51cc36ac1718cca9e4d5e67f6"},
+      "card": {"path": "docs/cach_sana_wam/architecture_validation/cach_a4_r1/CACH_A4_R1_RUN_CARD.json", "sha256": "faddcddcb7a1a6a69f013f615f39e99e78b128b50fe7d4a6f67fe3b8a335c0a7"},
+      "bridge": {"path": "src/sana_wam/model/cach_av1b_a4_state_conditioned_causal_odd_stream_r1.py", "sha256": "abd8a4f1d671cc7d0af735724a4034f86b85f05b5c0448dcfb2fc4ba2af31d1c"},
+      "config": {"path": "configs/experiments/cach_av1b_a4_state_conditioned_causal_odd_stream_r1.yaml", "sha256": "9acf0425fa8370be546686e7ee23e5c764a23a804b70dc125ee25c772e3317ae"},
+      "runner": {"path": "scripts/run_cach_av1b_a4_state_conditioned_causal_odd_stream_r1.py", "sha256": "4c273186ebc0ff61902f25b3a38b5e59fad51a701d59e7fc0b4351bac3bdf600"},
+      "test": {"path": "tests/test_cach_av1b_a4_state_conditioned_causal_odd_stream_r1.py", "sha256": "b4b386d439344b0c6c041544a5c79b0d016113d4f1e030c88e77cc5f6c27f606"}
+    },
+    "root": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_state_stream_r1/06f5d09127f8/cach-a4-state-stream-r1-9e604d41d671ac4e705816857457e5a4",
+    "nonce": "9e604d41d671ac4e705816857457e5a4",
+    "terminal_state": "HARNESS_REJECTED",
+    "typed_verdict": "INVALID_RUN",
+    "launcher_fix_succeeded": true,
+    "optimizer_steps_completed_per_arm": 200,
+    "failure_class": "POST_TRAINING_DIAGNOSTIC_MASK_SHAPE_BROADCAST",
+    "artifact_sha256": {
+      "RESULT.json": "ba24e73a316dcc92e2d759f90d9e309db9747db88f60842440bcd9e52b3875e0",
+      "FREEZE_RECEIPT.json": "383ca8321f454d62e9ec966f5db9e737532a2d2d6d1ee266b11e57972914c6f7",
+      "RUN_CONTEXT.json": "b34c8317fdce4e452be1ef209f3e3ea485d6990165b0b302053da42eba1a8a15",
+      "PROGRESS_EVENTS.json": "6be08df7a57e0871e3c278334242fb8ef4f944e26182fe9a22252abd3ebfca3e"
+    },
+    "root_reuse_or_mutation_allowed": false
+  },
+  "fix_contract": {
+    "only_code_delta": "ACTION_PRESENT_MASK_UNSQUEEZE_MINUS1_TWICE_BEFORE_EXPAND_AS_5D_ACTION_DELTA",
+    "base_bridge_sha256": "54924361009668a5c1cd113799812cc0f3d758b83528bf0aa917efba55a5fa6a",
+    "base_to_r2_exactly_one_hunk": true,
+    "diagnostic_only_after_all_optimizer_steps": true,
+    "model_or_gradient_delta": false,
+    "launcher_environment_before_torch_or_vendor_import": {
+      "GDN_DISABLE_COMPILE": "1",
+      "TORCHDYNAMO_DISABLE": "1"
+    },
+    "vendor_autograd_and_bare_triton_enabled": true
+  },
+  "scientific_parity": {
+    "architecture_unchanged": true,
+    "task_and_target_bytes_unchanged": true,
+    "shared_task_and_common_seed": 2026080331,
+    "candidate_only_seed": 2026080522,
+    "fresh_initialization": true,
+    "optimizer": "AdamW",
+    "macrosteps_per_arm": 200,
+    "losses_metrics_thresholds_and_verdict_mapping_unchanged": true,
+    "checkpoint_or_predecessor_continuation": false
+  },
+  "source_six": {
+    "mode": "ADDITIVE_ONLY_NO_PREDECESSOR_MUTATION",
+    "planned_paths": [
+      "docs/cach_sana_wam/architecture_validation/cach_a4_r2/CACH_A4_R2_DIAGNOSTIC_MASK_SHAPE_FIX_DECISION.md",
+      "docs/cach_sana_wam/architecture_validation/cach_a4_r2/CACH_A4_R2_RUN_CARD.json",
+      "src/sana_wam/model/cach_av1b_a4_state_conditioned_causal_odd_stream_r2.py",
+      "configs/experiments/cach_av1b_a4_state_conditioned_causal_odd_stream_r2.yaml",
+      "scripts/run_cach_av1b_a4_state_conditioned_causal_odd_stream_r2.py",
+      "tests/test_cach_av1b_a4_state_conditioned_causal_odd_stream_r2.py"
+    ],
+    "materialized_paths": [
+      "docs/cach_sana_wam/architecture_validation/cach_a4_r2/CACH_A4_R2_DIAGNOSTIC_MASK_SHAPE_FIX_DECISION.md",
+      "docs/cach_sana_wam/architecture_validation/cach_a4_r2/CACH_A4_R2_RUN_CARD.json",
+      "src/sana_wam/model/cach_av1b_a4_state_conditioned_causal_odd_stream_r2.py",
+      "configs/experiments/cach_av1b_a4_state_conditioned_causal_odd_stream_r2.yaml",
+      "scripts/run_cach_av1b_a4_state_conditioned_causal_odd_stream_r2.py",
+      "tests/test_cach_av1b_a4_state_conditioned_causal_odd_stream_r2.py"
+    ],
+    "bind_and_verify_all_six_sha256_before_gpu_execution": true
+  },
+  "execution": {
+    "source_and_cpu_authorized": true,
+    "gpu_execution_authorized": true,
+    "execution_requires_fresh_user_authority": false,
+    "fresh_user_authority_satisfied": true,
+    "one_shot_gpu_execution_max": 1,
+    "automatic_rerun": false,
+    "post_authority_capabilities": [
+      "SOURCE_IMPLEMENTATION",
+      "REDUCED_SYNTHETIC_CPU_TESTS",
+      "ONE_IDLE_SINGLE_GPU_FRESH_ROOT_SYNTHETIC_RUN"
+    ]
+  },
+  "execution_binding": {
+    "binding_state": "BOUND_BY_FRESH_USER_AUTHORITY",
+    "canonical_working_directory": "/home/zch/workspace/sana-wam",
+    "root": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_state_stream_r2/06f5d09127f8/cach-a4-state-stream-r2-f294a23c285082ae61b1685accec416e",
+    "nonce": "f294a23c285082ae61b1685accec416e",
+    "physical_gpu_index": 0,
+    "gpu_uuid": "GPU-1ec28cfb-f501-23f3-f865-275a744ca053",
+    "exact_env": {
+      "CUDA_VISIBLE_DEVICES": "GPU-1ec28cfb-f501-23f3-f865-275a744ca053",
+      "TRITON_CACHE_DIR": "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_state_stream_r2/06f5d09127f8/cach-a4-state-stream-r2-f294a23c285082ae61b1685accec416e/triton_cache",
+      "FUSED_GDN_PRECISION": "0",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "GDN_DISABLE_COMPILE": "1",
+      "TORCHDYNAMO_DISABLE": "1"
+    },
+    "exact_argv": [
+      "/home/zch/workspace/sana-wam/.venv/bin/python",
+      "scripts/run_cach_av1b_a4_state_conditioned_causal_odd_stream_r2.py",
+      "--card",
+      "docs/cach_sana_wam/architecture_validation/cach_a4_r2/CACH_A4_R2_RUN_CARD.json",
+      "--config",
+      "configs/experiments/cach_av1b_a4_state_conditioned_causal_odd_stream_r2.yaml",
+      "--root",
+      "/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_state_stream_r2/06f5d09127f8/cach-a4-state-stream-r2-f294a23c285082ae61b1685accec416e",
+      "--nonce",
+      "f294a23c285082ae61b1685accec416e",
+      "--gpu-index",
+      "0",
+      "--gpu-uuid",
+      "GPU-1ec28cfb-f501-23f3-f865-275a744ca053"
+    ],
+    "exact_command": "env CUDA_VISIBLE_DEVICES=GPU-1ec28cfb-f501-23f3-f865-275a744ca053 FUSED_GDN_PRECISION=0 GDN_DISABLE_COMPILE=1 PYTHONDONTWRITEBYTECODE=1 TORCHDYNAMO_DISABLE=1 TRITON_CACHE_DIR=/DATA/share/sana_cach_wam_nonformal_screens/cach_a4_state_stream_r2/06f5d09127f8/cach-a4-state-stream-r2-f294a23c285082ae61b1685accec416e/triton_cache /home/zch/workspace/sana-wam/.venv/bin/python scripts/run_cach_av1b_a4_state_conditioned_causal_odd_stream_r2.py --card docs/cach_sana_wam/architecture_validation/cach_a4_r2/CACH_A4_R2_RUN_CARD.json --config configs/experiments/cach_av1b_a4_state_conditioned_causal_odd_stream_r2.yaml --root /DATA/share/sana_cach_wam_nonformal_screens/cach_a4_state_stream_r2/06f5d09127f8/cach-a4-state-stream-r2-f294a23c285082ae61b1685accec416e --nonce f294a23c285082ae61b1685accec416e --gpu-index 0 --gpu-uuid GPU-1ec28cfb-f501-23f3-f865-275a744ca053",
+    "stdin_contract": "CANONICAL_UTF8_SORTED_COMPACT_JSON_PLUS_LF_RUNTIME_AUTHORITY"
+  },
+  "fresh_user_authority": {
+    "statement": "授权 A4-R2 单GPU合成运行",
+    "statement_sha256": "8dc3ad2e8bd1edbf8c276ff8c9979c3a923b24d026e0a9eca8dcf518311028b0",
+    "exact_utf8_length_bytes": 31,
+    "satisfied": true,
+    "scope": "THIS_CACH_A4_R2_ONE_SHOT_BINDING_ONLY",
+    "inherited_from_failed_a4_authority": false,
+    "required_before_gpu_selection_root_creation_or_cuda_import": true
+  },
+  "current_phase_facts": {
+    "namespace_or_root_created": false,
+    "gpu_queried_or_used": true,
+    "cuda_or_vendor_model_imported_or_executed": false,
+    "test_executed": true,
+    "parameter_update_or_training_executed": false,
+    "source_frozen": true,
+    "source_freeze_committed_before_execution": true
+  },
+  "forbidden": [
+    "REAL_DATA",
+    "CHECKPOINT_LOAD_OR_SAVE",
+    "FULL_2B",
+    "FORMAL_TRAINING_OR_EVALUATION",
+    "ADMISSION",
+    "AV2",
+    "GLOBAL_STAGE3",
+    "TOKEN_OR_CLAIM_OPERATION",
+    "AUTOMATIC_RERUN",
+    "FAILED_ROOT_REUSE_OR_MUTATION",
+    "PREDECESSOR_A4_OR_R1_MUTATION",
+    "GPU_OR_CUDA_OUTSIDE_EXACT_BINDING",
+    "SECOND_GPU_EXECUTION_OR_RERUN"
+  ]
+}

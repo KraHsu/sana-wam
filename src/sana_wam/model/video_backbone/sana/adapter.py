@@ -23,6 +23,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
+from sana_wam.cach.prefix_compaction import FixedKPrefixPlan
 from sana_wam.model.video_backbone.adapter import BlockLoopState, VideoBackbone
 from sana_wam.model.video_backbone.sana.blocks_split import SanaMSVideoSplit
 from sana_wam.model.video_backbone.sana.pipeline_builder import (
@@ -721,6 +722,8 @@ class SanaVideoBackbone(VideoBackbone):
         seq_lens: Optional[Tensor] = None,
         frame_index: Optional[Tensor] = None,
         bridge_layers: Tuple[int, ...] = (),
+        action_condition: Optional[Tensor] = None,
+        frame_valid_mask: Optional[Tensor] = None,
     ) -> Tuple[Tensor, dict, list]:
         """One cached-GDN chunk forward over an absolute latent-frame window.
 
@@ -733,6 +736,17 @@ class SanaVideoBackbone(VideoBackbone):
             start_f / end_f: absolute latent-frame window for this chunk's RoPE.
             bridge_layers: video block ids whose output hidden states are
                 captured for the cross-attn action stream.
+            action_condition: explicit ``(B, T_chunk, A)`` robot-action
+                condition.  It is routed only through the vendor
+                ``use_delta_pose_additive`` seam; no broadcast, implicit
+                dtype/device conversion, or camera-pose alias is accepted.
+            frame_valid_mask: explicit boolean ``(B, T_chunk)`` mask.  CACH
+                requires it even for a full chunk so partial-tail padding can
+                never be inferred from numeric values.  The main-tree adapter
+                validates exact-zero fixed-K padding, compacts the common valid
+                prefix before the vendor cached/Triton call, and restores
+                fixed-K outputs with exact-zero padding.  The vendor cache thus
+                advances through valid frames only.
 
         Returns:
             ``(video_pred_chunk, bridges, kv_cache)`` where ``bridges`` maps each
@@ -744,6 +758,123 @@ class SanaVideoBackbone(VideoBackbone):
         if not self.cached_streaming_enabled:
             self.enable_cached_streaming()
         dit = self._dit
+        action_seam_enabled = bool(
+            self._pipe.config.get("use_delta_pose_additive", False)
+        )
+        if action_seam_enabled and action_condition is None:
+            raise RuntimeError(
+                "the enabled CACH action seam requires an explicit "
+                "action_condition; identity-by-None is forbidden"
+            )
+        if action_seam_enabled and frame_valid_mask is None:
+            raise RuntimeError(
+                "the enabled CACH action seam requires an explicit "
+                "frame_valid_mask"
+            )
+        prefix_plan: FixedKPrefixPlan | None = None
+        if frame_valid_mask is not None:
+            if not isinstance(frame_valid_mask, Tensor):
+                raise TypeError("frame_valid_mask must be a torch Tensor")
+            expected_mask_shape = (
+                chunk_latents.shape[0],
+                chunk_latents.shape[2],
+            )
+            if (
+                frame_valid_mask.dtype is not torch.bool
+                or tuple(frame_valid_mask.shape) != expected_mask_shape
+            ):
+                raise ValueError(
+                    "frame_valid_mask must be exact boolean "
+                    f"{expected_mask_shape}"
+                )
+            if frame_valid_mask.device != self._device:
+                raise ValueError(
+                    f"frame_valid_mask device must be {self._device}, "
+                    f"got {frame_valid_mask.device}"
+                )
+            if frame_valid_mask.shape[1] > 1 and bool(
+                (
+                    (~frame_valid_mask[:, :-1])
+                    & frame_valid_mask[:, 1:]
+                ).any()
+            ):
+                raise ValueError("frame_valid_mask must be a contiguous prefix")
+            prefix_plan = FixedKPrefixPlan.from_mask(frame_valid_mask)
+        if action_condition is not None:
+            if not isinstance(action_condition, Tensor):
+                raise TypeError("action_condition must be a torch Tensor")
+            if action_condition.ndim != 3:
+                raise ValueError(
+                    "action_condition must have exact shape (B, T_chunk, A)"
+                )
+            expected_shape = (
+                chunk_latents.shape[0],
+                chunk_latents.shape[2],
+            )
+            if tuple(action_condition.shape[:2]) != expected_shape:
+                raise ValueError(
+                    "action_condition batch/time axes must exactly match "
+                    f"chunk_latents: expected={expected_shape}, "
+                    f"got={tuple(action_condition.shape[:2])}"
+                )
+            configured_dim = int(
+                self._pipe.config.get("delta_pose_additive_dim", 0) or 0
+            )
+            if configured_dim <= 0 or action_condition.shape[2] != configured_dim:
+                raise ValueError(
+                    "action_condition width differs from "
+                    f"delta_pose_additive_dim={configured_dim}"
+                )
+            if not action_seam_enabled:
+                raise RuntimeError(
+                    "action_condition supplied while the registered additive "
+                    "action seam is disabled"
+                )
+            if not bool(
+                getattr(dit, "_cach_delta_pose_output_zero_verified", False)
+            ):
+                raise RuntimeError(
+                    "action-conditioned DiT lacks the post-factory exact-zero "
+                    "projection attestation"
+                )
+            if action_condition.dtype != self._dtype:
+                raise TypeError(
+                    f"action_condition dtype must be {self._dtype}, "
+                    f"got {action_condition.dtype}"
+                )
+            if action_condition.device != self._device:
+                raise ValueError(
+                    f"action_condition device must be {self._device}, "
+                    f"got {action_condition.device}"
+                )
+            assert frame_valid_mask is not None
+            if bool(
+                action_condition.masked_select(
+                    ~frame_valid_mask.unsqueeze(-1)
+                ).count_nonzero()
+            ):
+                raise ValueError(
+                    "padded action_condition slots must be exact zero"
+                )
+
+        vendor_latents = chunk_latents
+        vendor_action_condition = action_condition
+        vendor_frame_index = frame_index
+        if prefix_plan is not None:
+            if end_f - start_f != prefix_plan.valid_slots:
+                raise ValueError(
+                    "absolute frame window must equal the valid prefix length"
+                )
+            vendor_latents = prefix_plan.compact_video(vendor_latents)
+            vendor_frame_index = prefix_plan.compact_frame_index(frame_index)
+            if action_condition is not None:
+                vendor_action_condition = prefix_plan.compact_condition(
+                    action_condition
+                )
+        vendor_latents = vendor_latents.to(
+            device=self._device,
+            dtype=self._dtype,
+        )
 
         # context → y (B, 1, L, D); forward_long runs y_embedder internally.
         y = context.unsqueeze(1) if context.dim() == 3 else context
@@ -762,22 +893,36 @@ class SanaVideoBackbone(VideoBackbone):
         # activation and break non-reentrant checkpointing's recompute check).
         bridges: dict[int, Tensor] = {}
         video_pred, kv_cache = dit.forward_long(
-            chunk_latents.to(device=self._device, dtype=self._dtype),
+            vendor_latents,
             timestep.to(device=self._device),
             y.to(device=self._device, dtype=self._dtype),
             mask=mask,
             start_f=start_f,
             end_f=end_f,
-            frame_index=frame_index,
+            frame_index=vendor_frame_index,
             kv_cache=kv_cache,
             save_kv_cache=save_kv_cache,
             bridge_layers=tuple(bridge_layers),
             bridge_out=bridges,
+            **(
+                {"delta_actions": vendor_action_condition}
+                if vendor_action_condition is not None
+                else {}
+            ),
+            # Cached/Triton GDN has no frame_valid_mask implementation.  The
+            # exact common prefix was compacted above, so passing the mask on
+            # would either fail or silently advance state through padding.
             # Eager block calls: the cached GDN state mutates in place, which is
             # incompatible with forward_long's internal grad checkpointing under
             # backprop. Per-chunk activations are small, so this is cheap.
             use_gradient_checkpointing=False,
         )
+        if prefix_plan is not None:
+            video_pred = prefix_plan.restore_video(video_pred)
+            bridges = {
+                layer_id: prefix_plan.restore_token_sequence(value)
+                for layer_id, value in bridges.items()
+            }
         return video_pred, bridges, kv_cache
 
     # ----------------------------------------------------------------

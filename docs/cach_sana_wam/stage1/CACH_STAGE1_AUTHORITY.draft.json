@@ -1,0 +1,107 @@
+{
+  "allowed_actions": [
+    "contract_implementation_review",
+    "read_only_static_verification",
+    "explicit_cpu_pure_contract_tests"
+  ],
+  "capabilities": {
+    "capture": false,
+    "checkpoint_or_weight_loading": false,
+    "cuda_or_gpu": false,
+    "dataset_or_hdf5_scan": false,
+    "deployment": false,
+    "evaluation": false,
+    "formal_or_experiment_root_creation": false,
+    "mini_or_full_model_construction": false,
+    "model_forward_backward_or_jvp": false,
+    "training": false,
+    "worker_spawn": false
+  },
+  "canonical_host": "H200",
+  "canonical_worktree": "/home/zch/workspace/sana-wam",
+  "decision": "allow_contract_implementation_and_lightweight_tests_only",
+  "evidence": {
+    "ast_parse": {
+      "files": 15,
+      "result": "passed"
+    },
+    "lightweight_test_report": {
+      "path": "docs/cach_sana_wam/stage1/STAGE1_LIGHTWEIGHT_TEST_REPORT.json",
+      "sha256": "71c03f132895ee46705cadcf8629dfc2d9de94003a2fda8b35a8fa4bf030ef05",
+      "status": "passed",
+      "tests_failed": 0,
+      "tests_passed": 209
+    },
+    "review_only_verifier": {
+      "execution_admission_valid": false,
+      "model_build_authorized": false,
+      "run_root_creation_authorized": false,
+      "scientific_eligible": false,
+      "training_authorized": false
+    }
+  },
+  "gate_status": {
+    "authorized_stage1_lightweight_suite": "passed",
+    "gate_s1": "not_claimed",
+    "reason": "The development-plan GATE-S1 sentence includes mini-model contract tests, while this authority explicitly forbids model construction and numerical model execution."
+  },
+  "issued_at": "2026-07-31T09:21:22+00:00",
+  "pins": {
+    "config": {
+      "path": "configs/experiments/cach_sana_wam_stage1.yaml",
+      "sha256": "4d81b07cc825ef33415b4fd8851b198581c652b184f28bad5bc76bd961364c3b"
+    },
+    "development_plan": {
+      "path": "docs/CAUSAL_ACTION_CONDITIONED_HYBRID_SANA_WAM_DEVELOPMENT_PLAN_20260731.md",
+      "sha256": "969d9668ffed07176844fcbd84062825f9d5f0af0325959b0068c38fe481f0dd"
+    },
+    "readme": {
+      "path": "docs/cach_sana_wam/stage1/README.md",
+      "sha256": "0a7c1fe0cddc94a462f3749782f0087ec65a9c47ded720ffa6c932f8fd8a96b3"
+    },
+    "source_manifest": {
+      "path": "docs/cach_sana_wam/stage1/SOURCE_MANIFEST.draft.json",
+      "sha256": "6d27becd6ac14d8553080c3c2c01bb31b334f13e3c7f31da5b91fbf589d1e287"
+    },
+    "stage1_source_bundle": {
+      "mode": "0444",
+      "path": "/DATA/share/sana_cach_source_bundles/cach_stage1_a6e7849b91464b6e939db6ac676ca8e0d139a8e889e2b6fedb730457d3ee31dc_20260731.tar",
+      "sha256": "a6e7849b91464b6e939db6ac676ca8e0d139a8e889e2b6fedb730457d3ee31dc",
+      "size_bytes": 870400
+    }
+  },
+  "registration": {
+    "external_trust_anchor_registered": false,
+    "registered_execution_authority": false,
+    "status": "draft"
+  },
+  "remaining_blockers": [
+    "reviewed_runtime_and_transitive_source_closure",
+    "real_dataset_row_timebase_and_normalization_manifests",
+    "real_model_exact_inventory_and_checkpoint_schema",
+    "reference_candidate_pair_afcc_isolation",
+    "typed_cache_vendor_list10_codec_and_exact_field_schema",
+    "mini_model_numerical_causal_and_mask_contract",
+    "committed_action_value_identity_and_history_operator",
+    "fresh_pair_named_initialization_parity",
+    "ref_gdn_corrected_commissioning",
+    "executable_five_piece_authority_and_immutable_root_state_machine",
+    "legacy_and_auxiliary_entrypoint_pre_runtime_guard_coverage",
+    "self_forcing_objective_and_deploy_applied_action_ack",
+    "capacity_and_gpu_admission"
+  ],
+  "repository_lineage": {
+    "sana_afcc_handoff_head": "9586486f2a9f5172d57b325e32093a3e018d34c0",
+    "sana_head": "16b9cec673e3335724ba2d8db25de7f9ed229292",
+    "sana_wam_head": "605f1c134b4c983ff80f8489c4bc8847036329e2"
+  },
+  "schema": "cach.stage1.authority.draft.v1",
+  "scientific_eligibility": {
+    "afcc_pair_isolation_verified": false,
+    "formal_result_exists": false,
+    "prospective_replicate_only": true,
+    "scientific_eligible": false
+  },
+  "stage": "stage1",
+  "variant": "cach_sana_wam_v0"
+}
