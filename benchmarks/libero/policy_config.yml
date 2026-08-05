@@ -1,0 +1,128 @@
+# sana-wam <-> LIBERO benchmark-only client contract.
+#
+# This file describes a LIBERO-native checkpoint interface.  It is not an
+# action-space adapter for an existing RoboTwin checkpoint: RoboTwin joint/eef
+# checkpoints emit 14D/20D bimanual actions, while LIBERO requires a 7D
+# single-arm relative action.
+
+schema_version: sana-wam-libero-benchmark-v1
+libero_git_sha: 8f1084e3132a39270c3a13ebe37270a43ece2a01
+task_order_index: 0
+seed: 0
+camera_height: 256
+camera_width: 256
+
+# Existing sana-wam policy server. single_eval.sh never starts the server.
+host: "127.0.0.1"
+http_port: 8848
+request_timeout: 300
+model_noise_base_seed: 2026080601
+
+# Project-specific sana-wam checkpoint observation contract. LIBERO itself can
+# expose additional state fields; this adapter intentionally pins the 8D schema
+# used by the H200 LeRobot conversion.
+send_state: true
+state_dim: 8
+state_layout:
+  - eef_x
+  - eef_y
+  - eef_z
+  - eef_axis_angle_x
+  - eef_axis_angle_y
+  - eef_axis_angle_z
+  - gripper_qpos_0
+  - gripper_qpos_1
+
+rotate_images_180: true
+camera_mapping:
+  agentview_image: head_camera
+  robot0_eye_in_hand_image: left_wrist_camera
+  missing: right_wrist_camera
+
+# LIBERO action contract. The six motion coordinates are relative deltas and
+# pass through unchanged. Only the gripper coordinate is thresholded/mapped.
+action_dim: 7
+action_layout:
+  - delta_x
+  - delta_y
+  - delta_z
+  - delta_axis_angle_x
+  - delta_axis_angle_y
+  - delta_axis_angle_z
+  - open_gripper
+action_representation: relative_delta_pose
+gripper:
+  model_open: 1.0
+  model_closed: 0.0
+  threshold: 0.5
+  env_open: -1.0
+  env_closed: 1.0
+
+# The checkpoint's saved config must carry this mapping verbatim at
+# dataloader.benchmark_contract. The policy server exposes it through /info,
+# allowing the client to reject RoboTwin or semantically incompatible 7D
+# checkpoints before a simulator environment or output root is created.
+expected_server_contract:
+  schema_version: sana-wam-libero-policy-v1
+  benchmark: libero
+  dataloader_type: libero
+  action_mode: libero_relative_eef
+  normalize_required: true
+  state_dim: 8
+  state_layout:
+    - eef_x
+    - eef_y
+    - eef_z
+    - eef_axis_angle_x
+    - eef_axis_angle_y
+    - eef_axis_angle_z
+    - gripper_qpos_0
+    - gripper_qpos_1
+  action_dim: 7
+  action_layout:
+    - delta_x
+    - delta_y
+    - delta_z
+    - delta_axis_angle_x
+    - delta_axis_angle_y
+    - delta_axis_angle_z
+    - open_gripper
+  action_representation: relative_delta_pose
+  action_output_space: denormalized_checkpoint_units
+  gripper:
+    model_open: 1.0
+    model_closed: 0.0
+    threshold: 0.5
+    env_open: -1.0
+    env_closed: 1.0
+  multiview: true
+  camera_layout:
+    - head_camera
+    - left_wrist_camera
+    - right_wrist_camera
+  camera_mapping:
+    agentview_image: head_camera
+    robot0_eye_in_hand_image: left_wrist_camera
+    missing: right_wrist_camera
+  missing_right_camera_fill: black
+
+# The policy server owns action chunking and cache state. The benchmark client
+# sends the current observation on every environment step.
+one_server_request_per_env_step: true
+client_action_queue: false
+
+# Benchmark rollout semantics. Direct eval_policy.py use defaults to 20 fixed
+# initial states per task; single_eval.sh keeps the count explicit on its CLI.
+default_num_trials_per_task: 20
+num_steps_wait: 5
+dummy_action: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+suite_max_steps:
+  libero_spatial: 220
+  libero_object: 280
+  libero_goal: 300
+  libero_10: 520
+
+# LIBERO-90 is retained as a dataset/pretraining suite, not a formal
+# closed-loop evaluation suite in this adapter.
+dataset_only_suites:
+  - libero_90

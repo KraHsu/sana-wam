@@ -23,6 +23,7 @@ src/sana_wam/
 configs/        train_ar_sana.yaml, deploy_ar_sana.yaml
 scripts/        train.py, deploy.py, smoke_ar.sh, train_ar.sh
 benchmarks/robotwin/   RoboTwin online-eval client
+benchmarks/libero/     LIBERO benchmark client (isolated simulator env)
 third_party/Sana       git submodule (upstream SANA `diffusion` package)
 tests/          AR unit tests (CPU mini-backbone; a few real-weight gated)
 ```
@@ -59,6 +60,13 @@ bash benchmarks/robotwin/single_eval.sh adjust_bottle demo_clean sana_wam <gpu> 
 ```
 Greedy policy is mandatory (the AR KV cache is stateful closed-loop; async /
 receding-horizon / temporal-ensemble break cache alignment).
+
+The LIBERO benchmark adapter is documented in
+[`benchmarks/libero/README.md`](benchmarks/libero/README.md). It connects a
+dedicated LIBERO/robosuite simulator environment to the same HTTP server, but
+requires a LIBERO-native 8D-state/7D-relative-action checkpoint and matching
+normalization statistics. Existing RoboTwin 14D/20D checkpoints are rejected;
+the adapter does not convert them or claim a LIBERO result.
 
 ## Canonical reference baseline
 
