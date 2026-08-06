@@ -46,6 +46,7 @@ def validate_libero_training_config(
         "dataloader.state_normalize_mode": "min-max",
         "dataloader.delta_action": False,
         "dataloader.training_video_rotation_degrees": 0,
+        "training.optimizer_master_weights": True,
     }
     for path, expected in exact.items():
         observed = OmegaConf.select(config, path, default=None)

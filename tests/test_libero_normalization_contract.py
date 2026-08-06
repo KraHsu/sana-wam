@@ -62,6 +62,7 @@ def _libero_config(*, stats_sha256: str | None = None):
             },
             "training": {
                 "action_stats_sha256": stats_sha256,
+                "optimizer_master_weights": True,
                 "preserve_frozen_input_grad_modules": ["video_backbone"],
             },
         }
@@ -171,6 +172,16 @@ def test_training_contract_rejects_model_or_temporal_semantic_drift() -> None:
         merge=False,
     )
     with pytest.raises(ValueError, match="preserve_frozen_input_grad_modules"):
+        validate_libero_training_config(cfg)
+
+    cfg = _libero_config()
+    OmegaConf.update(
+        cfg,
+        "training.optimizer_master_weights",
+        False,
+        merge=False,
+    )
+    with pytest.raises(ValueError, match="optimizer_master_weights"):
         validate_libero_training_config(cfg)
 
 

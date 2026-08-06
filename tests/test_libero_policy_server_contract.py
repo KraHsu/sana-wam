@@ -88,6 +88,7 @@ def test_policy_server_exposes_libero_checkpoint_compatibility_identity() -> Non
             },
             "inference": {"episode_noise_mode": "paired"},
             "training": {
+                "optimizer_master_weights": True,
                 "preserve_frozen_input_grad_modules": ["video_backbone"]
             },
             "policy": {

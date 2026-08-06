@@ -110,6 +110,8 @@ EXPECTED_TRAINABLE_ROOTS = (
     "proprio_video_embed",
     "proprio_action_embed",
 )
+EXPECTED_TRAINABLE_TENSOR_COUNT = 560
+EXPECTED_TRAINABLE_PARAMETER_COUNT = 639_653_063
 EXPECTED_PRESERVE_FROZEN_INPUT_GRAD_MODULES = ("video_backbone",)
 _ACTIVE_RUN_ROOT: Path | None = None
 
@@ -474,6 +476,10 @@ def main() -> int:
         raise RuntimeError("LIBERO update smoke requires lambda_video=0")
     if float(cfg.training.lambda_action) != 1.0:
         raise RuntimeError("LIBERO update smoke requires lambda_action=1")
+    if cfg.training.optimizer_master_weights is not True:
+        raise RuntimeError(
+            "LIBERO update smoke requires persistent FP32 optimizer masters"
+        )
     external_assets = _verify_external_assets(cfg)
     actual_identity["external_assets_sha256"] = _sha256_json(external_assets)
 
@@ -689,6 +695,58 @@ def main() -> int:
     ):
         raise RuntimeError("optimizer parameter set differs from trainable parameters")
     optimizer_groups, master_pairs = trainer._optimizer_param_groups(model_groups)
+    if len(named_trainables) != EXPECTED_TRAINABLE_TENSOR_COUNT:
+        raise RuntimeError(
+            "trainable tensor count differs: "
+            f"observed={len(named_trainables)} "
+            f"expected={EXPECTED_TRAINABLE_TENSOR_COUNT}"
+        )
+    trainable_parameter_count = sum(parameter.numel() for parameter in params)
+    if trainable_parameter_count != EXPECTED_TRAINABLE_PARAMETER_COUNT:
+        raise RuntimeError(
+            "trainable parameter count differs: "
+            f"observed={trainable_parameter_count} "
+            f"expected={EXPECTED_TRAINABLE_PARAMETER_COUNT}"
+        )
+    if len(master_pairs) != len(params):
+        raise RuntimeError(
+            "FP32 optimizer master coverage differs from trainable parameters"
+        )
+    if [id(model) for model, _master in master_pairs] != parameter_ids:
+        raise RuntimeError("FP32 optimizer master/model ordering differs")
+    masters = [master for _model, master in master_pairs]
+    master_ids = [id(master) for master in masters]
+    optimizer_parameters = [
+        parameter
+        for group in optimizer_groups
+        for parameter in group["params"]
+    ]
+    if (
+        len(master_ids) != len(set(master_ids))
+        or [id(parameter) for parameter in optimizer_parameters] != master_ids
+        or any(model.dtype != torch.bfloat16 for model, _master in master_pairs)
+        or any(master.dtype != torch.float32 for _model, master in master_pairs)
+        or any(
+            not master.requires_grad
+            or model.shape != master.shape
+            or model.device != master.device
+            for model, master in master_pairs
+        )
+    ):
+        raise RuntimeError("FP32 optimizer master identity/dtype contract differs")
+    if [len(group["params"]) for group in optimizer_groups] != [
+        len(group["params"]) for group in model_groups
+    ] or [float(group["lr"]) for group in optimizer_groups] != [
+        float(group["lr"]) for group in model_groups
+    ]:
+        raise RuntimeError("FP32 optimizer master group structure differs")
+    trainable_name_by_id = {
+        id(parameter): name for name, parameter in named_trainables
+    }
+    named_masters = [
+        (trainable_name_by_id[id(model)], master)
+        for model, master in master_pairs
+    ]
     optimizer = torch.optim.AdamW(
         optimizer_groups,
         weight_decay=float(cfg.training.weight_decay),
@@ -757,14 +815,56 @@ def main() -> int:
     )
     if not bool(torch.isfinite(grad_norm).item()):
         raise RuntimeError("gradient norm is non-finite")
-    probes = _capture_update_probes(named_trainables)
-    if not probes:
-        raise RuntimeError("no nonzero-gradient update probes were captured")
-    if master_pairs:
-        trainer._sync_master_gradients(master_pairs)
+    projected_bf16_probes = _capture_update_probes(named_trainables)
+    if not projected_bf16_probes:
+        raise RuntimeError("no nonzero-gradient BF16 projection probes were captured")
+    trainer._sync_master_gradients(master_pairs)
+    invalid_master_gradients = []
+    for name, master in named_masters:
+        gradient = master.grad
+        if (
+            gradient is None
+            or gradient.dtype != torch.float32
+            or not bool(torch.isfinite(gradient).all().item())
+            or not bool(torch.count_nonzero(gradient).item())
+        ):
+            invalid_master_gradients.append(name)
+    if invalid_master_gradients:
+        raise RuntimeError(
+            "FP32 optimizer masters lack finite nonzero FP32 gradients: "
+            f"{invalid_master_gradients[:8]!r}"
+        )
+    master_probes = _capture_update_probes(named_masters)
+    if len(master_probes) < len(named_masters):
+        raise RuntimeError("not every FP32 optimizer master produced an update probe")
     optimizer.step()
-    if master_pairs:
-        trainer._copy_master_parameters_to_model(master_pairs)
+    master_update_summary, changed_master_ids = _summarize_updates(master_probes)
+    if len(changed_master_ids) != len(named_masters):
+        raise RuntimeError(
+            "not every FP32 optimizer master had an observed numeric update: "
+            f"changed={len(changed_master_ids)} expected={len(named_masters)}"
+        )
+    if set(master_update_summary["changed_trainable_roots"]) != set(
+        EXPECTED_TRAINABLE_ROOTS
+    ):
+        raise RuntimeError(
+            "FP32 optimizer master updates did not cover every trainable root"
+        )
+    if any(
+        not bool(torch.isfinite(master).all().item()) for master in masters
+    ):
+        raise RuntimeError("AdamW produced non-finite FP32 optimizer masters")
+    trainer._copy_master_parameters_to_model(master_pairs)
+    projection_mismatches = [
+        trainable_name_by_id[id(model)]
+        for model, master in master_pairs
+        if not torch.equal(model.detach(), master.detach().to(dtype=model.dtype))
+    ]
+    if projection_mismatches:
+        raise RuntimeError(
+            "BF16 model tensors differ from their projected FP32 masters: "
+            f"{projection_mismatches[:8]!r}"
+        )
     nonfinite_trainables = [
         name
         for name, parameter in named_trainables
@@ -784,10 +884,12 @@ def main() -> int:
         "reserved_bytes": torch.cuda.memory_reserved(device),
     }
 
-    update_summary, changed_parameter_ids = _summarize_updates(probes)
-    if update_summary["changed_probe_count"] == 0:
+    projected_bf16_update_summary, changed_parameter_ids = _summarize_updates(
+        projected_bf16_probes
+    )
+    if projected_bf16_update_summary["changed_probe_count"] == 0:
         raise RuntimeError(
-            "AdamW completed but no max-gradient parameter probe changed"
+            "AdamW completed but no projected BF16 parameter probe changed"
         )
     unchanged_optimizer_groups = [
         index
@@ -923,7 +1025,7 @@ def main() -> int:
             "start_frame": sample["start_frame"],
             "task": sample["task_name"],
         },
-        "schema_version": "sana-wam-libero-ar-real-gpu-one-update-smoke-v1",
+        "schema_version": "sana-wam-libero-ar-real-gpu-one-update-smoke-v2",
         "scope": {
             "architecture_loss_forward_calls": architecture_forward_calls,
             "backward_executed": True,
@@ -952,9 +1054,13 @@ def main() -> int:
             "single_update": update_seconds,
         },
         "update": {
-            **update_summary,
+            "master_update": master_update_summary,
             "optimizer": "AdamW",
             "optimizer_master_parameter_count": len(master_pairs),
+            "optimizer_master_parameter_elements": sum(
+                master.numel() for master in masters
+            ),
+            "projected_bf16_update": projected_bf16_update_summary,
             "probe_learning_rates": [
                 float(group["lr"]) for group in model_groups
             ],

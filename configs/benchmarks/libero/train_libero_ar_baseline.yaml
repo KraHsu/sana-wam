@@ -173,6 +173,9 @@ training:
   # the video backbone itself is outside the allowlist and remains frozen.
   video_lr: 1.0e-4
   action_lr: 1.0e-4
+  # Keep optimizer arithmetic and sub-BF16 updates in persistent FP32 masters;
+  # BF16 model tensors remain the forward/backward storage.
+  optimizer_master_weights: true
   weight_decay: 0.0
   grad_clip: 1.0
   warmup_steps: 100

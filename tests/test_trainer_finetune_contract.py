@@ -323,6 +323,59 @@ def test_fp32_optimizer_master_weights_preserve_bf16_model_storage(
     torch.testing.assert_close(model_parameter.float(), master.to(torch.bfloat16).float())
 
 
+def test_fp32_optimizer_master_accumulates_sub_bf16_adamw_updates(
+    tmp_path, monkeypatch
+):
+    architecture = _DummyArchitecture().to(dtype=torch.bfloat16)
+    with torch.no_grad():
+        architecture.proprio_encoder.weight.fill_(1.0)
+    cfg = _config(
+        trainable_parameter_patterns=["proprio_encoder.weight"],
+        optimizer_master_weights=True,
+        video_lr=1.0e-4,
+    )
+    trainer, _, architecture = _make_trainer(
+        tmp_path, monkeypatch, cfg, architecture
+    )
+    model_parameter = architecture.proprio_encoder.weight
+    optimizer_groups, pairs = trainer._optimizer_param_groups(
+        trainer._param_groups()
+    )
+    master = pairs[0][1]
+    optimizer = torch.optim.AdamW(
+        optimizer_groups,
+        weight_decay=0.0,
+        betas=(0.9, 0.95),
+    )
+    initial_model = model_parameter.detach().clone()
+    initial_master = master.detach().clone()
+    first_master_delta = None
+
+    for step in range(1, 33):
+        model_parameter.grad = torch.full_like(model_parameter, 0.25)
+        trainer._sync_master_gradients(pairs)
+        optimizer.step()
+        trainer._copy_master_parameters_to_model(pairs)
+        assert torch.equal(
+            model_parameter,
+            master.detach().to(dtype=torch.bfloat16),
+        )
+        optimizer.zero_grad(set_to_none=True)
+
+        master_delta = float((master.detach() - initial_master).abs().max())
+        if step == 1:
+            first_master_delta = master_delta
+            assert first_master_delta > 0.0
+            assert torch.equal(model_parameter, initial_model)
+        elif step == 8:
+            assert first_master_delta is not None
+            assert master_delta > first_master_delta * 7.0
+            assert torch.equal(model_parameter, initial_model)
+
+    assert not torch.equal(master.detach(), initial_master)
+    assert not torch.equal(model_parameter, initial_model)
+
+
 def test_optimizer_master_weights_requires_boolean(tmp_path, monkeypatch):
     cfg = _config(optimizer_master_weights="yes")
     trainer, _, _ = _make_trainer(tmp_path, monkeypatch, cfg)

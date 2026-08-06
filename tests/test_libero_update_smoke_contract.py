@@ -41,6 +41,7 @@ def test_libero_source_template_freezes_t1_and_future_exact_stats_path() -> None
     assert config["training"]["preserve_frozen_input_grad_modules"] == [
         "video_backbone"
     ]
+    assert config["training"]["optimizer_master_weights"] is True
 
 
 def test_one_update_runner_has_narrow_execution_surface() -> None:
@@ -80,6 +81,11 @@ def test_one_update_runner_has_narrow_execution_surface() -> None:
     assert "EXPECTED_GEMMA_ASSET_SHA256" in source
     assert "EXPECTED_SPATIAL_SAMPLE_ASSET_SHA256" in source
     assert "EXPECTED_PRESERVE_FROZEN_INPUT_GRAD_MODULES" in source
+    assert "EXPECTED_TRAINABLE_TENSOR_COUNT" in source
+    assert "EXPECTED_TRAINABLE_PARAMETER_COUNT" in source
+    assert 'cfg.training.optimizer_master_weights is not True' in source
+    assert '"master_update"' in source
+    assert '"projected_bf16_update"' in source
     assert '"_sana_wam_no_grad_wrapped"' in source
     assert 'observed_checkpoint_names != ["SANA_Video_2B_480p.pth"]' in source
     assert "episode_000000.mp4" in source
