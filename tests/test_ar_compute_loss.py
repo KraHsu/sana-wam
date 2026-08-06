@@ -296,3 +296,86 @@ def test_ar_compute_loss_clean_copy_is_deterministic_at_zero_prob():
     )
     torch.testing.assert_close(copy, clean)
     assert torch.count_nonzero(ts) == 0
+
+
+@requires_sana
+@pytest.mark.parametrize(
+    "trajectory_only",
+    [False, True],
+)
+def test_ar_compute_loss_propagates_checkpoint_controls(
+    monkeypatch, trajectory_only
+):
+    arch, vb, ab = _build_arch()
+    observed = []
+
+    def fake_forward(noisy_actions, _action_timestep, **kwargs):
+        observed.append(
+            (
+                kwargs["use_gradient_checkpointing"],
+                kwargs["use_gradient_checkpointing_offload"],
+            )
+        )
+        return torch.zeros_like(kwargs["latents"]), torch.zeros_like(noisy_actions)
+
+    monkeypatch.setattr(arch, "forward", fake_forward)
+    if trajectory_only:
+        arch._ar_chunkwise_temporal_ops = True
+        arch._configure_ar_chunkwise_temporal_ops()
+        arch._video_on_path_loss_weight = 0.0
+        arch._video_trajectory_endpoint_weight = 1.0
+        arch._video_trajectory_steps = 1
+        arch._video_trajectory_min_sigma = 0.5
+        arch._video_trajectory_max_sigma = 0.5
+
+    batch = dict(
+        input_latents=torch.randn(1, vb._dit.in_channels, 2, 8, 8),
+        actions=torch.randn(1, 4, ab.action_dim),
+        context=torch.randn(1, 4, vb.context_dim),
+        seq_lens=torch.full((1,), 4, dtype=torch.long),
+        use_gradient_checkpointing=True,
+        use_gradient_checkpointing_offload=True,
+    )
+    arch.compute_loss(
+        lambda_video=1.0,
+        lambda_action=0.0 if trajectory_only else 1.0,
+        **batch,
+    )
+
+    expected = [(False, False), (True, True)] if trajectory_only else [(True, True)]
+    assert observed == expected
+
+
+@requires_sana
+@pytest.mark.parametrize(
+    "field",
+    ["use_gradient_checkpointing", "use_gradient_checkpointing_offload"],
+)
+def test_ar_compute_loss_rejects_non_boolean_checkpoint_controls(field):
+    arch, vb, ab = _build_arch()
+    batch = dict(
+        input_latents=torch.randn(1, vb._dit.in_channels, 2, 8, 8),
+        actions=torch.randn(1, 4, ab.action_dim),
+        context=torch.randn(1, 4, vb.context_dim),
+        seq_lens=torch.full((1,), 4, dtype=torch.long),
+        **{field: "true"},
+    )
+
+    with pytest.raises(TypeError, match=field):
+        arch.compute_loss(lambda_video=1.0, lambda_action=1.0, **batch)
+
+
+@requires_sana
+def test_ar_compute_loss_rejects_offload_without_checkpointing():
+    arch, vb, ab = _build_arch()
+    batch = dict(
+        input_latents=torch.randn(1, vb._dit.in_channels, 2, 8, 8),
+        actions=torch.randn(1, 4, ab.action_dim),
+        context=torch.randn(1, 4, vb.context_dim),
+        seq_lens=torch.full((1,), 4, dtype=torch.long),
+        use_gradient_checkpointing=False,
+        use_gradient_checkpointing_offload=True,
+    )
+
+    with pytest.raises(ValueError, match="requires use_gradient_checkpointing"):
+        arch.compute_loss(lambda_video=1.0, lambda_action=1.0, **batch)

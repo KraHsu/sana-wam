@@ -860,6 +860,8 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
         frame_chunk_size: int,
         video_is_pad: Optional[Tensor] = None,
         action_is_pad: Optional[Tensor] = None,
+        use_gradient_checkpointing: bool = False,
+        use_gradient_checkpointing_offload: bool = False,
     ) -> tuple[Tensor, Tensor, Tensor, int, int]:
         """Supervise model-generated denoising states with the expert endpoint."""
         import torch.nn.functional as F
@@ -935,7 +937,12 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
         if self._ar_bootstrap_clean_prefix:
             state[:, :, 0] = clean_video[:, :, 0]
 
-        def forward_video(current: Tensor, sigma: Tensor) -> Tensor:
+        def forward_video(
+            current: Tensor,
+            sigma: Tensor,
+            *,
+            checkpoint_for_backward: bool,
+        ) -> Tensor:
             video_timesteps = torch.full(
                 (batch, frames),
                 float(sigma.item()) * video_timestep_scale,
@@ -961,6 +968,13 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
                 ar_frame_chunk_size=frame_chunk_size,
                 ar_attn_window=self._ar_attn_window,
                 timestep=video_timesteps.mean(dim=1),
+                use_gradient_checkpointing=(
+                    use_gradient_checkpointing and checkpoint_for_backward
+                ),
+                use_gradient_checkpointing_offload=(
+                    use_gradient_checkpointing_offload
+                    and checkpoint_for_backward
+                ),
                 **fwd_inputs,
             )
             return prediction
@@ -970,7 +984,9 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
             for index in range(self._video_trajectory_steps):
                 sigma = schedule[index]
                 next_sigma = schedule[index + 1]
-                prediction = forward_video(state, sigma)
+                prediction = forward_video(
+                    state, sigma, checkpoint_for_backward=False
+                )
                 adjacent_endpoint = (
                     state.float() - sigma * prediction.float()
                 ).detach()
@@ -1007,7 +1023,9 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
         frame_pad_5d = (~frame_keep)[:, None, :, None, None]
         clean_video_for_loss = clean_video.float().masked_fill(frame_pad_5d, 0)
         for generated_state, sigma, adjacent_endpoint in supervised_states:
-            prediction = forward_video(generated_state, sigma)
+            prediction = forward_video(
+                generated_state, sigma, checkpoint_for_backward=True
+            )
             endpoint = generated_state.float() - sigma * prediction.float()
             velocity_target = (
                 generated_state.float() - clean_video.float()
@@ -1084,6 +1102,21 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
         action_scheduler = self.action_backbone.scheduler
 
         device, dtype = self.device, self.dtype
+        use_gradient_checkpointing = inputs.get(
+            "use_gradient_checkpointing", False
+        )
+        use_gradient_checkpointing_offload = inputs.get(
+            "use_gradient_checkpointing_offload", False
+        )
+        if type(use_gradient_checkpointing) is not bool:
+            raise TypeError("use_gradient_checkpointing must be boolean")
+        if type(use_gradient_checkpointing_offload) is not bool:
+            raise TypeError("use_gradient_checkpointing_offload must be boolean")
+        if use_gradient_checkpointing_offload and not use_gradient_checkpointing:
+            raise ValueError(
+                "use_gradient_checkpointing_offload=true requires "
+                "use_gradient_checkpointing=true"
+            )
         video_timestep_dtype = self._video_timestep_dtype(dtype)
         clean_video = inputs["input_latents"].to(device=device, dtype=dtype)
         B, _, T, _, _ = clean_video.shape
@@ -1610,6 +1643,10 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
                 ar_frame_chunk_size=fcs,
                 ar_attn_window=self._ar_attn_window,
                 timestep=v_ts_val.mean(dim=1),
+                use_gradient_checkpointing=use_gradient_checkpointing,
+                use_gradient_checkpointing_offload=(
+                    use_gradient_checkpointing_offload
+                ),
                 return_action_video_numerators=(
                     afcc_enabled or afcc_capture_required
                 ),
@@ -1847,6 +1884,10 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
                 ar_frame_chunk_size=fcs,
                 ar_attn_window=self._ar_attn_window,
                 timestep=v_ts_val.mean(dim=1),
+                use_gradient_checkpointing=use_gradient_checkpointing,
+                use_gradient_checkpointing_offload=(
+                    use_gradient_checkpointing_offload
+                ),
                 **fwd_inputs,
             )
             selected_sigmas = v_sigma_fp32[expansion_frame_mask]
@@ -1916,6 +1957,10 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
                 frame_chunk_size=fcs,
                 video_is_pad=forward_video_is_pad,
                 action_is_pad=forward_action_is_pad,
+                use_gradient_checkpointing=use_gradient_checkpointing,
+                use_gradient_checkpointing_offload=(
+                    use_gradient_checkpointing_offload
+                ),
             )
             (
                 endpoint_loss,

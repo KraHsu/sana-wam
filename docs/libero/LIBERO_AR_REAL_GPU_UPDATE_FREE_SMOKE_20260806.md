@@ -137,17 +137,17 @@ Without this field, the first real model forward deterministically fails with
 
 1. Materialize immutable training-split-only action/state stats at the
    production path and pin its SHA in the training config.
-2. `training.use_gradient_checkpointing: true` is currently dropped by AR
-   `compute_loss` before its forward calls. Repair and test that propagation
-   before any update smoke or training; this forward-only smoke intentionally
-   used inference mode and is unaffected.
-3. Decide and freeze the intended LIBERO video timestep contract. The current
+2. Decide and freeze the intended LIBERO video timestep contract. The current
    source config uses integerized BF16 T0 conditioning
    (`continuous_timestep_conditioning=false`), rather than the newer FP32
    continuous T1 path.
-4. Run a separately authorized single-GPU update smoke only after the first
-   three contracts close. Formal training and benchmark evaluation remain
+3. Run a separately authorized single-GPU update smoke only after the first
+   two contracts close. Formal training and benchmark evaluation remain
    unauthorized.
+
+The gradient-checkpointing propagation blocker recorded by this smoke was
+closed by the successor source/CPU-test work documented in
+[`LIBERO_AR_GRADIENT_CHECKPOINTING_FIX_20260806.md`](LIBERO_AR_GRADIENT_CHECKPOINTING_FIX_20260806.md).
 
 ## Verification commands
 

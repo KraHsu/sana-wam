@@ -69,7 +69,12 @@ normalization statistics. Existing RoboTwin 14D/20D checkpoints are rejected;
 the adapter does not convert them or claim a LIBERO result. A native LeRobot
 v2.1 training loader, metadata-to-stats builder, strict LIBERO-only train/deploy
 launchers, and non-authorizing AR baseline template now live beside that
-adapter; no LIBERO training or evaluation run has been started.
+adapter. The full-2B real-sample update-free GPU smoke and the subsequent AR
+gradient-checkpointing propagation repair are recorded in
+[`docs/libero/LIBERO_AR_REAL_GPU_UPDATE_FREE_SMOKE_20260806.md`](docs/libero/LIBERO_AR_REAL_GPU_UPDATE_FREE_SMOKE_20260806.md)
+and
+[`docs/libero/LIBERO_AR_GRADIENT_CHECKPOINTING_FIX_20260806.md`](docs/libero/LIBERO_AR_GRADIENT_CHECKPOINTING_FIX_20260806.md).
+No LIBERO training or benchmark evaluation run has been started.
 
 ## Canonical reference baseline
 

@@ -89,10 +89,17 @@ def _architecture(*, expansion_enabled=True, on_path_weight=0.0):
     architecture._video_local_expansion_weight = 1.0 if expansion_enabled else 0.0
     architecture.expansion_test_slope = nn.Parameter(torch.tensor(-100.0))
     architecture.expansion_forward_states = []
+    architecture.expansion_checkpoint_controls = []
 
     def fake_forward(self, noisy_actions, action_timestep, **inputs):  # noqa: ARG001
         state = inputs["latents"]
         self.expansion_forward_states.append(state.detach().clone())
+        self.expansion_checkpoint_controls.append(
+            (
+                inputs["use_gradient_checkpointing"],
+                inputs["use_gradient_checkpointing_offload"],
+            )
+        )
         velocity = self.expansion_test_slope * state
         return velocity, torch.zeros_like(noisy_actions)
 
@@ -163,6 +170,22 @@ def test_compute_loss_uses_analytic_center_and_exactly_one_extra_forward():
     gradient = architecture.expansion_test_slope.grad
     assert gradient is not None and torch.isfinite(gradient)
     assert gradient.abs().item() > 0
+
+
+def test_local_expansion_propagates_checkpoint_controls_to_both_forwards():
+    architecture = _architecture()
+    architecture.compute_loss(
+        lambda_video=1.0,
+        lambda_action=0.0,
+        use_gradient_checkpointing=True,
+        use_gradient_checkpointing_offload=True,
+        **_batch(plan_row=_plan_row()),
+    )
+
+    assert architecture.expansion_checkpoint_controls == [
+        (True, True),
+        (True, True),
+    ]
 
 
 def test_local_expansion_ignores_nan_storage_padding():
