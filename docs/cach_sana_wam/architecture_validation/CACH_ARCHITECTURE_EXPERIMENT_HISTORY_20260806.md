@@ -5,7 +5,7 @@
 整理日期：2026-08-06  
 规范主机：`H200`  
 规范工作树：`/home/zch/workspace/sana-wam`  
-主仓 T8 执行 source commit：`9cd1c490d14b3c2437e82225ee8cfdf58646837e`
+主仓 T9 aggregate source commit：`b7cded5fd9cf83ffabeba18a7e352b1cb4438b66`
 Sana gitlink：`16b9cec673e3335724ba2d8db25de7f9ed229292`
 
 本文是一份可独立阅读的历史快照，汇总截至当前已经设计的架构、基础实现、所有关键
@@ -55,18 +55,21 @@ REF-GDN-CORRECTED
    和 multi-seed confirmation 都没有执行。
 8. 项目没有进入正式训练、正式评测、formal admission、Global Stage 3、checkpoint
    训练或部署；不得宣称已有 504-step formal 结果或正式模型完成。
-9. 在独立的 LIBERO production-shaped `DualSystemARArchitecture` 验证线上，T1 至 T8
+9. 在独立的 LIBERO production-shaped `DualSystemARArchitecture` 验证线上，T1 至 T9
    已依次闭合 one-update、fixed-sample 20-update learnability、held-out recipe、同任务
    episode、跨 Spatial task 以及跨 Object/Goal/LIBERO-10 suite 的 update-free action-loss
    transfer、四套件循环微学习与相位旋转诊断。T7 的 typed numerical verdict 为
    `T7_FOUR_SUITE_CYCLIC_GO`（受 post-run audit 限定）；T8 的有效终态为
-   `T8_PHASE_ROTATED_MIXED_INCONCLUSIVE`。
-10. LIBERO T7/T8 不改变 CACH-A4 reduced-path stop，也不是 benchmark success：其证据仅为
+   `T8_PHASE_ROTATED_MIXED_INCONCLUSIVE`。T9 补齐另外两个循环相位后得到冻结组合结论
+   `T9_COMMON_POSITION_EFFECT_SUPPORTED`：4/4 suite 的最旧端点差于最新端点，其中
+   Object、Goal、LIBERO-10 的位置 Spearman `rho>=0.8`。
+10. LIBERO T7/T8/T9 不改变 CACH-A4 reduced-path stop，也不是 benchmark success：其证据仅为
     一个初始化、一个 recipe、每套件一个更新样本与一个同任务 fresh episode 的 20-step
     loss-space screen。T7 中 Spatial A/H 同时回退；T8 只旋转循环相位后 Spatial 被救回，
-    但最旧的 Object A/H 转为回退，预注册的单调 recency 判据没有通过。probes 仍属于
-    四套件数据和 normalization population；rollout、suite distribution generalization、
-    正式训练和正式评测仍未执行。
+    但最旧的 Object A/H 转为回退。T9 表明跨四个冻结循环相位后存在共同 retention/
+    position effect，但 Spatial 与 LIBERO-10 的中间位置仍非单调。probes 仍属于四套件
+    数据和 normalization population；rollout、suite distribution generalization、正式
+    训练和正式评测仍未执行。
 
 ## 2. 证据等级与命名
 
@@ -705,7 +708,7 @@ motion-sensitive primary；后者正是用于检查前者是否值得扩大投�
   CACH-A4 reduced path = REDUCED_ARCH_STOP
   AV-4 = NOT_UNLOCKED
   review token = CONSUMED
-  independent LIBERO production-shaped AR path = T8 valid / phase-rotated mixed inconclusive
+  independent LIBERO production-shaped AR path = T9 common-position effect supported
 
 未开始或未通过：
   full CACH v0 package validation
@@ -747,6 +750,7 @@ training checkpoint，也没有运行 simulator 或 benchmark evaluator。
 | T6 | 保持 T5 core，同 recipe，Object/Goal/LIBERO-10 各一个 mechanically selected sample | `T6_CROSS_SUITE_TRANSFER_GO` | S1/S2/S3 全部改善；ratio `0.157667 / 0.176770 / 0.152686`，median `0.157667`；T5 core 逐值复现 |
 | T7 | A0-A3 四套件循环 5 轮，共 20 updates；每套件一个同任务 fresh heldout | typed numerical `T7_FOUR_SUITE_CYCLIC_GO` / audit-qualified | A median ratio `0.625211`，H median `0.636552`，3/4 对应套件双改善；Spatial A/H 分别回退 `9.48% / 7.63%` |
 | T8 | 同一 A/H、同一剂量，仅把循环相位旋转为 `[Object,Goal,LIBERO-10,Spatial] × 5`，并在各套件第五次更新后加 phase probes | `T8_PHASE_ROTATED_MIXED_INCONCLUSIVE` | Spatial A/H 被救回，Object A/H 转为回退；2/3 nonterminal overwrite 过阈值，但 `rho_recency=0.4` 未过 `0.8` |
+| T9 | 补齐循环相位 C=`[Goal,LIBERO-10,Spatial,Object]×5` 与 D=`[LIBERO-10,Spatial,Object,Goal]×5`，再只读组合 T7/T8/C/D | `T9_COMMON_POSITION_EFFECT_SUPPORTED` | 4/4 suite 均 `q(3)>q(0)`，Object/Goal/LIBERO-10 的 `rho>=0.8`，故 `endpoint_count=4, strong_count=3`；Spatial `rho=0.4` |
 
 T4 的 frozen training-core expected/observed projection SHA256 均为
 `e34a2dd0ae2dfe28303dcd9baf64ffc5800d002b0b7646b89dde2aafa132c352`，排除了
@@ -809,6 +813,27 @@ buffer identity/data pointer/单调 `_version` 变化，但更强的逐 event �
 formal admission。T8 还继承了 T7 位于 `/tmp` 的 T1 predecessor pin；执行时文件及 SHA
 正确，但该位置不是持久证据存储。
 
+T9 保持同一个模型、初始化、recipe、八个样本和每样本五次更新，只执行剩余两个循环
+相位。C 与 D 分别从 fresh model/empty optimizer 启动，source commit 均为
+`f73a7950eded2787ad57b26523da686dc5722512`，arm runner SHA256 为
+`d0d4cacf35d4116db3a8c166ffcdc92578a28f5037614a960e22b4ccbcc4a84c`；两臂各精确执行
+8 prepare / 44 forward / 24 measurement / 20 backward / 20 optimizer step，并得到
+`T9_LATIN_ARM_C_VALID` 与 `T9_LATIN_ARM_D_VALID`。C 的 terminal q 为 Spatial(k1)
+`0.852055`、Object(k0) `0.457466`、Goal(k3) `1.130739`、LIBERO-10(k2)
+`0.986213`；D 为 Spatial(k2) `0.358488`、Object(k1) `0.230310`、Goal(k0)
+`0.317411`、LIBERO-10(k3) `0.455242`。
+
+随后标准库 CPU harness 从 raw pre/terminal loss 强校验并组合 T7/T8/C/D 的 16 个 cell，
+没有使用 GPU、构造模型、更新参数或加载 checkpoint。四个 suite 的 `[q(0),q(1),q(2),q(3)]`
+分别为 Spatial `[0.645719,0.852055,0.358488,1.085568]`、Object
+`[0.457466,0.230310,0.761653,1.589239]`、Goal
+`[0.317411,0.500110,0.598033,1.130739]`、LIBERO-10
+`[0.137864,0.252070,0.986213,0.455242]`；对应 Spearman rho 为
+`0.4 / 0.8 / 1.0 / 0.8`，且四者都满足严格 `q(3)>q(0)`。因此冻结的
+`endpoint_count=4, strong_count=3` 按预注册规则唯一产生
+`T9_COMMON_POSITION_EFFECT_SUPPORTED`。这支持共同的终端位置/保留干扰，但不表示每个
+suite 都单调；Spatial 明显非单调，LIBERO-10 在 k2 达到最差值。
+
 主要冻结证据：
 
 | Run | Immutable root | RESULT SHA256 |
@@ -821,13 +846,18 @@ formal admission。T8 还继承了 T7 位于 `/tmp` 的 T1 predecessor pin；执
 | T6 | `/DATA/share/sana_wam_libero_nonformal_screens/t6/708b1d856986/libero-t6-crosssuite3-fixed20-67a02fcc85508e03f136e09221a6a9d4` | `4855f3771b80349547c985d137426cce79e25597f910eff88e136328424b8b89` |
 | T7 | `/DATA/share/sana_wam_libero_nonformal_screens/t7/d19109a2314f/libero-t7-foursuite-cyclic-fixed20-61e0a0ff817970e994b0875be4840ed6` | `9f5181a30cd0d6b676f09315244f7560cd3902004f5f17ca833330e33cb44d3a` |
 | T8 | `/DATA/share/sana_wam_libero_nonformal_screens/t8/9cd1c490d14b/libero-t8-phase-rotated-fixed20-2e1efcc69bc552affb5c85b7feeb5175` | `bfdb852e14a5bd9b1c8e776be9f4ff108899eae65d557cebe42b06f1991b0a18` |
+| T9 arm C | `/DATA/share/sana_wam_libero_nonformal_screens/t9/f73a7950eded/libero-t9-arm-c-latin-fixed20-5b1425bc07c1162fe6eb0f04164f9b9e` | `213d61f4a63f42983e4a42db6db9410279cc6a898bffcf11f157c560adf39771` |
+| T9 arm D | `/DATA/share/sana_wam_libero_nonformal_screens/t9/f73a7950eded/libero-t9-arm-d-latin-fixed20-741c81a12b6dda6592d9cc89b1b78765` | `7326bff58efe3b5d07e83db96aefe539f5da36e30ef453d3404166dade38aca0` |
+| T9 aggregate | `/DATA/share/sana_wam_libero_nonformal_screens/t9_aggregate/b7cded5fd9cf/libero-t9-latin-square-combined-ab99dd8758ef03bb191d5fb48f3b9fbc` | `0cfc53b820939123de4bc2a626380495878d4d5c9a37a0be9be667173254149d` |
 
 当前可以支持的最强结论是：在一次初始化和固定 recipe 下，完整 production-shaped AR
 path 不仅具备单样本 learnability 和多轴 update-free loss transfer，也能用一个 persistent
 optimizer 在 20 次四套件循环更新中通过 train/fresh 双 median 与 3/4 联合改善数值门。
-T8 进一步表明该联合门的主要回退对象会随终端相位从 Spatial 转移到 Object，支持存在
-明显的顺序敏感干扰，但不足以支持预注册的单调 terminal-recency 或稳定 suite-effect
-分类。T7/T8 probes 仍属于训练 metadata 与 normalization population；结果不证明
+T8 表明主要回退对象会随终端相位从 Spatial 转移到 Object；T9 补齐四相位后进一步支持
+共同的 terminal-position/retention effect：四套件的最旧端点都差于最新端点，且三套件
+呈强 rank trend。该结论仍允许显著 identity interaction 和非单调中间位置，不能简化为
+一个严格指数 recency law。T7/T8/T9 probes 仍属于训练 metadata 与 normalization population；结果不证明
 closed-loop success、LIBERO benchmark performance、suite-level distribution
 generalization、稳定长程优化或正式训练。任何后续实验仍需 fresh source/root，不能把
-T7 GO 或 T8 的诊断性 joint gate 直接升级成正式训练或 benchmark 授权。
+T7 GO、T8 的诊断性 joint gate 或 T9 的 common-position verdict 直接升级成正式训练或
+benchmark 授权。

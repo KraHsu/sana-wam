@@ -1,6 +1,6 @@
 # LIBERO T9 Four-Phase Latin-Square Core Screen
 
-Status: **C/D arms frozen valid / CPU aggregate pending**
+Status: **complete / frozen common-position effect supported**
 
 Date: 2026-08-06
 
@@ -312,6 +312,36 @@ The CPU aggregate records:
 No GPU, model construction, parameter update, checkpoint, additional data, or
 new measurement is needed for aggregation.
 
+### 7.1 Frozen combined result
+
+The CPU aggregator executed once from source commit
+`b7cded5fd9cf83ffabeba18a7e352b1cb4438b66`, runner SHA256
+`b884ef028a48ee37afda70e730c431db48ed30f62be7f59cb2c665b6072ffc0d`,
+and nonce `ab99dd8758ef03bb191d5fb48f3b9fbc`. Its immutable root is:
+
+```text
+/DATA/share/sana_wam_libero_nonformal_screens/t9_aggregate/b7cded5fd9cf/libero-t9-latin-square-combined-ab99dd8758ef03bb191d5fb48f3b9fbc
+```
+
+The canonical, single-file `RESULT.json` SHA256 is
+`0cfc53b820939123de4bc2a626380495878d4d5c9a37a0be9be667173254149d`;
+the root is `0555` and the result is `0444`. The aggregator strongly bound all
+four input RESULT SHA256 values, recomputed every ratio from raw pre/terminal
+losses, and emitted:
+
+| Suite | q(0) | q(1) | q(2) | q(3) | average ranks | rho | q(3)>q(0) | strong |
+|---|---:|---:|---:|---:|---|---:|---|---|
+| Spatial | 0.645719 | 0.852055 | 0.358488 | 1.085568 | [2,3,1,4] | 0.4 | yes | no |
+| Object | 0.457466 | 0.230310 | 0.761653 | 1.589239 | [2,1,3,4] | 0.8 | yes | yes |
+| Goal | 0.317411 | 0.500110 | 0.598033 | 1.130739 | [1,2,3,4] | 1.0 | yes | yes |
+| LIBERO-10 | 0.137864 | 0.252070 | 0.986213 | 0.455242 | [1,2,4,3] | 0.8 | yes | yes |
+
+Therefore `endpoint_count=4`, `strong_count=3`, and the frozen typed verdict
+is `T9_COMMON_POSITION_EFFECT_SUPPORTED`. The result supports a common
+retention penalty as more other-suite updates follow a suite's fifth update.
+It does not claim a perfectly monotonic response for every suite: Spatial is
+strongly non-monotonic, and LIBERO-10 also peaks at `k=2` rather than `k=3`.
+
 ## 8. Scope
 
 T9 is a deterministic, single-seed, one-sample-pair-per-suite, non-formal
@@ -321,5 +351,6 @@ deployment. Its next decision is whether a common terminal-position effect is
 strong enough to motivate changing the update strategy, or whether
 identity-sensitive interference requires a different core experiment.
 
-C and D now exist only as the frozen non-formal roots pinned in section 4.1.
-No combined aggregate root or combined verdict exists at this document state.
+C and D and the CPU aggregate now exist only as the immutable non-formal roots
+pinned in sections 4.1 and 7.1. The verdict motivates a new update-retention
+hypothesis; it does not authorize formal training or benchmark evaluation.
