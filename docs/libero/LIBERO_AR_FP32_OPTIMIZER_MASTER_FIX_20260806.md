@@ -67,5 +67,43 @@ master continued to drift through step 8, and by step 32 the accumulated value
 crossed a BF16 quantization boundary. Every projection exactly matched the
 BF16 cast of the persistent master.
 
-The separately authorized fresh-root single-GPU result is appended after
-execution.
+## Fresh-root single-GPU result
+
+The authorized one-step rerun passed on physical GPU 0 / UUID
+`GPU-1ec28cfb-f501-23f3-f865-275a744ca053`.
+
+- Source commit: `0337e2882cfbacf5ae235b18c1109af795f01bb6`
+- Config SHA256:
+  `dd3e54afeefd7dad62126f38d771035f28fd21b12a0baacd7f822e2cbff7cb30`
+- Runner SHA256:
+  `cabf945dcff48a92bdcbfd79426ce8bb6cd52da341fe8114b95a0ab988903eb9`
+- Root:
+  `/tmp/sana-wam-libero-t1-one-update-fp32master-0337e28-20260806-a3`
+- `RESULT.json` SHA256:
+  `9d9c139fd67baa8c131ad9e6537862536b8262b732c2fda668a7c8b8b6a8621a`
+- Frozen modes: root `0500`, result `0400`
+
+All 560 trainable tensors again had finite nonzero gradients. Exactly 560 FP32
+masters covering 639,653,063 elements were paired one-to-one with the BF16
+model tensors. All 4,479 selected FP32 master probes changed numerically,
+covering `action_backbone`, `proprio_encoder`, `proprio_video_embed`, and
+`proprio_action_embed`; optimizer state, masters, model parameters, and the
+exact BF16 projections remained finite and consistent.
+
+Of the same 4,479 projected BF16 probes, 3,598 changed immediately and covered
+the three roots seen in the predecessor run. `proprio_encoder` again did not
+cross a BF16 quantization boundary in one step, while its FP32 master did
+change. This closes the identified precision risk: the optimizer now retains
+that root's first-step update in FP32 for accumulation by subsequent steps.
+
+The fixed sample produced the same finite action loss
+`13.992515563964844`; the pre-clip gradient norm was `1272.0`. Model/data
+construction took 40.70 seconds and the single forward/backward/update section
+took 2.47 seconds. Peak update memory was about 24.40 GiB allocated / 25.51 GiB
+reserved. GPU memory returned to zero after exit.
+
+This remains non-formal architecture/optimizer evidence using metadata-only
+smoke normalization stats. It performed exactly one optimizer step, did not
+load or save a SANA-WAM checkpoint, and did not run a training loop, simulator,
+or benchmark evaluation. Formal selected-row stats admission and resumable
+optimizer-state checkpoint semantics remain separate blockers.

@@ -108,6 +108,11 @@ closure or the two optimizer-group update assertion, but it is a precision risk
 to close before formal training; the probe result must not be reported as proof
 that every allowlisted root made a numerically effective first-step update.
 
+That precision risk was subsequently closed for optimizer arithmetic by the
+FP32-master implementation and frozen fresh-root evidence documented in
+`LIBERO_AR_FP32_OPTIMIZER_MASTER_FIX_20260806.md`. The historical statement
+above remains the exact boundary of this predecessor run.
+
 The run used metadata-bootstrap normalization stats, one real sample, one
 microbatch, positive base learning rates, and no production warmup or gradient
 accumulation equivalence. It did not load or save a SANA-WAM checkpoint, enter a
