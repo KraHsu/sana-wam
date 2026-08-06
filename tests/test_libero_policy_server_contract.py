@@ -66,7 +66,8 @@ def test_policy_server_exposes_libero_checkpoint_compatibility_identity() -> Non
                     "state_dim": 8,
                     "use_proprioception": True,
                     "delta_action": False,
-                }
+                },
+                "video_backbone": {"continuous_timestep_conditioning": True},
             },
             "dataloader": {
                 "type": "libero",

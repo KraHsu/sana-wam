@@ -79,11 +79,14 @@ They remain explicit follow-up work rather than silently broadening this fix:
 - The cross-attention architecture has a similar runtime-control propagation
   gap, but it is outside the current LIBERO self-attention AR path.
 
-Before any LIBERO update run or training, the project still must:
+The successor pre-update decision is recorded in
+[`LIBERO_AR_T1_AND_STATS_PREUPDATE_DECISION_20260806.md`](LIBERO_AR_T1_AND_STATS_PREUPDATE_DECISION_20260806.md).
+It selects T1 for the non-formal architecture update smoke while retaining the
+strict production-stats work for the formal-training boundary.
+
+Before formal LIBERO training, the project still must:
 
 1. Materialize and hash immutable training-split-only action/state statistics
    at the production path.
-2. Decide and freeze integerized BF16 T0 versus continuous FP32 T1 video
-   timestep conditioning.
-3. Run a separately authorized, fresh-root, single-GPU forward/backward/update
+2. Run a separately authorized, fresh-root, single-GPU forward/backward/update
    smoke. Formal training and benchmark evaluation remain separate decisions.

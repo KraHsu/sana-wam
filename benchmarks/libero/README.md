@@ -183,9 +183,12 @@ The subsequent full-2B, real-sample, update-free GPU construction smoke is
 recorded in
 [`docs/libero/LIBERO_AR_REAL_GPU_UPDATE_FREE_SMOKE_20260806.md`](../../docs/libero/LIBERO_AR_REAL_GPU_UPDATE_FREE_SMOKE_20260806.md).
 It validates one finite AR architecture forward, not training or benchmark
-quality.
+quality. The T1 choice, statistics boundary, and prepared one-update smoke are
+recorded in
+[`docs/libero/LIBERO_AR_T1_AND_STATS_PREUPDATE_DECISION_20260806.md`](../../docs/libero/LIBERO_AR_T1_AND_STATS_PREUPDATE_DECISION_20260806.md).
 
-Normalization stats can be materialized without decoding Parquet or video:
+Metadata-only normalization stats can be materialized without decoding Parquet
+or video:
 
 ```bash
 python scripts/build_libero_stats.py \
@@ -195,6 +198,16 @@ python scripts/build_libero_stats.py \
   /DATA/share/LIBERO/libero/libero_goal_no_noops_1.0.0_lerobot \
   /DATA/share/LIBERO/libero/libero_10_no_noops_1.0.0_lerobot
 ```
+
+This command is suitable only for non-formal interface and architecture
+smokes. Its pooled suite metadata includes all 1,693 episodes, including the
+state/action rows of Goal episode 82, while the actual training sampler excludes
+that complete episode. The resulting H200 artifact has SHA256
+`333b2cb1e150b451ee1cf6833b1e628ebb50914a466f2cb1fa1808cff8e9f2d0` and must
+not be placed in `training.action_stats_sha256`. Exact production statistics
+must instead be recomputed from the unique selected Parquet rows at the fresh
+path reserved by the training template; that producer remains a pre-training
+task.
 
 The current H200 Goal snapshot has a corrupted wrist video for episode 82.
 The Isaac-GR00T patch available locally belongs to a different 169-frame

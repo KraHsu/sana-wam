@@ -39,6 +39,7 @@ def validate_libero_training_config(
         "model.architecture.state_dim": LIBERO_STATE_DIM,
         "model.architecture.use_proprioception": True,
         "model.architecture.delta_action": False,
+        "model.video_backbone.continuous_timestep_conditioning": True,
         "dataloader.action_mode": LIBERO_ACTION_MODE,
         "dataloader.state_mode": LIBERO_STATE_MODE,
         "dataloader.normalize_mode": "min-max",

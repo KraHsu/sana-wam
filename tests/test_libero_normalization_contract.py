@@ -47,7 +47,8 @@ def _libero_config(*, stats_sha256: str | None = None):
                     "state_dim": 8,
                     "use_proprioception": True,
                     "delta_action": False,
-                }
+                },
+                "video_backbone": {"continuous_timestep_conditioning": True},
             },
             "dataloader": {
                 "type": "libero",
@@ -147,6 +148,16 @@ def test_training_contract_rejects_model_or_temporal_semantic_drift() -> None:
     validate_libero_training_config(cfg)
     OmegaConf.update(cfg, "model.architecture.action_dim", 20, merge=False)
     with pytest.raises(ValueError, match="action_dim"):
+        validate_libero_training_config(cfg)
+
+    cfg = _libero_config()
+    OmegaConf.update(
+        cfg,
+        "model.video_backbone.continuous_timestep_conditioning",
+        False,
+        merge=False,
+    )
+    with pytest.raises(ValueError, match="continuous_timestep_conditioning"):
         validate_libero_training_config(cfg)
 
 

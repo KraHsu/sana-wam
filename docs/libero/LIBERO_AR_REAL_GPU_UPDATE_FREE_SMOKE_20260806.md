@@ -133,17 +133,22 @@ model:
 Without this field, the first real model forward deterministically fails with
 `frame_is_pad requires configured AR chunkwise temporal operators`.
 
-## Remaining blockers before training
+## Successor decision and remaining boundary
 
-1. Materialize immutable training-split-only action/state stats at the
-   production path and pin its SHA in the training config.
-2. Decide and freeze the intended LIBERO video timestep contract. The current
-   source config uses integerized BF16 T0 conditioning
-   (`continuous_timestep_conditioning=false`), rather than the newer FP32
-   continuous T1 path.
-3. Run a separately authorized single-GPU update smoke only after the first
-   two contracts close. Formal training and benchmark evaluation remain
-   unauthorized.
+The successor architecture-validation path selects continuous FP32 T1. The
+choice, its limited RoboTwin offline evidence, the frozen-video compatibility
+risk, and the distinction between non-formal metadata stats and future exact
+training-row stats are recorded in
+[`LIBERO_AR_T1_AND_STATS_PREUPDATE_DECISION_20260806.md`](LIBERO_AR_T1_AND_STATS_PREUPDATE_DECISION_20260806.md).
+
+The update-free PASS recorded above remains a T0 run: its frozen config omitted
+`continuous_timestep_conditioning`, so the implementation defaulted to false.
+The successor T1 decision does not retroactively relabel that evidence.
+
+The metadata-bootstrap stats may be used only for a separately authorized
+single-GPU one-update architecture smoke. Exact exclusion-aware statistics and
+a pinned SHA remain mandatory before formal training. Formal training and
+benchmark evaluation remain unauthorized.
 
 The gradient-checkpointing propagation blocker recorded by this smoke was
 closed by the successor source/CPU-test work documented in

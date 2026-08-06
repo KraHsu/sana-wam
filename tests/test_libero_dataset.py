@@ -311,7 +311,8 @@ def test_launcher_rejects_libero_dimension_or_delta_drift() -> None:
                 "state_dim": 8,
                 "use_proprioception": True,
                 "delta_action": False,
-            }
+            },
+            "video_backbone": {"continuous_timestep_conditioning": True},
         },
         "dataloader": {
             "type": "libero",
@@ -345,6 +346,7 @@ def test_training_template_matches_benchmark_checkpoint_contract() -> None:
     )
     dataloader = template["dataloader"]
     architecture = template["model"]["architecture"]
+    video_backbone = template["model"]["video_backbone"]
 
     assert dataloader["benchmark_contract"] == _contract()
     assert dataloader["action_mode"] == LIBERO_ACTION_MODE
@@ -354,3 +356,4 @@ def test_training_template_matches_benchmark_checkpoint_contract() -> None:
     assert architecture["action_dim"] == 7
     assert architecture["state_dim"] == 8
     assert architecture["ar_chunkwise_temporal_ops"] is True
+    assert video_backbone["continuous_timestep_conditioning"] is True
