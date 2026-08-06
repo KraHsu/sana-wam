@@ -1,6 +1,6 @@
 # LIBERO T9 Four-Phase Latin-Square Core Screen
 
-Status: **candidate pre-registration / not executed**
+Status: **C/D arms frozen valid / CPU aggregate pending**
 
 Date: 2026-08-06
 
@@ -163,6 +163,45 @@ The arm roots are fixed to:
 An invalid C or D arm has no scientific status and cannot contribute to the
 combined result. There is no result-dependent extension or automatic rerun.
 
+### 4.1 Frozen C/D executions
+
+Both arms executed exactly once from source commit
+`f73a7950eded2787ad57b26523da686dc5722512` with arm-runner SHA256
+`d0d4cacf35d4116db3a8c166ffcdc92578a28f5037614a960e22b4ccbcc4a84c`
+on physical GPU 0 / UUID
+`GPU-1ec28cfb-f501-23f3-f865-275a744ca053`. Each reproduced the frozen
+starting losses and recorded exactly 8 preparations, 44 forwards, 24
+measurements, 20 backwards, and 20 optimizer steps. Neither loaded or saved a
+SANA-WAM training checkpoint, ran a simulator, or performed benchmark/formal
+evaluation.
+
+- C nonce `5b1425bc07c1162fe6eb0f04164f9b9e`, root
+  `/DATA/share/sana_wam_libero_nonformal_screens/t9/f73a7950eded/libero-t9-arm-c-latin-fixed20-5b1425bc07c1162fe6eb0f04164f9b9e`,
+  RESULT SHA256
+  `213d61f4a63f42983e4a42db6db9410279cc6a898bffcf11f157c560adf39771`,
+  verdict `T9_LATIN_ARM_C_VALID`;
+- D nonce `741c81a12b6dda6592d9cc89b1b78765`, root
+  `/DATA/share/sana_wam_libero_nonformal_screens/t9/f73a7950eded/libero-t9-arm-d-latin-fixed20-741c81a12b6dda6592d9cc89b1b78765`,
+  RESULT SHA256
+  `7326bff58efe3b5d07e83db96aefe539f5da36e30ef453d3404166dade38aca0`,
+  verdict `T9_LATIN_ARM_D_VALID`.
+
+The frozen per-suite diagnostics are:
+
+| Arm | Suite | k | q phase | q terminal | terminal / phase |
+|---|---|---:|---:|---:|---:|
+| C | Spatial | 1 | 0.1613527581 | 0.8520549099 | 5.2806962814 |
+| C | Object | 0 | 0.4574664142 | 0.4574664142 | 1.0000000000 |
+| C | Goal | 3 | 2.0848917111 | 1.1307392171 | 0.5423491355 |
+| C | LIBERO-10 | 2 | 0.4660701868 | 0.9862132306 | 2.1160186995 |
+| D | Spatial | 2 | 3.2107157317 | 0.3584876270 | 0.1116534932 |
+| D | Object | 1 | 1.2467110249 | 0.2303102918 | 0.1847343027 |
+| D | Goal | 0 | 0.3174111524 | 0.3174111524 | 1.0000000000 |
+| D | LIBERO-10 | 3 | 0.5941060496 | 0.4552422189 | 0.7662642371 |
+
+These phase-overwrite values remain diagnostics only. The frozen combined
+classifier below uses terminal/pre losses from all four arms.
+
 ## 5. Complete Latin-square assembly
 
 The combined classifier runs on CPU only after T7, T8, C, and D results are
@@ -243,6 +282,23 @@ within this four-phase cyclic design.
 
 ## 7. Required combined summary
 
+The standard-library-only CPU harness is
+`scripts/summarize_libero_ar_t9_latin_square.py`. It accepts the exact C/D
+RESULT paths and SHA256 values, the aggregator's own expected source commit
+and runner SHA256, plus one fresh nonce/root. The T7/T8 roots and pins, and the
+completed C/D arm source commit and runner SHA256, are constants rather than
+caller-selectable alternatives. Its only permitted root shape is:
+
+```text
+/DATA/share/sana_wam_libero_nonformal_screens/t9_aggregate/<source-commit-12>/libero-t9-latin-square-combined-<nonce>
+```
+
+The root is exclusive and terminal: success or failure writes one canonical
+`RESULT.json`, then freezes files to `0444` and directories to `0555`. Input
+roots must themselves be non-symlink, frozen, single-RESULT roots with
+canonical JSON. C and D must bind the same T9 source/arm-runner/config while
+using distinct roots and nonces.
+
 The CPU aggregate records:
 
 - the pinned T7, T8, C, and D result/source identities;
@@ -265,5 +321,5 @@ deployment. Its next decision is whether a common terminal-position effect is
 strong enough to motivate changing the update strategy, or whether
 identity-sensitive interference requires a different core experiment.
 
-No arm, root, nonce, GPU assignment, source SHA, or result exists under this
-candidate document yet.
+C and D now exist only as the frozen non-formal roots pinned in section 4.1.
+No combined aggregate root or combined verdict exists at this document state.
