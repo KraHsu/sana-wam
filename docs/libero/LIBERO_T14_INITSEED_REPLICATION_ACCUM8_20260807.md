@@ -1,6 +1,7 @@
 # LIBERO T14：Fresh-Initialization-Seed Replication
 
-状态：**source implementation；尚未创建运行 root，尚未执行 GPU screen。**
+状态：**已执行；valid frozen non-formal result；科学 verdict 为
+`T14_INITSEED_REPLICATION_ACCUM8_BALANCED_JOINT_REPLICATED`。**
 
 T14 是 T13 的单轴复现。它只改变 SANA-WAM `Trainer`、进程和模型构造所用的
 initialization seed，从 `20260806` 改为 `20260807`；数据选择、dataloader seed、
@@ -80,8 +81,8 @@ runner 内冻结每个样本的 parquet、head-camera MP4 和 wrist-camera MP4 S
   `A12,A13,A14,A15,A16,A17,A18,A19` 执行八次 singleton
   forward/backward。
 - 每个 singleton loss coefficient 固定为 `0.125`；八项和为 1。
-- 八次 micro-backward 之间 model parameter、FP32 master、optimizer state、buffer、
-  mode 和 gradient 必须满足预注册 no-mutation 契约。
+- 八次 micro-backward 之间 model parameter、FP32 master 与 optimizer state 必须满足
+  预注册 no-mutation 契约；gradient 按 accumulation 语义正常累积。
 - 第八次 backward 后只允许一次 gradient clip、一次 FP32-master AdamW step、一次
   BF16 projection。
 - 每个 update sample 20 次 raw exposure、累计 coefficient `2.5`；heldout exposure
@@ -139,17 +140,54 @@ root 必须 fresh、排他、one-shot。terminal root 设为 `0500`，且只允�
 mutation；失败只能冻结当前 root，若需要修复必须另行审计并使用新的 source revision
 与 fresh root。
 
-禁止正式训练、benchmark evaluation、simulator/rollout、真实机器人、checkpoint
-load/save、admission、deploy、AV2 或 Global Stage 3。即使得到 `REPLICATED`，结论也
-只覆盖第二个 initialization seed、同四任务、同 16 episodes 和短程 loss-space；不等同
-于 LIBERO success rate，也不授予正式训练或评测资格。
+禁止正式训练、benchmark evaluation、simulator/rollout、真实机器人、SANA-WAM
+training checkpoint load/save、admission、deploy、AV2 或 Global Stage 3。即使得到
+`REPLICATED`，结论也只覆盖第二个 initialization seed、同四任务、同 16 episodes 和
+短程 loss-space；不等同于 LIBERO success rate，也不授予正式训练或评测资格。
 
-## 7. 待填写冻结结果
+## 7. 冻结运行结果
 
-GPU 执行前本节必须保持未完成：
+执行身份：
 
-- source commit：待 source freeze 后填写
-- runner SHA256：待格式化和 source freeze 后填写
-- immutable root：尚未创建
-- RESULT/FAILED SHA256：尚无
-- execution/scientific verdict：尚无
+- source commit：`d230798ec66bd05fb5320bf8862b367fb0dfecbb`
+- runner SHA256：
+  `2e44ed88267bdc8b96deb79533a35f3327ea2e731ac1556c5716caebb4fca73c`
+- immutable root：
+  `/DATA/share/sana_wam_libero_nonformal_screens/t14/d230798ec66b/libero-t14-initseed-replication-accum8-balanced-joint-fixed20-a9d1dd749b4dd62b454324872401cdcb`
+- RESULT SHA256：
+  `9c0e6b5f83e989c76570363ea182a0d547c61ebabc997f760139906bee7a930d`
+- execution verdict：`T14_INITSEED_REPLICATION_ACCUM8_JOINT_ARM_VALID`
+- scientific verdict：
+  `T14_INITSEED_REPLICATION_ACCUM8_BALANCED_JOINT_REPLICATED`
+- physical GPU：0 / `GPU-1ec28cfb-f501-23f3-f865-275a744ca053`
+
+RESULT 是 `310934` bytes 的 canonical JSON+LF；terminal root 为 `0500`，唯一
+`RESULT.json` 为 `0400`。全部 8 个 update 与 8 个 heldout sample 的未舍入 ratio
+均严格小于 1：
+
+| suite | update ratios | heldout ratios | T14 q | T13 q（诊断） |
+|---|---:|---:|---:|---:|
+| Spatial | `0.060421 / 0.064404` | `0.058037 / 0.058695` | `0.060389` | `0.103599` |
+| Object | `0.045245 / 0.047849` | `0.056504 / 0.045259` | `0.048714` | `0.124816` |
+| Goal | `0.055089 / 0.062708` | `0.063551 / 0.054517` | `0.058966` | `0.131623` |
+| LIBERO-10 | `0.055452 / 0.055380` | `0.055519 / 0.054554` | `0.055226` | `0.079014` |
+
+update ratio median 为 `0.055415958169840594`，heldout ratio median 为
+`0.056011665064723035`。四个 T14 `q` 都严格低于对应 T13 `q`；该结果是有利的
+初始化敏感性诊断，但按冻结契约排除在 scientific classifier 外，不能用来改变或扩大
+16/16 严格改善 verdict 的含义。
+
+运行精确执行 `16 prepare / 192 forward / 160 backward / 20 optimizer step`，其中
+measurement/training forwards 分别为 `32 / 160`；20/20 macro 均通过八次
+micro-backward 间 model parameter、FP32 master 与 optimizer state 的 no-mutation
+证据。20 个 accumulation-8 macro update 加 32 次 measurement 耗时
+`251.69797796569765 s`。update 阶段 CUDA peak allocated/reserved 分别为
+`44551804416 / 49673142272` bytes。
+
+本次只加载冻结 SANA base construction checkpoint；没有加载或保存 SANA-WAM training
+checkpoint，没有执行 simulator、rollout、benchmark evaluation 或 formal training。
+唯一运行 warning 是预期的 SANA partial load（`280 missing / 0 unexpected`），没有
+secondary diagnostic warning。T14 因而在第二个 initialization seed 上复现了 T13
+的多 episode accumulation-8 短程保持结论，为该定性结论不局限于 seed `20260806`
+提供了直接证据；覆盖面仍只有两个 seed，且不构成 rollout success、正式训练或
+benchmark admission。
