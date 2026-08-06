@@ -68,7 +68,9 @@ performing a second numeric reduction over all selected rows.
 ## Producer
 
 The dedicated producer accepts one config and takes its output path only from
-`dataloader.action_stats_path`:
+`dataloader.action_stats_path`. The exact one-time command below was run from
+source commit `a7350bc1a7d8b5d586df0202a94a950207c7ce4f` while both source pins were
+null:
 
 ```bash
 CUDA_VISIBLE_DEVICES=-1 .venv/bin/python \
@@ -83,6 +85,8 @@ counts differ from 4 suites / 1,693 source episodes / 1,692 selected episodes /
 271,644 action rows. Every gate runs before publication, so a rejected build
 does not occupy the reserved path. Publication uses a temporary file,
 file/directory fsync, exclusive hard-link creation, and mode `0444`.
+The checked-in config is now pinned and the target exists, so repeating that
+command intentionally fails closed.
 
 ## CPU synthetic verification
 
@@ -98,16 +102,30 @@ Trainer, freeze, mini-AR, and LIBERO suite passed 124 tests with 14 pre-existing
 dependency warnings. Compilation, Ruff check, and Ruff formatting checks
 passed with CUDA hidden.
 
-## Current boundary and next experiment
+## CPU real-data materialization
 
-This change has not scanned the real LIBERO Parquet population and has not
-created the reserved `/DATA/share/LIBERO/sana_wam_libero_train_all4_excl_goal82_stats_v2.npy`
-artifact. No GPU, model, optimizer, training, checkpoint, simulator, or
-evaluation path was executed.
+The authorized CPU-only materialization completed once on 2026-08-06:
 
-After separately authorized CPU real-data materialization, the expected live
-population is 1,692 selected episodes, 273,336 state rows, and 271,644 action
-rows with exactly Goal episode 82 excluded. The next architecture experiment
-is a separately authorized bounded LIBERO T2 multi-step learnability screen on
-a fixed small slice, with a fresh root and checkpoint load/save disabled. It is
-not formal training or benchmark evaluation.
+- artifact: `/DATA/share/LIBERO/sana_wam_libero_train_all4_excl_goal82_stats_v2.npy`;
+- mode/owner/size: `0444`, `zch:sharegrp`, 351,803 bytes;
+- artifact SHA256:
+  `e5d985903539c1767a246e63c629b214c47c395d2000dee44122b8a0672253c7`;
+- population-manifest SHA256:
+  `7ed9772facf261299022e55169bcdaaa49fe3a7a20e0057e08cf419b5e584146`;
+- selection-contract SHA256:
+  `bff79d8a8aa5e111b3cd94dc79117bdde9e3c605fe254cb968a942e5a2e305b5`;
+- population: 4 suites, 1,693 source episodes, 1,692 selected episodes,
+  exactly 1 excluded episode, 273,465 source state rows, 273,336 selected
+  state rows, and 271,644 supervised action rows.
+
+After the two SHA pins were written into the training config, the formal
+pre-Trainer CPU preflight passed, including live manifest reconstruction and
+exact recomputation of every numeric statistics array. No GPU, model, Trainer,
+optimizer, training, checkpoint, simulator, or evaluation path was executed.
+
+## Next experiment
+
+The next architecture experiment is a separately authorized bounded LIBERO T2
+multi-step learnability screen on a fixed small slice, with a fresh root and
+checkpoint load/save disabled. It is not formal training or benchmark
+evaluation.

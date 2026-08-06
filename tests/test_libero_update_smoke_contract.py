@@ -28,17 +28,19 @@ def _calls(tree: ast.AST) -> set[str]:
     return result
 
 
-def test_libero_source_template_freezes_t1_and_future_exact_stats_path() -> None:
+def test_libero_source_template_pins_materialized_selected_row_stats() -> None:
     config = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
 
-    assert config["model"]["video_backbone"][
-        "continuous_timestep_conditioning"
-    ] is True
+    assert config["model"]["video_backbone"]["continuous_timestep_conditioning"] is True
     assert config["dataloader"]["action_stats_path"].endswith(
         "sana_wam_libero_train_all4_excl_goal82_stats_v2.npy"
     )
-    assert config["training"]["action_stats_sha256"] is None
-    assert config["training"]["action_stats_population_sha256"] is None
+    assert config["training"]["action_stats_sha256"] == (
+        "e5d985903539c1767a246e63c629b214c47c395d2000dee44122b8a0672253c7"
+    )
+    assert config["training"]["action_stats_population_sha256"] == (
+        "7ed9772facf261299022e55169bcdaaa49fe3a7a20e0057e08cf419b5e584146"
+    )
     assert config["training"]["preserve_frozen_input_grad_modules"] == [
         "video_backbone"
     ]
@@ -84,7 +86,7 @@ def test_one_update_runner_has_narrow_execution_surface() -> None:
     assert "EXPECTED_PRESERVE_FROZEN_INPUT_GRAD_MODULES" in source
     assert "EXPECTED_TRAINABLE_TENSOR_COUNT" in source
     assert "EXPECTED_TRAINABLE_PARAMETER_COUNT" in source
-    assert 'cfg.training.optimizer_master_weights is not True' in source
+    assert "cfg.training.optimizer_master_weights is not True" in source
     assert '"master_update"' in source
     assert '"projected_bf16_update"' in source
     assert '"_sana_wam_no_grad_wrapped"' in source

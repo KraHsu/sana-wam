@@ -187,8 +187,8 @@ training:
   deepspeed: null
   seed: 20260806
   debug: false
-  # Must be filled with the generated stats SHA before any training authority.
-  action_stats_sha256: null
+  # Immutable selected-row v2 artifact materialized CPU-only on 2026-08-06.
+  action_stats_sha256: e5d985903539c1767a246e63c629b214c47c395d2000dee44122b8a0672253c7
   # Must independently pin the selected-row v2 population manifest embedded
   # in the stats artifact; metadata-only v1 stats have no admissible value.
-  action_stats_population_sha256: null
+  action_stats_population_sha256: 7ed9772facf261299022e55169bcdaaa49fe3a7a20e0057e08cf419b5e584146
