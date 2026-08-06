@@ -1,6 +1,7 @@
 # LIBERO T15：Global Fixed-Recipe-Seed Replication
 
-状态：**source implementation；尚未创建运行 root，尚未执行 GPU screen。**
+状态：**GPU screen 已完成并冻结；有效执行，16/16 ratio 严格 `<1`，
+global fixed-recipe-seed 复现通过。**
 
 T15 是 T14 的单轴复现：只把所有 192 次 forward 共用的 fixed loss-recipe seed 从
 `20260826` 改为 `20260827`。initialization seed、dataloader seed、config、16 个样本、
@@ -138,10 +139,77 @@ deploy、AV2 或 Global Stage 3。
 smoke，并在取得新增 simulator/checkpoint 权限前不执行。若 T15 不 replicated，则冻结
 失败科学 verdict，先分析 recipe 敏感性，不自动重跑。
 
-## 7. 待填写冻结结果
+## 7. 冻结身份与结果
 
-- source commit：待 source freeze
-- runner SHA256：待格式化与 source freeze
-- immutable root：尚未创建
-- RESULT/FAILED SHA256：尚无
-- execution/scientific verdict：尚无
+- source commit：`d669a2e0bc201941fd911f484df36d7afec44cd6`
+- runner SHA256：
+  `25ebbe148287a7ee9795f56e9253b1db238d0cf5dbea52778c7b61932ee9023a`
+- nonce：`9732531de18094840229d7ca0598a648`
+- GPU：physical GPU 0，
+  `GPU-1ec28cfb-f501-23f3-f865-275a744ca053`
+- immutable root：
+  `/DATA/share/sana_wam_libero_nonformal_screens/t15/d669a2e0bc20/libero-t15-loss-recipe-seed-replication-accum8-balanced-joint-fixed20-9732531de18094840229d7ca0598a648`
+- RESULT：`313690` bytes，canonical UTF-8 sorted compact JSON + final LF
+- RESULT SHA256：
+  `9e4ee9cb515e5cfafc5598eff33041232ad702b32e641b26435bcb1c643820b7`
+- execution verdict：
+  `T15_LOSS_RECIPE_SEED_REPLICATION_ACCUM8_JOINT_ARM_VALID`
+- scientific verdict：
+  `T15_LOSS_RECIPE_SEED_REPLICATION_ACCUM8_BALANCED_JOINT_REPLICATED`
+
+root 已冻结为 `0500`，唯一 terminal 文件 `RESULT.json` 已冻结为 `0400`；
+进程退出码为 0，退出后指定 GPU 上无 compute process。
+
+## 8. 未舍入数值结果
+
+| suite | update ratios | heldout ratios | T15 `q` | `q - T14 q` |
+|---|---|---|---:|---:|
+| Spatial | A12 `0.05855667346799558`, A13 `0.06311710241127066` | H12 `0.07591331024723302`, H13 `0.08491452087955839` | `0.07062540175151441` | `+0.010236420675618543` |
+| Object | A14 `0.04384963566930872`, A15 `0.045794253548511986` | H14 `0.03905547885554516`, H15 `0.12062984005446141` | `0.06233230203195682` | `+0.013618056287729906` |
+| Goal | A16 `0.057714160550297905`, A17 `0.06551929631611449` | H16 `0.0783754119283018`, H17 `0.07015831533762534` | `0.06794179603308488` | `+0.008975596871972816` |
+| LIBERO-10 | A18 `0.03814969204189277`, A19 `0.03538701931828637` | H18 `0.051707981996862315`, H19 `0.04530126764471062` | `0.04263649025043802` | `-0.012589811931840632` |
+
+- update median ratio：`0.05175420704940495`
+- heldout median ratio：`0.07303581279242918`
+- 最差 ratio：H15 `0.12062984005446141`，仍距失败边界 `1.0` 很远。
+- T15 全局 recipe signature：
+  `1ed9a3c26a9035f9b58a38df471dc09fb62a5b9110d08c99488a1eb7e96b69c5`；
+  192/192 forward 唯一且一致，并与 T14 signature 不同。
+- T14 对比只是次要诊断：四个 suite 中仅 LIBERO-10 的 `q` 低于 T14；
+  这不影响预先冻结的 16/16 classifier。
+
+## 9. 执行与不变性证据
+
+- 精确计数：`16 prepare / 32 measurement forward / 160 training forward /
+  160 backward / 20 optimizer step`。
+- A12–A19 各进入 20 次 update forward，H12–H19 的 backward/update exposure
+  均为 0。
+- 20/20 macro 均验证八次 micro-backward 之间 model parameters、FP32 master
+  与 optimizer state 不变；20 次 AdamW state 均 finite，每次 BF16 projection
+  与 FP32 master 严格同步。
+- measurement/probe state 不变，prepared inputs 不变且无 alias；heldout 样本
+  未进入 backward 或 update。
+- 终态独立审计 `blocker/major/minor = 0/0/0`；102/102 个 external
+  manifest 文件共 `14029037784` bytes 已逐字节 live rehash，size/SHA 差异为 0。
+  所有 root 祖先 lstat 均无 symlink，source/config/Sana/T14 direct-predecessor pins
+  与 T13/T14 selection bytes 均一致。
+- update 核心加 32 次 measurement 用时 `252.71128380298615 s`；更新峰值
+  allocated/reserved 分别为 `44551804416` / `49673142272` bytes。
+- 唯一捕获 warning 为预期的 SANA base partial load：`280 missing / 0 unexpected`。
+- 未执行 benchmark、simulator、formal training；未加载或保存 SANA-WAM
+  training checkpoint。
+
+## 10. 科学解释与下一门槛
+
+T15 在保持 T14 initialization seed、dataloader seed、数据、任务、样本、优化器和
+20×accum8 拓扑不变时，更换 global fixed-recipe seed 后再次得到 16/16
+严格改善。结合 T14 的 initialization-seed 复现，当前证据支持：这个
+same-cohort loss-fit 现象对已测的两个主要随机轴定性稳健。
+
+该结论仍不是纯 training-recipe 因果效应：同一 recipe seed 同时控制
+measurement 和 training forward，而且 `q` 的定量排序会随 recipe 变化。
+它也不证明闭环控制、rollout success 或 benchmark 能力。
+
+因为预先冻结的停止条件已满足，不再追加同 cohort loss-only seed screen。
+下一核心实验应跨越行为证据门槛：先设计最小闭环 LIBERO behavior smoke，
+在获得 simulator 和必要的 in-memory trained-state/checkpoint 能力后再执行。
