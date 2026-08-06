@@ -708,7 +708,7 @@ motion-sensitive primary；后者正是用于检查前者是否值得扩大投�
   CACH-A4 reduced path = REDUCED_ARCH_STOP
   AV-4 = NOT_UNLOCKED
   review token = CONSUMED
-  independent LIBERO production-shaped AR path = T9 common-position effect supported
+  independent LIBERO production-shaped AR path = T10 balanced joint retention supports overwrite
 
 未开始或未通过：
   full CACH v0 package validation
@@ -751,6 +751,7 @@ training checkpoint，也没有运行 simulator 或 benchmark evaluator。
 | T7 | A0-A3 四套件循环 5 轮，共 20 updates；每套件一个同任务 fresh heldout | typed numerical `T7_FOUR_SUITE_CYCLIC_GO` / audit-qualified | A median ratio `0.625211`，H median `0.636552`，3/4 对应套件双改善；Spatial A/H 分别回退 `9.48% / 7.63%` |
 | T8 | 同一 A/H、同一剂量，仅把循环相位旋转为 `[Object,Goal,LIBERO-10,Spatial] × 5`，并在各套件第五次更新后加 phase probes | `T8_PHASE_ROTATED_MIXED_INCONCLUSIVE` | Spatial A/H 被救回，Object A/H 转为回退；2/3 nonterminal overwrite 过阈值，但 `rho_recency=0.4` 未过 `0.8` |
 | T9 | 补齐循环相位 C=`[Goal,LIBERO-10,Spatial,Object]×5` 与 D=`[LIBERO-10,Spatial,Object,Goal]×5`，再只读组合 T7/T8/C/D | `T9_COMMON_POSITION_EFFECT_SUPPORTED` | 4/4 suite 均 `q(3)>q(0)`，Object/Goal/LIBERO-10 的 `rho>=0.8`，故 `endpoint_count=4, strong_count=3`；Spatial `rho=0.4` |
+| T10 | matched SEQ 与四套件等权 JOINT 各 20 macro steps；每个 macro 固定 A0-A3 四次 micro-backward 后仅一次 update | `T10_BALANCED_JOINT_SIMULTANEOUS_RETENTION_SUPPORTS_OVERWRITE` | SEQ 对 T7 八个 terminal loss 零误差复现；JOINT 的 8/8 `rA/rH<1`，4/4 q 低于 T9 median，3/4 suite componentwise Pareto 优于 SEQ |
 
 T4 的 frozen training-core expected/observed projection SHA256 均为
 `e34a2dd0ae2dfe28303dcd9baf64ffc5800d002b0b7646b89dde2aafa132c352`，排除了
@@ -834,6 +835,26 @@ T9 保持同一个模型、初始化、recipe、八个样本和每样本五次�
 `T9_COMMON_POSITION_EFFECT_SUPPORTED`。这支持共同的终端位置/保留干扰，但不表示每个
 suite 都单调；Spatial 明显非单调，LIBERO-10 在 k2 达到最差值。
 
+T10 用 matched-core 两臂直接检验该位置效应是否来自 sequential optimizer overwrite。
+SEQ 与 JOINT 都从 seed `20260806` 的 fresh model/empty optimizer 启动，都在每个 macro
+按 A0-A3 固定顺序执行四次 forward/backward，再进行一次 clip、一次 persistent FP32-master
+AdamW step 和一次 BF16 projection。SEQ 使用循环 one-hot 权重，JOINT 每步使用
+`[0.25,0.25,0.25,0.25]`；两臂都是 20 optimizer steps、80 backward，每个 A raw exposure
+20 且累计 scalar coefficient 5。因此区别只在四套件梯度是在不同 optimizer state 顺序进入，
+还是在同一个 state 等权聚合。每个 macro 的运行时 identity/version 快照还证明四次
+micro-backward 之间 model parameters、FP32 masters 与 optimizer state 均未更新。
+
+SEQ 逐值复现 T7 的八个 terminal action loss，八项 absolute error 全部为 0，建立了精确
+bridge。JOINT 的 Spatial/Object/Goal/LIBERO-10 `(rA,rH,q)` 分别为
+`(0.276152,0.270262,0.273207)`、`(0.272380,0.254421,0.263401)`、
+`(0.294436,0.352028,0.323232)`、`(0.186363,0.188152,0.187258)`。8/8 `rA/rH`
+严格小于 1，故按预注册第一分支产生
+`T10_BALANCED_JOINT_SIMULTANEOUS_RETENTION_SUPPORTS_OVERWRITE`。诊断上 JOINT 的 4/4 q
+均低于 T9 四位置 median，且 Spatial/Object/Goal componentwise Pareto 优于 SEQ；
+LIBERO-10 的 SEQ q 更低，但 JOINT 仍同时保留强 fit。该结果是在完全 matched update/dose
+下的 capacity witness，强支持顺序覆盖的操作性解释，但不证明 gradient averaging 是唯一
+机制，也不等价于 rollout 或正式 benchmark 成功。
+
 主要冻结证据：
 
 | Run | Immutable root | RESULT SHA256 |
@@ -849,15 +870,22 @@ suite 都单调；Spatial 明显非单调，LIBERO-10 在 k2 达到最差值。
 | T9 arm C | `/DATA/share/sana_wam_libero_nonformal_screens/t9/f73a7950eded/libero-t9-arm-c-latin-fixed20-5b1425bc07c1162fe6eb0f04164f9b9e` | `213d61f4a63f42983e4a42db6db9410279cc6a898bffcf11f157c560adf39771` |
 | T9 arm D | `/DATA/share/sana_wam_libero_nonformal_screens/t9/f73a7950eded/libero-t9-arm-d-latin-fixed20-741c81a12b6dda6592d9cc89b1b78765` | `7326bff58efe3b5d07e83db96aefe539f5da36e30ef453d3404166dade38aca0` |
 | T9 aggregate | `/DATA/share/sana_wam_libero_nonformal_screens/t9_aggregate/b7cded5fd9cf/libero-t9-latin-square-combined-ab99dd8758ef03bb191d5fb48f3b9fbc` | `0cfc53b820939123de4bc2a626380495878d4d5c9a37a0be9be667173254149d` |
+| T10 SEQ | `/DATA/share/sana_wam_libero_nonformal_screens/t10/6861e5a13fa8/libero-t10-seq-matched-core-fixed20-0d211cfc62324c0f4ab506cad2fd76f6` | `d92fe05fe523c346e90ab6a392ddad9c3ec41764d5581211e6223895a42e8937` |
+| T10 JOINT | `/DATA/share/sana_wam_libero_nonformal_screens/t10/6861e5a13fa8/libero-t10-joint-matched-core-fixed20-561f95c143f58bc635259bff41ef4366` | `423ce3e01bea7368786b1c470a790af666baf7504a2235894a59b82efef3ea9b` |
+| T10 aggregate | `/DATA/share/sana_wam_libero_nonformal_screens/t10_aggregate/128e1be8cd48/libero-t10-exact-balanced-joint-combined-f77c1cd125343922634395db86812db9` | `8fcd26ea3a59fe6e01cf8f279301c899ed5dab541ada9c57e2ce85888abd147b` |
 
-当前可以支持的最强结论是：在一次初始化和固定 recipe 下，完整 production-shaped AR
-path 不仅具备单样本 learnability 和多轴 update-free loss transfer，也能用一个 persistent
-optimizer 在 20 次四套件循环更新中通过 train/fresh 双 median 与 3/4 联合改善数值门。
-T8 表明主要回退对象会随终端相位从 Spatial 转移到 Object；T9 补齐四相位后进一步支持
-共同的 terminal-position/retention effect：四套件的最旧端点都差于最新端点，且三套件
-呈强 rank trend。该结论仍允许显著 identity interaction 和非单调中间位置，不能简化为
-一个严格指数 recency law。T7/T8/T9 probes 仍属于训练 metadata 与 normalization population；结果不证明
-closed-loop success、LIBERO benchmark performance、suite-level distribution
-generalization、稳定长程优化或正式训练。任何后续实验仍需 fresh source/root，不能把
-T7 GO、T8 的诊断性 joint gate 或 T9 的 common-position verdict 直接升级成正式训练或
-benchmark 授权。
+当前可以支持的最强结论是：在一次初始化、固定八个真实样本和固定 recipe 下，完整
+production-shaped AR path 不仅具备单样本 learnability 与多轴 update-free loss transfer，
+而且其四套件顺序训练中的共同 position/retention penalty 可被 exact-balanced joint
+objective 消除。T10 的 matched SEQ 精确复现 T7，排除了新 harness 改变历史 sequential
+path 的解释；matched JOINT 在相同 optimizer-step、raw-backward 和累计 loss coefficient
+预算下让 8/8 train/fresh ratios 同时低于 1。因此 balanced simultaneous multi-suite
+objective 是当前最有证据支持的 successor training topology，继续旋转 sequential phase
+不再是高价值核心实验。
+
+该结论仍是 single-seed、fixed-sample、non-formal loss-space evidence。T7-T10 probes
+属于训练 metadata 与 normalization population；结果不证明 closed-loop success、LIBERO
+benchmark performance、suite-level distribution generalization、长程 optimizer stability
+或正式训练。下一步应把 balanced objective 扩展到更多独立样本/mini-batch 的短程
+production-path 验证，并保持 fresh source/root；在那之前不能把 T10 verdict 直接升级成
+正式训练、checkpoint 或 benchmark admission。
