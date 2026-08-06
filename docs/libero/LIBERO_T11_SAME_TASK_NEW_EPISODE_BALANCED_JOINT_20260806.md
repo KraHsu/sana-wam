@@ -1,6 +1,8 @@
 # LIBERO T11：同任务、新 episode 的 balanced-JOINT 复现
 
-状态：**冻结的 non-formal 单 GPU 架构/优化拓扑 screen 候选；尚未执行。**
+状态：**已执行并冻结；执行 verdict 为
+`T11_NEW_EPISODE_JOINT_ARM_VALID`，科学 verdict 为
+`T11_SAME_TASK_NEW_EPISODE_BALANCED_JOINT_REPLICATED`。**
 
 T11 只回答一个核心问题：T10 的 balanced-JOINT 在同一四个任务、但完全不同的
 update/probe episodes 上，是否仍能令四个 update loss 与四个 held-out loss 同时下降。
@@ -139,3 +141,54 @@ RESULT 另记录每个 suite 的 `q=(rA+rH)/2`、冻结的 T10 JOINT `q`、两�
 - 禁止 simulator、rollout、benchmark evaluation、正式训练、admission、完整 2B、部署。
 - 本 screen 仅有一个 seed、每 suite 一对新 episodes，不能据此声称 benchmark success
   或正式训练 readiness。
+
+## 6. 冻结执行结果
+
+本轮仅执行一次，没有重跑或扩展预算。冻结身份与证据为：
+
+- source commit：`7d53d618234e3e37367c5b1e39e169742c2cf514`
+- runner SHA256：
+  `ab66fcf6052582631424c97f149c9187d942b1da253e201fc698142e5ad41b54`
+- immutable root：
+  `/DATA/share/sana_wam_libero_nonformal_screens/t11/7d53d618234e/libero-t11-same-task-new-episode-balanced-joint-fixed20-05e0d719fbc5c25e66ddf435cb47eba2`
+- nonce：`05e0d719fbc5c25e66ddf435cb47eba2`
+- RESULT SHA256：
+  `6da12f2e3622d4e6427070bfd10b3dab9550c338a834b7662309cefea98d7417`
+- 冻结权限：root `0500`，`RESULT.json` `0400`；文件是唯一 canonical
+  terminal result。
+- 物理 GPU 0：`GPU-1ec28cfb-f501-23f3-f865-275a744ca053`。
+
+四个 suite 的未舍入 ratio 与诊断性 `q=(rA+rH)/2` 如下。八个 ratio
+全部严格小于 1，因此按冻结分类器唯一进入 `REPLICATED` 分支。
+
+| suite | `rA` | `rH` | `q` | T10 JOINT `q` | `q - q_T10` |
+|---|---:|---:|---:|---:|---:|
+| Spatial | `0.20113512209310244` | `0.20696124596611650` | `0.20404818402960948` | `0.27320731955314786` | `-0.06915913552353839` |
+| Object | `0.19894518695843905` | `0.20661460291178890` | `0.20277989493511397` | `0.26340073735799435` | `-0.06062084242288038` |
+| Goal | `0.25910625185730085` | `0.22687573827231447` | `0.24299099506480765` | `0.32323180400807430` | `-0.08024080894326663` |
+| LIBERO-10 | `0.13246952172421890` | `0.13349105932495006` | `0.13298029052458450` | `0.18725771119867107` | `-0.05427742067408659` |
+
+update 与 held-out ratio 的中位数分别为 `0.20004015452577073` 和
+`0.20678792443895272`。四个 T11 `q` 也都低于对应的冻结 T10 JOINT
+`q`；这只是跨 episode 难度/优化幅度诊断，不参与科学 verdict。
+
+执行账本与资源观测与冻结预算一致：8 次 `prepare_inputs`、96 次
+architecture forward（其中 80 次 training、16 次 measurement）、80 次
+backward、20 次 macro optimizer step；每个 A 的 raw exposure 是 20、累计
+loss coefficient 是 5，H 从未参与 backward/update。20/20 macro 的
+no-intra-macro mutation 证据全部通过。模型与数据集构造耗时
+`40.55068732984364 s`，八个样本 prepare 合计约 `3.27397 s`，二十个 macro
+update 加十六次 measurement 耗时 `125.35481818392873 s`。update 阶段
+peak allocated/reserved 分别为 `32,521,826,816` / `37,557,895,168` bytes，
+约 `30.288311` / `34.978516 GiB`。
+
+结论是：T10 的 balanced simultaneous multi-suite objective 并非只对原固定八个
+episode 有效；在相同四个 task、全新 update/probe episodes 上，它仍然令
+4/4 update 与 4/4 same-task held-out loss 同时改善。这强化了 balanced-JOINT
+作为 successor training topology 的 loss-space 证据，并降低了 T10 结果只是
+episode-specific 巧合的解释力。但它仍是 single-seed、每 suite 只有一对新
+episodes 的 short-horizon non-formal screen；样本属于训练 metadata/
+normalization population，且仅测 action loss。本轮没有运行 simulator、rollout、
+benchmark evaluation 或 formal training，也没有加载/保存 SANA-WAM training
+checkpoint，因而不支持 benchmark success、closed-loop capability 或正式训练
+readiness 声称。
