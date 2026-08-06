@@ -46,6 +46,7 @@ class _DummyArchitecture(nn.Module):
         self.register_buffer("action_std", torch.ones(2))
         self.events = []
         self.load_calls = []
+        self.freeze_calls = []
 
     def set_dtype_device(self, dtype, device):
         self.events.append("set_dtype_device")
@@ -61,7 +62,8 @@ class _DummyArchitecture(nn.Module):
     def set_training_runtime(self, **kwargs):
         self.events.append(("set_training_runtime", kwargs))
 
-    def freeze_modules(self, names):
+    def freeze_modules(self, names, *, preserve_input_grad=False):
+        self.freeze_calls.append((tuple(names), preserve_input_grad))
         frozen = []
         for name in names:
             try:
@@ -212,6 +214,28 @@ def test_training_mode_restores_frozen_subtrees_to_eval(tmp_path, monkeypatch):
     assert all(module.training for module in architecture.action_backbone.modules())
     assert all(not module.training for module in architecture.video_backbone.modules())
     assert all(not module.training for module in architecture.proprio_encoder.modules())
+
+
+def test_allowlist_can_preserve_inputs_gradients_through_one_frozen_root(
+    tmp_path, monkeypatch
+):
+    cfg = _config(
+        trainable_modules=["action_backbone"],
+        preserve_frozen_input_grad_modules=["video_backbone"],
+    )
+    trainer, _, architecture = _make_trainer(tmp_path, monkeypatch, cfg)
+
+    assert trainer._frozen_input_grad_module_paths == ("video_backbone",)
+    assert (("video_backbone",), True) in architecture.freeze_calls
+    assert (("proprio_encoder",), False) in architecture.freeze_calls
+    assert all(
+        not parameter.requires_grad
+        for parameter in architecture.video_backbone.parameters()
+    )
+    trainer._set_training_mode()
+    assert all(
+        not module.training for module in architecture.video_backbone.modules()
+    )
 
 
 def test_parameter_patterns_select_only_matching_tensors(tmp_path, monkeypatch):
@@ -377,6 +401,53 @@ def test_allowlist_rejects_competing_legacy_freeze(tmp_path, monkeypatch):
     )
     with pytest.raises(ValueError, match="cannot be combined"):
         _make_trainer(tmp_path, monkeypatch, cfg)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        (
+            {"preserve_frozen_input_grad_modules": ["video_backbone"]},
+            "requires training.trainable_modules",
+        ),
+        (
+            {
+                "trainable_modules": ["action_backbone"],
+                "preserve_frozen_input_grad_modules": ["missing"],
+            },
+            "unknown training.preserve_frozen_input_grad_modules",
+        ),
+        (
+            {
+                "trainable_modules": ["action_backbone"],
+                "preserve_frozen_input_grad_modules": [
+                    "video_backbone",
+                    "video_backbone",
+                ],
+            },
+            "duplicate training.preserve_frozen_input_grad_modules",
+        ),
+        (
+            {
+                "trainable_modules": ["action_backbone"],
+                "preserve_frozen_input_grad_modules": ["action_backbone"],
+            },
+            "must name a frozen module",
+        ),
+        (
+            {
+                "trainable_modules": ["action_backbone"],
+                "preserve_frozen_input_grad_modules": ["video_backbone.0"],
+            },
+            "exact top-level module names",
+        ),
+    ],
+)
+def test_invalid_frozen_input_gradient_contracts_fail_closed(
+    tmp_path, monkeypatch, overrides, message
+):
+    with pytest.raises((ValueError, RuntimeError), match=message):
+        _make_trainer(tmp_path, monkeypatch, _config(**overrides))
 
 
 def test_save_initial_checkpoint_helper_writes_step_zero(tmp_path, monkeypatch):

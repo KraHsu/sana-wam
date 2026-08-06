@@ -110,6 +110,7 @@ EXPECTED_TRAINABLE_ROOTS = (
     "proprio_video_embed",
     "proprio_action_embed",
 )
+EXPECTED_PRESERVE_FROZEN_INPUT_GRAD_MODULES = ("video_backbone",)
 _ACTIVE_RUN_ROOT: Path | None = None
 
 
@@ -444,6 +445,13 @@ def main() -> int:
         raise RuntimeError("LIBERO update smoke requires explicit T1=true")
     if tuple(cfg.training.trainable_modules) != EXPECTED_TRAINABLE_ROOTS:
         raise RuntimeError("LIBERO trainable module allowlist differs")
+    if (
+        tuple(cfg.training.preserve_frozen_input_grad_modules)
+        != EXPECTED_PRESERVE_FROZEN_INPUT_GRAD_MODULES
+    ):
+        raise RuntimeError(
+            "LIBERO frozen input-gradient preservation contract differs"
+        )
     if cfg.training.use_gradient_checkpointing is not True:
         raise RuntimeError("LIBERO update smoke requires gradient checkpointing")
     if OmegaConf.select(cfg, "training.init_checkpoint", default=None) is not None:
@@ -553,6 +561,22 @@ def main() -> int:
         raise RuntimeError("live video backbone did not retain T1")
     if trainer._trainable_module_allowlist != EXPECTED_TRAINABLE_ROOTS:
         raise RuntimeError("live Trainer trainable allowlist differs")
+    if (
+        trainer._frozen_input_grad_module_paths
+        != EXPECTED_PRESERVE_FROZEN_INPUT_GRAD_MODULES
+    ):
+        raise RuntimeError(
+            "live Trainer frozen input-gradient preservation differs"
+        )
+    if any(
+        getattr(module, "_sana_wam_no_grad_wrapped", False)
+        for module in video_backbone.modules()
+    ):
+        raise RuntimeError(
+            "preserved video backbone contains a recursive no-grad wrapper"
+        )
+    if any(parameter.requires_grad for parameter in video_backbone.parameters()):
+        raise RuntimeError("preserved video-backbone parameters are not frozen")
 
     named_trainables = [
         (name, parameter)
@@ -590,6 +614,8 @@ def main() -> int:
         raise RuntimeError("LIBERO action alignment differs")
 
     trainer._set_training_mode()
+    if any(module.training for module in video_backbone.modules()):
+        raise RuntimeError("preserved video backbone left eval mode")
     torch.cuda.reset_peak_memory_stats(device)
     prepare_started = time.perf_counter()
     with torch.no_grad():
@@ -819,6 +845,9 @@ def main() -> int:
             "action_dim": architecture.action_dim,
             "class": type(architecture).__name__,
             "continuous_timestep_conditioning": True,
+            "frozen_input_grad_modules": list(
+                EXPECTED_PRESERVE_FROZEN_INPUT_GRAD_MODULES
+            ),
             "parameter_count": sum(
                 parameter.numel() for parameter in architecture.parameters()
             ),

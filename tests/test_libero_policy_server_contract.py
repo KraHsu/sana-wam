@@ -87,6 +87,9 @@ def test_policy_server_exposes_libero_checkpoint_compatibility_identity() -> Non
                 "benchmark_contract": expected,
             },
             "inference": {"episode_noise_mode": "paired"},
+            "training": {
+                "preserve_frozen_input_grad_modules": ["video_backbone"]
+            },
             "policy": {
                 "history_len": 10,
                 "execute_horizon": None,

@@ -553,16 +553,30 @@ class BaseWAMArchitecture(ABC, nn.Module):
                 kwargs["loss_weighting"] = str(action_loss_weighting)
             bb.scheduler.set_timesteps(num_timesteps, **kwargs)
 
-    def freeze_modules(self, names: list[str]) -> list[str]:
+    def freeze_modules(
+        self,
+        names: list[str],
+        *,
+        preserve_input_grad: bool = False,
+    ) -> list[str]:
         """Freeze named sub-modules by dotted path. Returns actually frozen names.
 
-        Single-point freeze API. Two effects per frozen submodule:
+        Single-point freeze API. Every frozen submodule has its parameters
+        disabled and is put in eval mode. By default its complete subtree is
+        also wrapped in ``torch.no_grad``:
 
         1. ``module.requires_grad_(False)`` — optimizer cannot update its params.
         2. ``module.forward`` is wrapped in ``torch.no_grad`` so the frozen
            subtree never saves activations for backward. This is the full
            semantic of "freeze" — neither the trainer nor any backbone needs to
            inspect freeze status separately.
+
+        ``preserve_input_grad=True`` deliberately skips step 2. It is for a
+        frozen parameterized backbone that consumes the output of a separate
+        trainable seam: the backbone parameters stay frozen/eval, while
+        autograd may still differentiate its output with respect to that input.
+        This costs backward activations and must be selected explicitly by the
+        launcher/training contract.
 
         For text_encoder / vae, which are already called under the
         ``@torch.no_grad()`` ``prepare_inputs`` decorator, the wrapper is a
@@ -582,13 +596,22 @@ class BaseWAMArchitecture(ABC, nn.Module):
             except (AttributeError, KeyError):
                 module = None
             if module is not None:
+                if preserve_input_grad and any(
+                    getattr(sub, "_sana_wam_no_grad_wrapped", False)
+                    for sub in module.modules()
+                ):
+                    raise RuntimeError(
+                        "cannot preserve frozen input gradients after the "
+                        f"module subtree was no-grad wrapped: {name}"
+                    )
                 module.requires_grad_(False)
                 # Set eval mode on the frozen subtree. Use modules() instead
                 # of .eval() to avoid infinite recursion when a submodule has
                 # self-referential aliases (e.g. HF model.model = self).
                 for sub in module.modules():
                     sub.training = False
-                _wrap_forward_in_no_grad(module)
+                if not preserve_input_grad:
+                    _wrap_forward_in_no_grad(module)
                 frozen.append(name)
         return frozen
 

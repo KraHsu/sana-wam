@@ -159,6 +159,7 @@ class Trainer:
         self._trainable_module_allowlist: tuple[str, ...] | None = None
         self._trainable_parameter_patterns: tuple[str, ...] | None = None
         self._frozen_module_paths: tuple[str, ...] = ()
+        self._frozen_input_grad_module_paths: tuple[str, ...] = ()
         self._eval_module_paths: tuple[str, ...] = self._resolve_eval_modules()
         frozen = self._configure_trainable_modules()
         promoted = self._configure_trainable_parameter_dtype()
@@ -1082,6 +1083,14 @@ class Trainer:
         """Apply legacy freezes or an exact, fail-closed top-level allowlist."""
         raw_allowlist = self.t.get("trainable_modules", None)
         raw_patterns = self.t.get("trainable_parameter_patterns", None)
+        raw_preserve_input_grad = self.t.get(
+            "preserve_frozen_input_grad_modules", None
+        )
+        if raw_preserve_input_grad is not None and raw_allowlist is None:
+            raise ValueError(
+                "training.preserve_frozen_input_grad_modules requires "
+                "training.trainable_modules"
+            )
         if raw_patterns is not None:
             if raw_allowlist is not None or self.t.get("freeze", None):
                 raise ValueError(
@@ -1183,6 +1192,40 @@ class Trainer:
                 f"available top-level modules: {sorted(top_level)}"
             )
 
+        preserve_input_grad = []
+        if raw_preserve_input_grad is not None:
+            requested = self._as_config_list(
+                raw_preserve_input_grad,
+                "preserve_frozen_input_grad_modules",
+            )
+            for name in requested:
+                if (
+                    not isinstance(name, str)
+                    or not name
+                    or name.strip() != name
+                    or "." in name
+                ):
+                    raise ValueError(
+                        "training.preserve_frozen_input_grad_modules entries "
+                        "must be exact top-level module names"
+                    )
+                if name in preserve_input_grad:
+                    raise ValueError(
+                        "duplicate training.preserve_frozen_input_grad_modules "
+                        f"entry: {name}"
+                    )
+                if name not in top_level:
+                    raise ValueError(
+                        "unknown training.preserve_frozen_input_grad_modules "
+                        f"entry: {name}"
+                    )
+                if name in normalized:
+                    raise ValueError(
+                        "training.preserve_frozen_input_grad_modules must name "
+                        f"a frozen module, got trainable module: {name}"
+                    )
+                preserve_input_grad.append(name)
+
         # Direct architecture parameters have no top-level module owner and are
         # therefore outside the allowlist by definition.
         for parameter in self.architecture.parameters(recurse=False):
@@ -1192,7 +1235,12 @@ class Trainer:
         for name in top_level:
             if name in normalized:
                 continue
-            actually_frozen = self.architecture.freeze_modules([name])
+            if name in preserve_input_grad:
+                actually_frozen = self.architecture.freeze_modules(
+                    [name], preserve_input_grad=True
+                )
+            else:
+                actually_frozen = self.architecture.freeze_modules([name])
             if actually_frozen != [name]:
                 raise RuntimeError(
                     f"failed to freeze non-allowlisted top-level module: {name}"
@@ -1216,6 +1264,7 @@ class Trainer:
 
         self._trainable_module_allowlist = tuple(normalized)
         self._frozen_module_paths = tuple(frozen)
+        self._frozen_input_grad_module_paths = tuple(preserve_input_grad)
         return frozen
 
     def _configure_trainable_parameter_dtype(self) -> int:

@@ -60,7 +60,10 @@ def _libero_config(*, stats_sha256: str | None = None):
                 "training_video_rotation_degrees": 0,
                 "benchmark_contract": _expected_contract(),
             },
-            "training": {"action_stats_sha256": stats_sha256},
+            "training": {
+                "action_stats_sha256": stats_sha256,
+                "preserve_frozen_input_grad_modules": ["video_backbone"],
+            },
         }
     )
 
@@ -158,6 +161,16 @@ def test_training_contract_rejects_model_or_temporal_semantic_drift() -> None:
         merge=False,
     )
     with pytest.raises(ValueError, match="continuous_timestep_conditioning"):
+        validate_libero_training_config(cfg)
+
+    cfg = _libero_config()
+    OmegaConf.update(
+        cfg,
+        "training.preserve_frozen_input_grad_modules",
+        [],
+        merge=False,
+    )
+    with pytest.raises(ValueError, match="preserve_frozen_input_grad_modules"):
         validate_libero_training_config(cfg)
 
 

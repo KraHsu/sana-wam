@@ -165,6 +165,10 @@ training:
     - proprio_encoder
     - proprio_video_embed
     - proprio_action_embed
+  # Keep all video-backbone parameters frozen/eval while retaining autograd
+  # with respect to the trainable proprio_video_embed input seam.
+  preserve_frozen_input_grad_modules:
+    - video_backbone
   # Trainer groups non-action top-level conditioning modules under video_lr;
   # the video backbone itself is outside the allowlist and remains frozen.
   video_lr: 1.0e-4

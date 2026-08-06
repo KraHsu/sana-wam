@@ -87,3 +87,31 @@ def test_per_chunk_proprio_changes_prediction_when_trained():
     assert arch.proprio_action_embed.weight.grad is not None
     assert torch.isfinite(arch.proprio_video_embed.weight.grad).all()
     assert torch.isfinite(arch.proprio_action_embed.weight.grad).all()
+
+
+@requires_sana
+def test_action_loss_reaches_video_proprio_seam_through_frozen_backbone():
+    """A frozen 2B-style video path must preserve input grad for its seam."""
+    torch.manual_seed(0)
+    arch, vb, ab = _build_arch()
+    _enable_proprio(arch, vb, ab, per_chunk=True)
+    arch.freeze_modules(["video_backbone"], preserve_input_grad=True)
+    batch = _batch(vb, ab, B=1)
+
+    torch.manual_seed(7)
+    output = arch.compute_loss(
+        lambda_video=0.0,
+        lambda_action=1.0,
+        use_gradient_checkpointing=True,
+        use_gradient_checkpointing_offload=False,
+        **batch,
+    )
+    output["loss"].backward()
+
+    gradient = arch.proprio_video_embed.weight.grad
+    assert gradient is not None
+    assert torch.isfinite(gradient).all()
+    assert torch.count_nonzero(gradient).item() > 0
+    assert all(not parameter.requires_grad for parameter in vb.parameters())
+    assert all(parameter.grad is None for parameter in vb.parameters())
+    assert all(not module.training for module in vb.modules())

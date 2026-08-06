@@ -38,6 +38,9 @@ def test_libero_source_template_freezes_t1_and_future_exact_stats_path() -> None
         "sana_wam_libero_train_all4_excl_goal82_stats_v1.npy"
     )
     assert config["training"]["action_stats_sha256"] is None
+    assert config["training"]["preserve_frozen_input_grad_modules"] == [
+        "video_backbone"
+    ]
 
 
 def test_one_update_runner_has_narrow_execution_surface() -> None:
@@ -76,6 +79,8 @@ def test_one_update_runner_has_narrow_execution_surface() -> None:
     assert "EXPECTED_SANA_ASSET_SHA256" in source
     assert "EXPECTED_GEMMA_ASSET_SHA256" in source
     assert "EXPECTED_SPATIAL_SAMPLE_ASSET_SHA256" in source
+    assert "EXPECTED_PRESERVE_FROZEN_INPUT_GRAD_MODULES" in source
+    assert '"_sana_wam_no_grad_wrapped"' in source
     assert 'observed_checkpoint_names != ["SANA_Video_2B_480p.pth"]' in source
     assert "episode_000000.mp4" in source
     assert "external_assets = _verify_external_assets(cfg)" in source

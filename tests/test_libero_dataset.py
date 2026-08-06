@@ -324,6 +324,9 @@ def test_launcher_rejects_libero_dimension_or_delta_drift() -> None:
             "training_video_rotation_degrees": 0,
             "benchmark_contract": _contract(),
         },
+        "training": {
+            "preserve_frozen_input_grad_modules": ["video_backbone"]
+        },
     }
     validate_libero_training_config(config, dataset=dataset)
 

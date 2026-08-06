@@ -55,6 +55,19 @@ def validate_libero_training_config(
                 f"got {observed!r}"
             )
 
+    preserve_input_grad = OmegaConf.select(
+        config,
+        "training.preserve_frozen_input_grad_modules",
+        default=None,
+    )
+    if preserve_input_grad is None or tuple(preserve_input_grad) != (
+        "video_backbone",
+    ):
+        raise ValueError(
+            "LIBERO training contract requires "
+            "training.preserve_frozen_input_grad_modules=['video_backbone']"
+        )
+
     contract = OmegaConf.select(config, "dataloader.benchmark_contract", default=None)
     if OmegaConf.is_config(contract):
         contract = OmegaConf.to_container(contract, resolve=True)

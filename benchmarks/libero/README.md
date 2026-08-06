@@ -186,6 +186,9 @@ It validates one finite AR architecture forward, not training or benchmark
 quality. The T1 choice, statistics boundary, and prepared one-update smoke are
 recorded in
 [`docs/libero/LIBERO_AR_T1_AND_STATS_PREUPDATE_DECISION_20260806.md`](../../docs/libero/LIBERO_AR_T1_AND_STATS_PREUPDATE_DECISION_20260806.md).
+The first update attempt's frozen-input-gradient root cause and source fix are
+recorded in
+[`docs/libero/LIBERO_AR_FROZEN_INPUT_GRAD_FIX_20260806.md`](../../docs/libero/LIBERO_AR_FROZEN_INPUT_GRAD_FIX_20260806.md).
 
 Metadata-only normalization stats can be materialized without decoding Parquet
 or video:
