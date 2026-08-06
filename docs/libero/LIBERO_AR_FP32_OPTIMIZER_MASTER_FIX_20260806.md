@@ -100,7 +100,7 @@ The fixed sample produced the same finite action loss
 `13.992515563964844`; the pre-clip gradient norm was `1272.0`. Model/data
 construction took 40.70 seconds and the single forward/backward/update section
 took 2.47 seconds. Peak update memory was about 24.40 GiB allocated / 25.51 GiB
-reserved. GPU memory returned to zero after exit.
+reserved. A post-exit read-only `nvidia-smi` check observed 0 MiB in use.
 
 This remains non-formal architecture/optimizer evidence using metadata-only
 smoke normalization stats. It performed exactly one optimizer step, did not
