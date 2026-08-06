@@ -657,6 +657,17 @@ def _load_function(tree: ast.Module, name: str, namespace: dict[str, Any]):
     return namespace[name]
 
 
+def _load_functions(
+    tree: ast.Module, names: tuple[str, ...], namespace: dict[str, Any]
+) -> dict[str, Any]:
+    module = ast.Module(
+        body=[_function_node(tree, name) for name in names], type_ignores=[]
+    )
+    ast.fix_missing_locations(module)
+    exec(compile(module, str(RUNNER), "exec"), namespace)  # noqa: S102
+    return namespace
+
+
 def test_t7_frozen_manifests_rebuild_to_exact_bytes_and_sha() -> None:
     eligible = _expected_eligible_manifest()
     eligible_payload = _canonical_bytes(eligible)
@@ -877,6 +888,47 @@ def test_t7_paired_gate_is_independent_for_train_and_fresh_heldout() -> None:
     assert "fresh_heldout_summary=_paired_four_sample_summary(" in compact_source
     assert "T7_MIN_IMPROVED=3" in compact_source
     assert "T7_MEDIAN_RATIO=0.95" in compact_source
+
+
+def test_t7_final_gate_requires_three_corresponding_suites() -> None:
+    _source, tree = _source_and_tree()
+    namespace = _load_functions(
+        tree,
+        ("_paired_four_sample_summary", "_four_suite_cyclic_summary"),
+        {
+            "Any": Any,
+            "T7_CYCLIC_TRAIN_SAMPLES": EXPECTED_TRAIN_SAMPLES,
+            "T7_FRESH_HELDOUT_SAMPLES": EXPECTED_HELDOUT_SAMPLES,
+            "T7_MIN_IMPROVED": 3,
+            "T7_MEDIAN_RATIO": 0.95,
+            "T7_SUITE_ORDER": SUITE_ORDER,
+            "math": math,
+            "statistics": statistics,
+        },
+    )
+    summary = namespace["_four_suite_cyclic_summary"]
+    train_before = {f"A{index}": 10.0 for index in range(4)}
+    heldout_before = {f"H{index}": 10.0 for index in range(4)}
+
+    disjoint_edge = summary(
+        train_before,
+        {"A0": 5.0, "A1": 5.0, "A2": 5.0, "A3": 10.0},
+        heldout_before,
+        {"H0": 10.0, "H1": 5.0, "H2": 5.0, "H3": 5.0},
+    )
+    assert disjoint_edge["update_samples"]["paired_gate"] is True
+    assert disjoint_edge["fresh_same_task_update_heldout"]["paired_gate"] is True
+    assert disjoint_edge["paired_suite_improved_count"] == 2
+    assert disjoint_edge["gate"] is False
+
+    corresponding_three = summary(
+        train_before,
+        {"A0": 10.0, "A1": 5.0, "A2": 5.0, "A3": 5.0},
+        heldout_before,
+        {"H0": 10.0, "H1": 5.0, "H2": 5.0, "H3": 5.0},
+    )
+    assert corresponding_three["paired_suite_improved_count"] == 3
+    assert corresponding_three["gate"] is True
 
 
 def test_t7_cycle_is_a0_through_a3_five_times_and_exactly_bounded() -> None:

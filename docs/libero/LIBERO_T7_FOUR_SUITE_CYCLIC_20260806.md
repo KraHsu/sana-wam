@@ -1,8 +1,13 @@
 # LIBERO T7 Four-Suite Cyclic Micro-Learnability Screen
 
-Status: **proposed / not executed**
+Status: **executed / `T7_FOUR_SUITE_CYCLIC_GO`**
 
 Date: 2026-08-06
+
+Evidence source is the frozen execution commit
+`d19109a2314f8e7186571afed6b4acd816d7cfab` and runner SHA stated in Section
+10. This post-run documentation revision records the immutable result; it is
+not the executed source and does not mutate or reattribute that root.
 
 ## 1. Scientific question
 
@@ -255,7 +260,8 @@ The frozen optimization recipe is:
 - one persistent FP32-master AdamW optimizer over the four admitted roots;
 - learning rate `1e-4`, betas `(0.9, 0.95)`, weight decay 0;
 - global gradient clip bound 1.0;
-- BF16 model projection after each optimizer step;
+- BF16 model projection is called after each optimizer step; full-tensor
+  projection equality is explicitly checked after steps 1 and 20;
 - no scheduler, warmup, gradient accumulation, sample shuffle, batching,
   resampling, early stopping, or SANA-WAM checkpoint.
 
@@ -296,11 +302,13 @@ Every forward, including probes and update forwards, resets to recipe seed
 Torch CUDA RNG states. All 36 captured recipe signatures must equal the frozen
 T6 signature.
 
-Before update 1, the starting-state projection must match T6. It includes the
-fresh model and trainable-root fingerprints, optimizer/master identities,
-empty optimizer state, prepared A-input digests and shapes, recipe signature,
-and the four exact A pre action losses in Section 3. This is the attribution
-bridge to T6. T7 must not claim equality to the T6 post-update training core.
+Before update 1, the deterministic starting state must reproduce the frozen T6
+source/config/Sana/seed/recipe and trainable-root structure, empty optimizer
+state, and the four exact A pre action losses in Section 3. Runtime checks also
+bind the 560 persistent FP32 masters to the 560 BF16 trainable tensors. The T6
+RESULT does not contain a bytewise fresh-model parameter fingerprint, so this
+contract does not claim a cross-run bytewise model or master fingerprint
+comparison. T7 must not claim equality to the T6 post-update training core.
 
 ## 8. Validity and attribution gates
 
@@ -316,8 +324,10 @@ A scientific verdict is allowed only if all harness gates pass:
    pinned dataset, task text, task index, episode index, length, and prompt.
 4. All eight prepared mappings remain mutually non-aliasing and immutable;
    their object identities and tensor versions do not change.
-5. Fresh initialization and the complete starting-state projection reproduce
-   T6 exactly, including the four pinned A pre action losses.
+5. Fresh initialization reproduces the frozen T6 source/config/Sana/seed/recipe,
+   trainable-root structure, empty optimizer state, and four pinned A pre
+   action losses. No bytewise T6 fresh-model fingerprint is available or
+   claimed.
 6. One persistent optimizer and FP32-master set are used for all 20 steps.
    Optimizer state is empty before step 1, no optimizer object is replaced,
    and all Adam counters are exactly 20 after step 20.
@@ -327,9 +337,11 @@ A scientific verdict is allowed only if all harness gates pass:
 8. Every update-free probe block preserves parameters, FP32 masters, buffers,
    module modes, gradients, optimizer state, prepared tensors, and caller RNG
    state.
-9. Only the four admitted trainable roots change; frozen parameters and
-   buffers retain their values. Gradient, update, clipping, master-sync, and
-   BF16-projection telemetry is finite and is reported for every step.
+9. Only the four admitted trainable roots receive gradients or optimizer
+   updates; frozen parameter versions remain unchanged. Update-free probe
+   blocks additionally preserve buffer versions. Gradient, update, clipping,
+   master-sync, and sampled BF16-projection telemetry is finite for every
+   step, with full projection equality checked at steps 1 and 20.
 10. All losses are finite and non-negative, every pre action loss is strictly
     positive, and total loss equals action loss within the frozen T6 tolerance.
 11. The exact 8/36/20/20 prepare/forward/backward/optimizer counts and exact
@@ -381,7 +393,7 @@ forbidden.
 
 ## 10. Root and execution boundary
 
-Any later execution authority must fix one never-created root of this form:
+The executed authority fixed one never-created root of this form:
 
 ```text
 /DATA/share/sana_wam_libero_nonformal_screens/t7/<execution-commit-12>/libero-t7-foursuite-cyclic-fixed20-<32-lowercase-hex nonce>
@@ -393,11 +405,22 @@ A valid terminal root contains only `RESULT.json`; an execution failure root
 contains only `FAILED.json`. Terminal root mode is `0500` and terminal JSON
 mode is `0400`.
 
-This document does not authorize execution. A separate authority must pin the
-implementation source commit, runner SHA256, GPU identity, nonce, and absolute
-fresh root. That authority may permit one H200 GPU, offline base construction
-assets, fresh model construction, eight real-sample preparations, 16
-update-free measurements, and the fixed 20-step micro-update only.
+The realized execution identity was:
+
+- source commit: `d19109a2314f8e7186571afed6b4acd816d7cfab`;
+- runner SHA256:
+  `b6e764bf3d3566bf3d1fe5e2e3802dafef691f6a0162568337b49ca1a183310b`;
+- config SHA256:
+  `5df45965d6de3a32c5154a8bb4c41d29d20113bbe8908c1a98c8c63a7bff4a45`;
+- physical GPU 0 / UUID
+  `GPU-1ec28cfb-f501-23f3-f865-275a744ca053`;
+- nonce: `61e0a0ff817970e994b0875be4840ed6`;
+- root:
+  `/DATA/share/sana_wam_libero_nonformal_screens/t7/d19109a2314f/libero-t7-foursuite-cyclic-fixed20-61e0a0ff817970e994b0875be4840ed6`.
+
+The execution used one H200 GPU, offline base construction assets, fresh model
+construction, eight real-sample preparations, 16 update-free measurements,
+and the fixed 20-step micro-update only.
 
 Simulator execution, rollout, benchmark evaluation, checkpoint load/save,
 formal training, admission, deployment, token namespaces, real-data samples
@@ -449,7 +472,50 @@ same root.
 
 ## 13. Result state
 
-T7 has not been executed. There is no execution source pin, GPU selection,
-nonce, run root, `RESULT.json`, `FAILED.json`, measured H loss, or scientific
-verdict. Any such value must be added only after a separately authorized root
-has terminalized and been independently verified.
+The root terminalized with one read-only `RESULT.json` and no `FAILED.json`.
+The canonical result SHA256 is
+`9f5181a30cd0d6b676f09315244f7560cd3902004f5f17ca833330e33cb44d3a`.
+The valid typed verdict is `T7_FOUR_SUITE_CYCLIC_GO`.
+
+| Pair | A pre → post | A ratio | H pre → post | H ratio | Both improved |
+|---|---:|---:|---:|---:|---|
+| Spatial | 13.679719 → 14.976528 | 1.094798 | 13.379680 → 14.401052 | 1.076338 | no |
+| Object | 14.696585 → 11.250627 | 0.765527 | 14.698094 → 11.137909 | 0.757779 | yes |
+| Goal | 12.066481 → 5.850971 | 0.484895 | 12.026172 → 6.197388 | 0.515325 | yes |
+| LIBERO-10 | 20.431152 → 2.809816 | 0.137526 | 20.885685 → 2.886462 | 0.138203 | yes |
+
+The four A ratios have median `0.6252105785`; the four H ratios have median
+`0.6365520894`. Object, Goal, and LIBERO-10 improved on both members of their
+pair, so the joint count is 3/4 and all three pre-registered gate clauses pass.
+Spatial regressed on both A0 and H0; GO therefore must not be described as
+uniform four-suite improvement.
+
+The exact execution counts were 8 preparations, 36 forwards, 20 backward
+calls, and 20 optimizer steps. Each A sample entered five updates; every H
+sample entered zero. All 36 stochastic recipe signatures were identical, all
+560 Adam counters reached 20, and the persistent FP32-master state remained
+finite. No SANA-WAM checkpoint was loaded or saved, and no simulator, rollout,
+benchmark evaluation, formal training, admission, or deployment ran.
+
+## 14. Post-run audit notes
+
+The terminal result binds the exact config path content through the reported
+SHA and the execution CLI identity comparison. The runner source itself accepts
+the authority-provided expected config SHA rather than hard-coding the baseline
+SHA, so reuse under a different source authority must not be treated as this
+T7 result.
+
+The runner also re-verifies the historical T1-T6 evidence chain. T1 currently
+resides under its historical `/tmp` path and was present with the pinned SHA at
+preflight; this is a reproducibility weakness for a future rerun, not a mutation
+of this frozen terminal result. The scientific evidence here remains a single
+initialization, fixed-recipe loss-space screen, with the interpretation limits
+in Section 11.
+
+The harness accepts each frozen starting loss within
+`1e-6 + 1e-6 * abs(expected)` rather than requiring bitwise float equality.
+In this realized result all four serialized observed values equal their pins
+exactly. The harness does not compare frozen-buffer values across the update
+loop, and it performs full-tensor BF16/master projection equality checks only
+at steps 1 and 20; these are attribution-checking limits, not evidence of an
+observed runtime failure.

@@ -5,7 +5,7 @@
 整理日期：2026-08-06  
 规范主机：`H200`  
 规范工作树：`/home/zch/workspace/sana-wam`  
-主仓 T6 执行 source commit：`708b1d8569866608898031f9116566d52fdeb742`
+主仓 T7 执行 source commit：`d19109a2314f8e7186571afed6b4acd816d7cfab`
 Sana gitlink：`16b9cec673e3335724ba2d8db25de7f9ed229292`
 
 本文是一份可独立阅读的历史快照，汇总截至当前已经设计的架构、基础实现、所有关键
@@ -55,14 +55,15 @@ REF-GDN-CORRECTED
    和 multi-seed confirmation 都没有执行。
 8. 项目没有进入正式训练、正式评测、formal admission、Global Stage 3、checkpoint
    训练或部署；不得宣称已有 504-step formal 结果或正式模型完成。
-9. 在独立的 LIBERO production-shaped `DualSystemARArchitecture` 验证线上，T1 至 T6
+9. 在独立的 LIBERO production-shaped `DualSystemARArchitecture` 验证线上，T1 至 T7
    已依次闭合 one-update、fixed-sample 20-update learnability、held-out recipe、同任务
    episode、跨 Spatial task 以及跨 Object/Goal/LIBERO-10 suite 的 update-free action-loss
-   transfer；T6 为 `T6_CROSS_SUITE_TRANSFER_GO`。
-10. LIBERO T6 不改变 CACH-A4 reduced-path stop，也不是 benchmark success：其证据仅为
-    一个初始化、一个 recipe、三个固定非 Spatial sample 的 optimizer-update-held-out
-    loss transfer。probes 仍属于四套件数据和 normalization population；rollout、suite
-    distribution generalization、正式训练和正式评测仍未执行。
+   transfer，以及四套件循环微学习；T7 为 `T7_FOUR_SUITE_CYCLIC_GO`。
+10. LIBERO T7 不改变 CACH-A4 reduced-path stop，也不是 benchmark success：其证据仅为
+    一个初始化、一个 recipe、每套件一个更新样本与一个同任务 fresh episode 的 20-step
+    loss-space screen。Object/Goal/LIBERO-10 的 A/H 配对改善，而 Spatial A/H 同时回退；
+    probes 仍属于四套件数据和 normalization population；rollout、suite distribution
+    generalization、正式训练和正式评测仍未执行。
 
 ## 2. 证据等级与命名
 
@@ -701,7 +702,7 @@ motion-sensitive primary；后者正是用于检查前者是否值得扩大投�
   CACH-A4 reduced path = REDUCED_ARCH_STOP
   AV-4 = NOT_UNLOCKED
   review token = CONSUMED
-  independent LIBERO production-shaped AR path = T6_CROSS_SUITE_TRANSFER_GO
+  independent LIBERO production-shaped AR path = T7_FOUR_SUITE_CYCLIC_GO
 
 未开始或未通过：
   full CACH v0 package validation
@@ -741,6 +742,7 @@ training checkpoint，也没有运行 simulator 或 benchmark evaluator。
 | T4 | 保持 T2/T3 core，同 recipe，3 个 same-task update-held-out episodes | `T4_HELDOUT_SAMPLE_TRANSFER_GO` | ep16/405/40 全部改善；ratio `0.123714 / 0.139309 / 0.123339`，median `0.123714`；T3 core 逐值复现 |
 | T5 | 保持 T3/T4 core，同 recipe，3 个 mechanically selected distinct-task episodes | `T5_CROSS_TASK_TRANSFER_GO` | task7/1/4 的 ep36/325/11 全部改善；ratio `0.148637 / 0.113500 / 0.150387`，median `0.148637`；T4 core 逐值复现 |
 | T6 | 保持 T5 core，同 recipe，Object/Goal/LIBERO-10 各一个 mechanically selected sample | `T6_CROSS_SUITE_TRANSFER_GO` | S1/S2/S3 全部改善；ratio `0.157667 / 0.176770 / 0.152686`，median `0.157667`；T5 core 逐值复现 |
+| T7 | A0-A3 四套件循环 5 轮，共 20 updates；每套件一个同任务 fresh heldout | `T7_FOUR_SUITE_CYCLIC_GO` | A median ratio `0.625211`，H median `0.636552`，3/4 对应套件双改善；Spatial A/H 分别回退 `9.48% / 7.63%` |
 
 T4 的 frozen training-core expected/observed projection SHA256 均为
 `e34a2dd0ae2dfe28303dcd9baf64ffc5800d002b0b7646b89dde2aafa132c352`，排除了
@@ -767,6 +769,16 @@ median post/pre 为 `0.1576670424`。T6 expected/observed training-core 继续�
 `e34a2dd...` projection，且精确执行 4 prepare / 28 forward / 20 backward / 20 AdamW
 step；三个 suite probes 从未进入 backward/update。
 
+T7 把 T6 的四个跨套件端点提升为 A0-A3 更新集，固定按
+`[Spatial,Object,Goal,LIBERO-10] × 5` 使用一个 persistent FP32-master AdamW optimizer，
+并为每套件机械选择一个同任务、零更新的 fresh episode H0-H3。A 样本的 post/pre ratio
+为 `1.094798 / 0.765527 / 0.484895 / 0.137526`，median `0.6252105785`；H 样本为
+`1.076338 / 0.757779 / 0.515325 / 0.138203`，median `0.6365520894`。Object、Goal、
+LIBERO-10 在 A/H 两侧均改善，满足冻结的 3/4 联合门槛；Spatial 两侧同时回退，因此该
+GO 不是 uniform four-suite improvement。运行精确执行 8 prepare / 36 forward / 20
+backward / 20 AdamW step，每个 A 恰好 5 次更新、每个 H 为 0；没有 SANA-WAM
+checkpoint、simulator、rollout 或 benchmark evaluation。
+
 主要冻结证据：
 
 | Run | Immutable root | RESULT SHA256 |
@@ -777,13 +789,14 @@ step；三个 suite probes 从未进入 backward/update。
 | T4 | `/DATA/share/sana_wam_libero_nonformal_screens/t4/7db8182ef46f/libero-t4-heldout3-fixed20-36120c596971575d286d378df42ac564` | `4c33aaff6d202068d77efc0ac406c74198c56e72527cfabdde046fc9a3a4b6f4` |
 | T5 | `/DATA/share/sana_wam_libero_nonformal_screens/t5/5150693a0751/libero-t5-crosstask3-fixed20-cf7dd8a1b1cef03511d2026a48e4a271` | `a656aaef1528537527fe830ad7d4107138b29e8e254b5606b43c46a47e323e83` |
 | T6 | `/DATA/share/sana_wam_libero_nonformal_screens/t6/708b1d856986/libero-t6-crosssuite3-fixed20-67a02fcc85508e03f136e09221a6a9d4` | `4855f3771b80349547c985d137426cce79e25597f910eff88e136328424b8b89` |
+| T7 | `/DATA/share/sana_wam_libero_nonformal_screens/t7/d19109a2314f/libero-t7-foursuite-cyclic-fixed20-61e0a0ff817970e994b0875be4840ed6` | `9f5181a30cd0d6b676f09315244f7560cd3902004f5f17ca833330e33cb44d3a` |
 
-当前可以支持的最强结论是：在一次初始化和固定 recipe 下，Spatial task0/ep0 的 20 次
-update 不只降低训练窗口 loss，也跨 diffusion recipes、同任务 episode、Spatial tasks，
-并进一步降低三个 mechanically selected Object/Goal/LIBERO-10 samples 的 action loss。
-T6 probes 仍属于训练 metadata 与 normalization population，而且 suite、task text、视觉
-episode、长度与 temporal coverage 同时变化，因此不是纯 suite/language isolation 或严格
-dataset holdout。它不证明 closed-loop success、LIBERO benchmark performance、suite-level
-distribution generalization、稳定优化或正式训练。update-free loss-transfer breadth ladder
-到 T6 已闭合；下一项最小独立架构问题是四套件 cyclic micro-learnability，需要新的冻结
-训练/heldout 选择、root 和判定契约，不因 T6 GO 自动获得正式训练或 benchmark 授权。
+当前可以支持的最强结论是：在一次初始化和固定 recipe 下，完整 production-shaped AR
+path 不仅具备单样本 learnability 和多轴 update-free loss transfer，也能用一个 persistent
+optimizer 在 20 次四套件循环更新中通过预注册的 train/fresh 双 median 与 3/4 联合改善门。
+但是 Spatial 的训练样本与同任务 fresh episode 同时变差，说明已有明确的套件间干扰或
+顺序/尺度不平衡信号。T7 probes 仍属于训练 metadata 与 normalization population；该结果
+不证明 closed-loop success、LIBERO benchmark performance、suite-level distribution
+generalization、稳定长程优化或正式训练。loss-space architecture ladder 到 T7 已闭合；
+后续若继续，应是另行冻结的 bounded multi-suite training/admission 诊断，优先观察并处理
+Spatial 回退，而不是把 T7 GO 直接升级成正式训练或 benchmark 授权。
