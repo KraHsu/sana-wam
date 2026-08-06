@@ -58,7 +58,7 @@ rows, and 271,644 unique supervised action rows (`[0, L-1)` per episode). The
 source training template therefore reserves a distinct, currently absent path:
 
 ```text
-/DATA/share/LIBERO/sana_wam_libero_train_all4_excl_goal82_stats_v1.npy
+/DATA/share/LIBERO/sana_wam_libero_train_all4_excl_goal82_stats_v2.npy
 ```
 
 `training.action_stats_sha256` remains null. Before formal training, a

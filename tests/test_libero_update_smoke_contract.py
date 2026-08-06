@@ -35,9 +35,10 @@ def test_libero_source_template_freezes_t1_and_future_exact_stats_path() -> None
         "continuous_timestep_conditioning"
     ] is True
     assert config["dataloader"]["action_stats_path"].endswith(
-        "sana_wam_libero_train_all4_excl_goal82_stats_v1.npy"
+        "sana_wam_libero_train_all4_excl_goal82_stats_v2.npy"
     )
     assert config["training"]["action_stats_sha256"] is None
+    assert config["training"]["action_stats_population_sha256"] is None
     assert config["training"]["preserve_frozen_input_grad_modules"] == [
         "video_backbone"
     ]

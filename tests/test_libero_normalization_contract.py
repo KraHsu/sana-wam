@@ -61,6 +61,7 @@ def _libero_config(*, stats_sha256: str | None = None):
                 "benchmark_contract": _expected_contract(),
             },
             "training": {
+                "action_stats_population_sha256": None,
                 "action_stats_sha256": stats_sha256,
                 "optimizer_master_weights": True,
                 "preserve_frozen_input_grad_modules": ["video_backbone"],

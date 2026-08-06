@@ -11,10 +11,7 @@ same time ``t``; RoboTwin's absolute-state ``t+1`` convention is not reused.
 from __future__ import annotations
 
 import copy
-import json
-import random
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -26,11 +23,20 @@ from sana_wam.dataloader.base_dataset import BaseActionDataset
 from sana_wam.dataloader.libero_stats import (
     LIBERO_ACTION_DIM,
     LIBERO_ACTION_MODE,
+    LIBERO_SELECTED_STATS_SCHEMA_VERSION,
     LIBERO_STATE_DIM,
     LIBERO_STATE_MODE,
     build_source_manifest,
     load_libero_stats,
     sha256_file,
+)
+from sana_wam.dataloader.libero_selected_stats import (
+    validate_libero_selected_stats_for_config,
+)
+from sana_wam.dataloader.libero_selection import (
+    LiberoEpisode,
+    read_libero_episode_arrays,
+    select_libero_episodes,
 )
 from sana_wam.dataloader.transforms.multiview import (
     assemble_multiview_layout,
@@ -73,36 +79,6 @@ _KNOWN_INCOMPATIBLE_169_FRAME_PATCH_SHA256 = (
 _KNOWN_CORRUPTED_EPISODE_KEY = f"{_KNOWN_GOAL_DATASET}:82"
 
 
-@dataclass(frozen=True)
-class LiberoEpisode:
-    dataset: str
-    root: Path
-    episode_index: int
-    length: int
-    task: str
-    task_index: int
-    chunks_size: int
-    data_path_template: str
-    video_path_template: str
-
-    @property
-    def episode_chunk(self) -> int:
-        return self.episode_index // self.chunks_size
-
-    def data_path(self) -> Path:
-        return self.root / self.data_path_template.format(
-            episode_chunk=self.episode_chunk,
-            episode_index=self.episode_index,
-        )
-
-    def video_path(self, video_key: str) -> Path:
-        return self.root / self.video_path_template.format(
-            episode_chunk=self.episode_chunk,
-            episode_index=self.episode_index,
-            video_key=video_key,
-        )
-
-
 def _get(config: Any, key: str, default: Any = None) -> Any:
     if isinstance(config, Mapping):
         value = config.get(key, default)
@@ -111,39 +87,6 @@ def _get(config: Any, key: str, default: Any = None) -> Any:
     else:
         value = getattr(config, key, default)
     return default if value is None else value
-
-
-def _read_json_lines(path: Path) -> list[dict[str, Any]]:
-    rows = []
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError as exc:
-        raise ValueError(f"cannot read LIBERO JSONL {path}: {exc}") from exc
-    for line_number, line in enumerate(lines, start=1):
-        if not line.strip():
-            continue
-        try:
-            row = json.loads(line)
-        except json.JSONDecodeError as exc:
-            raise ValueError(
-                f"invalid LIBERO JSONL at {path}:{line_number}: {exc}"
-            ) from exc
-        if not isinstance(row, dict):
-            raise ValueError(
-                f"LIBERO JSONL row must be an object: {path}:{line_number}"
-            )
-        rows.append(row)
-    return rows
-
-
-def _load_json(path: Path) -> dict[str, Any]:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"cannot read LIBERO JSON {path}: {exc}") from exc
-    if not isinstance(value, dict):
-        raise ValueError(f"LIBERO JSON must contain an object: {path}")
-    return value
 
 
 def _normalization_mode(value: Any, *, field: str) -> str | None:
@@ -515,12 +458,40 @@ class LiberoLeRobotDataset(BaseActionDataset):
             )
         resolved_stats = stats_candidate.resolve()
         payload = load_libero_stats(resolved_stats)
-        if verify_stats_source and payload["source_manifest"] != build_source_manifest(
-            self.dataset_roots
-        ):
-            raise ValueError(
-                "LIBERO action_stats source_manifest differs from dataset roots"
-            )
+        if verify_stats_source:
+            if payload["schema_version"] == LIBERO_SELECTED_STATS_SCHEMA_VERSION:
+                from omegaconf import OmegaConf
+
+                stats_config = OmegaConf.create(
+                    {
+                        "dataloader": {
+                            "dataset_roots": [str(root) for root in self.dataset_roots],
+                            "excluded_episodes": sorted(self.excluded_episodes),
+                            "num_frames": self.num_frames,
+                            "repeat": self.repeat,
+                            "seed": self.seed,
+                            "split": self.split,
+                            "val_ratio": self.val_ratio,
+                            "window_stride": self.window_stride,
+                        }
+                    }
+                )
+                validate_libero_selected_stats_for_config(
+                    payload,
+                    stats_config,
+                    verify_live_sources=True,
+                    # The dedicated launcher already performs the one full
+                    # numeric recomputation before constructing Trainer.  The
+                    # dataset independently re-hashes the live manifest but
+                    # does not read and reduce every selected row a second time.
+                    verify_numeric_sources=False,
+                )
+            elif payload["source_manifest"] != build_source_manifest(
+                self.dataset_roots
+            ):
+                raise ValueError(
+                    "LIBERO action_stats source_manifest differs from dataset roots"
+                )
         action_stats = payload[LIBERO_ACTION_MODE]
         state_stats = payload[LIBERO_STATE_MODE]
         _validate_stat_shape(
@@ -537,23 +508,24 @@ class LiberoLeRobotDataset(BaseActionDataset):
             mode=YAML_TO_NORM_MODE[self.state_normalize_mode], stats=state_stats
         )
 
-        episodes = []
-        for root in self.dataset_roots:
-            source_episodes = self._load_root_episodes(root)
-            rng = random.Random(f"sana-wam-libero-split-v1:{self.seed}:{root.name}")
-            indices = list(range(len(source_episodes)))
-            rng.shuffle(indices)
-            if self.val_ratio <= 0.0:
-                n_val = 0
-            elif self.val_ratio >= 1.0:
-                n_val = len(indices)
-            else:
-                n_val = max(1, int(len(indices) * self.val_ratio))
-            selected = indices[:n_val] if split == "val" else indices[n_val:]
-            episodes.extend(source_episodes[index] for index in sorted(selected))
-        if not episodes:
-            raise ValueError(f"no LIBERO episodes selected for split={split!r}")
-        self._episodes = tuple(episodes)
+        selection = select_libero_episodes(
+            self.dataset_roots,
+            split=self.split,
+            val_ratio=self.val_ratio,
+            seed=self.seed,
+            excluded_episodes=tuple(self.excluded_episodes),
+            require_all_exclusions=verify_known_repairs,
+        )
+        self._observed_exclusions = {episode.identity for episode in selection.excluded}
+        for episode in selection.eligible:
+            for video_key in LIBERO_VIDEO_KEY_TO_CAMERA:
+                video_path = episode.video_path(video_key)
+                if video_path.is_symlink() or not video_path.is_file():
+                    raise ValueError(
+                        "LIBERO episode video must be a regular non-symlink "
+                        f"file: {video_path}"
+                    )
+        self._episodes = selection.selected
         self._windows = tuple(
             (episode_index, start)
             for episode_index, episode in enumerate(self._episodes)
@@ -562,15 +534,6 @@ class LiberoLeRobotDataset(BaseActionDataset):
         if not self._windows:
             raise ValueError(
                 "LIBERO dataset contains no valid obs(t)->action(t) windows"
-            )
-        root_names = {root.name for root in self.dataset_roots}
-        applicable_exclusions = {
-            key for key in self.excluded_episodes if key.rsplit(":", 1)[0] in root_names
-        }
-        missing_exclusions = applicable_exclusions - self._observed_exclusions
-        if missing_exclusions:
-            raise ValueError(
-                f"LIBERO excluded episode keys were not found: {sorted(missing_exclusions)}"
             )
 
     def _verify_known_data_repairs(self) -> None:
@@ -599,102 +562,6 @@ class LiberoLeRobotDataset(BaseActionDataset):
                 "LIBERO Goal episode_000082 is not excluded and has no pinned "
                 "snapshot-compatible repaired wrist video"
             )
-
-    def _load_root_episodes(self, root: Path) -> list[LiberoEpisode]:
-        info = _load_json(root / "meta/info.json")
-        if info.get("codebase_version") != "v2.1":
-            raise ValueError(f"{root.name} is not a LeRobot v2.1 dataset")
-        if info.get("fps") != 20:
-            raise ValueError(f"{root.name} fps must be exactly 20")
-        features = info.get("features")
-        if not isinstance(features, Mapping):
-            raise ValueError(f"{root.name} has no features mapping")
-        expected_features = {
-            "observation.state": ("float32", [LIBERO_STATE_DIM]),
-            "action": ("float32", [LIBERO_ACTION_DIM]),
-            "observation.images.image": ("video", [256, 256, 3]),
-            "observation.images.wrist_image": ("video", [256, 256, 3]),
-        }
-        for key, (dtype, shape) in expected_features.items():
-            feature = features.get(key)
-            if not isinstance(feature, Mapping):
-                raise ValueError(f"{root.name} is missing feature {key!r}")
-            if feature.get("dtype") != dtype or feature.get("shape") != shape:
-                raise ValueError(f"{root.name} feature {key!r} has incompatible schema")
-        chunks_size = info.get("chunks_size")
-        if (
-            isinstance(chunks_size, bool)
-            or not isinstance(chunks_size, int)
-            or chunks_size <= 0
-        ):
-            raise ValueError(f"{root.name} has invalid chunks_size")
-        data_template = info.get("data_path")
-        video_template = info.get("video_path")
-        if not isinstance(data_template, str) or not isinstance(video_template, str):
-            raise ValueError(f"{root.name} has invalid data/video path templates")
-
-        task_rows = _read_json_lines(root / "meta/tasks.jsonl")
-        task_to_index = {}
-        for row in task_rows:
-            task = row.get("task")
-            task_index = row.get("task_index")
-            if (
-                not isinstance(task, str)
-                or not task
-                or isinstance(task_index, bool)
-                or not isinstance(task_index, int)
-                or task_index < 0
-            ):
-                raise ValueError(f"{root.name} contains an invalid task row")
-            task_to_index[task] = task_index
-
-        episode_rows = _read_json_lines(root / "meta/episodes.jsonl")
-        if len(episode_rows) != info.get("total_episodes"):
-            raise ValueError(f"{root.name} episode count differs from info.json")
-        result = []
-        for row in episode_rows:
-            episode_index = row.get("episode_index")
-            length = row.get("length")
-            tasks = row.get("tasks")
-            if (
-                isinstance(episode_index, bool)
-                or not isinstance(episode_index, int)
-                or episode_index < 0
-                or isinstance(length, bool)
-                or not isinstance(length, int)
-                or length < 2
-                or not isinstance(tasks, list)
-                or len(tasks) != 1
-                or not isinstance(tasks[0], str)
-                or tasks[0] not in task_to_index
-            ):
-                raise ValueError(f"{root.name} contains an invalid episode row")
-            exclusion_key = f"{root.name}:{episode_index}"
-            if exclusion_key in self.excluded_episodes:
-                self._observed_exclusions.add(exclusion_key)
-                continue
-            episode = LiberoEpisode(
-                dataset=root.name,
-                root=root,
-                episode_index=episode_index,
-                length=length,
-                task=tasks[0],
-                task_index=task_to_index[tasks[0]],
-                chunks_size=chunks_size,
-                data_path_template=data_template,
-                video_path_template=video_template,
-            )
-            if not episode.data_path().is_file():
-                raise ValueError(
-                    f"LIBERO episode parquet is missing: {episode.data_path()}"
-                )
-            for video_key in LIBERO_VIDEO_KEY_TO_CAMERA:
-                if not episode.video_path(video_key).is_file():
-                    raise ValueError(
-                        f"LIBERO episode video is missing: {episode.video_path(video_key)}"
-                    )
-            result.append(episode)
-        return result
 
     @property
     def action_dim(self) -> int:
@@ -728,69 +595,7 @@ class LiberoLeRobotDataset(BaseActionDataset):
     def _read_episode_arrays(
         self, episode: LiberoEpisode
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        try:
-            import pyarrow.parquet as pq
-        except ImportError as exc:
-            raise RuntimeError(
-                "LIBERO Parquet loading requires PyArrow; install the pinned "
-                "benchmarks/libero/requirements-data.txt in the sana-wam environment "
-                "before use"
-            ) from exc
-        table = pq.read_table(
-            episode.data_path(),
-            columns=[
-                "observation.state",
-                "action",
-                "task_index",
-                "episode_index",
-                "frame_index",
-                "timestamp",
-            ],
-            memory_map=True,
-        )
-        states = np.asarray(table["observation.state"].to_pylist(), dtype=np.float32)
-        actions = np.asarray(table["action"].to_pylist(), dtype=np.float32)
-        task_indices = np.asarray(table["task_index"].to_pylist(), dtype=np.int64)
-        episode_indices = np.asarray(table["episode_index"].to_pylist(), dtype=np.int64)
-        frame_indices = np.asarray(table["frame_index"].to_pylist(), dtype=np.int64)
-        timestamps = np.asarray(table["timestamp"].to_pylist(), dtype=np.float64)
-        if states.shape != (episode.length, LIBERO_STATE_DIM):
-            raise ValueError(
-                f"LIBERO state array shape differs for {episode.data_path()}: {states.shape}"
-            )
-        if actions.shape != (episode.length, LIBERO_ACTION_DIM):
-            raise ValueError(
-                f"LIBERO action array shape differs for {episode.data_path()}: {actions.shape}"
-            )
-        if task_indices.shape != (episode.length,) or not np.all(
-            task_indices == episode.task_index
-        ):
-            raise ValueError(f"LIBERO task_index differs within {episode.data_path()}")
-        if episode_indices.shape != (episode.length,) or not np.all(
-            episode_indices == episode.episode_index
-        ):
-            raise ValueError(
-                f"LIBERO episode_index differs within {episode.data_path()}"
-            )
-        expected_frames = np.arange(episode.length, dtype=np.int64)
-        if frame_indices.shape != (episode.length,) or not np.array_equal(
-            frame_indices, expected_frames
-        ):
-            raise ValueError(
-                f"LIBERO frame_index is not contiguous in {episode.data_path()}"
-            )
-        expected_timestamps = expected_frames.astype(np.float64) / 20.0
-        if timestamps.shape != (episode.length,) or not np.allclose(
-            timestamps, expected_timestamps, rtol=0.0, atol=1e-5
-        ):
-            raise ValueError(
-                f"LIBERO timestamp/frame alignment differs in {episode.data_path()}"
-            )
-        if not np.isfinite(states).all() or not np.isfinite(actions).all():
-            raise ValueError(
-                f"LIBERO episode contains non-finite state/action: {episode.data_path()}"
-            )
-        return states, actions, task_indices
+        return read_libero_episode_arrays(episode)
 
     def _read_video_indices(
         self, path: Path, requested_indices: Sequence[int]

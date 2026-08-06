@@ -65,7 +65,7 @@ dataloader:
   # Reserved fresh path for exact selected-training-row statistics.  The
   # existing sana_wam_libero_all_minmax_stats.npy is metadata-only smoke data
   # and must not be pinned for training.
-  action_stats_path: /DATA/share/LIBERO/sana_wam_libero_train_all4_excl_goal82_stats_v1.npy
+  action_stats_path: /DATA/share/LIBERO/sana_wam_libero_train_all4_excl_goal82_stats_v2.npy
   action_mode: libero_relative_eef
   state_mode: libero_eef_axis_angle_gripper
   normalize_mode: min-max
@@ -189,3 +189,6 @@ training:
   debug: false
   # Must be filled with the generated stats SHA before any training authority.
   action_stats_sha256: null
+  # Must independently pin the selected-row v2 population manifest embedded
+  # in the stats artifact; metadata-only v1 stats have no admissible value.
+  action_stats_population_sha256: null

@@ -28,6 +28,10 @@ LIBERO_STATE_MODE = "libero_eef_axis_angle_gripper"
 LIBERO_ACTION_DIM = 7
 LIBERO_STATE_DIM = 8
 LIBERO_STATS_SCHEMA_VERSION = "sana-wam-libero-stats-v1"
+LIBERO_SELECTED_STATS_SCHEMA_VERSION = "sana-wam-libero-selected-row-stats-v2"
+LIBERO_POPULATION_MANIFEST_SCHEMA_VERSION = (
+    "sana-wam-libero-selected-row-population-manifest-v2"
+)
 
 _SOURCE_METADATA_FILES = (
     "meta/info.json",
@@ -222,7 +226,11 @@ def build_libero_stats_from_metadata(
 def validate_libero_stats_payload(payload: Mapping[str, Any]) -> None:
     """Fail closed on malformed or dimensionally incompatible stats."""
 
-    if payload.get("schema_version") != LIBERO_STATS_SCHEMA_VERSION:
+    schema_version = payload.get("schema_version")
+    if schema_version not in {
+        LIBERO_STATS_SCHEMA_VERSION,
+        LIBERO_SELECTED_STATS_SCHEMA_VERSION,
+    }:
         raise ValueError("LIBERO stats schema_version differs")
     for key, dim in (
         (LIBERO_ACTION_MODE, LIBERO_ACTION_DIM),
@@ -233,8 +241,13 @@ def validate_libero_stats_payload(payload: Mapping[str, Any]) -> None:
             raise ValueError(f"LIBERO stats payload has no {key!r} mapping")
         for field in _STAT_FIELDS:
             _stat_vector(mode_stats, field, dim=dim, label=key)
-    if not isinstance(payload.get("source_manifest"), Mapping):
-        raise ValueError("LIBERO stats payload has no source_manifest")
+    manifest_key = (
+        "source_manifest"
+        if schema_version == LIBERO_STATS_SCHEMA_VERSION
+        else "population_manifest"
+    )
+    if not isinstance(payload.get(manifest_key), Mapping):
+        raise ValueError(f"LIBERO stats payload has no {manifest_key}")
 
 
 def load_libero_stats(path: str | Path) -> dict[str, Any]:
@@ -306,6 +319,8 @@ __all__ = [
     "LIBERO_ACTION_MODE",
     "LIBERO_STATE_DIM",
     "LIBERO_STATE_MODE",
+    "LIBERO_SELECTED_STATS_SCHEMA_VERSION",
+    "LIBERO_POPULATION_MANIFEST_SCHEMA_VERSION",
     "LIBERO_STATS_SCHEMA_VERSION",
     "build_libero_stats_from_metadata",
     "build_source_manifest",

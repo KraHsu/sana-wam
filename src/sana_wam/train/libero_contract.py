@@ -11,10 +11,113 @@ from sana_wam.dataloader.libero_dataset import validate_libero_benchmark_contrac
 from sana_wam.dataloader.libero_stats import (
     LIBERO_ACTION_DIM,
     LIBERO_ACTION_MODE,
+    LIBERO_SELECTED_STATS_SCHEMA_VERSION,
     LIBERO_STATE_DIM,
     LIBERO_STATE_MODE,
+    load_libero_stats,
     sha256_file,
 )
+from sana_wam.dataloader.libero_selected_stats import (
+    validate_libero_selected_stats_for_config,
+    validate_libero_window_coverage_for_config,
+)
+
+
+LIBERO_PRODUCTION_DATASET_ROOTS = tuple(
+    sorted(
+        (
+            "/DATA/share/LIBERO/libero/libero_spatial_no_noops_1.0.0_lerobot",
+            "/DATA/share/LIBERO/libero/libero_object_no_noops_1.0.0_lerobot",
+            "/DATA/share/LIBERO/libero/libero_goal_no_noops_1.0.0_lerobot",
+            "/DATA/share/LIBERO/libero/libero_10_no_noops_1.0.0_lerobot",
+        )
+    )
+)
+LIBERO_PRODUCTION_STATS_PATH = (
+    "/DATA/share/LIBERO/sana_wam_libero_train_all4_excl_goal82_stats_v2.npy"
+)
+LIBERO_PRODUCTION_POPULATION_COUNTS = {
+    "action_rows": 271_644,
+    "excluded_episodes": 1,
+    "selected_episodes": 1_692,
+    "source_episodes": 1_693,
+    "source_state_rows": 273_465,
+    "state_rows": 273_336,
+    "suites": 4,
+}
+
+
+def _config_value(config: Any, path: str, default: Any = None) -> Any:
+    value = OmegaConf.select(config, path, default=default)
+    if OmegaConf.is_config(value):
+        value = OmegaConf.to_container(value, resolve=True)
+    return value
+
+
+def _validate_libero_production_population_config(config: Any) -> None:
+    exact = {
+        "dataloader.excluded_episodes": ["libero_goal_no_noops_1.0.0_lerobot:82"],
+        "dataloader.seed": 20260806,
+        "dataloader.split": "train",
+        "dataloader.val_ratio": 0.0,
+        "dataloader.verify_known_repairs": True,
+        "dataloader.verify_stats_source": True,
+    }
+    for path, expected in exact.items():
+        observed = _config_value(config, path, default=None)
+        if type(observed) is not type(expected) or observed != expected:
+            raise ValueError(
+                f"formal LIBERO population requires {path}={expected!r}, "
+                f"got {observed!r}"
+            )
+
+    for path, minimum in (
+        ("dataloader.num_frames", 2),
+        ("dataloader.repeat", 1),
+        ("dataloader.window_stride", 1),
+    ):
+        observed = OmegaConf.select(config, path, default=None)
+        if observed is not None and (
+            isinstance(observed, bool)
+            or not isinstance(observed, int)
+            or observed < minimum
+        ):
+            raise ValueError(
+                f"LIBERO training contract requires {path} to be an integer "
+                f">= {minimum}, got {observed!r}"
+            )
+
+    raw_roots = _config_value(config, "dataloader.dataset_roots", default=None)
+    if (
+        not isinstance(raw_roots, list)
+        or len(raw_roots) != 4
+        or any(not isinstance(root, str) for root in raw_roots)
+    ):
+        raise ValueError("formal LIBERO population requires exactly four dataset roots")
+    candidates = [Path(str(root)).expanduser() for root in raw_roots]
+    if any(candidate.is_symlink() for candidate in candidates):
+        raise ValueError("formal LIBERO dataset roots must not be symlinks")
+    observed_roots = tuple(sorted(str(candidate.resolve()) for candidate in candidates))
+    if observed_roots != LIBERO_PRODUCTION_DATASET_ROOTS:
+        raise ValueError("formal LIBERO dataset roots differ from production roots")
+
+    raw_stats_path = _config_value(config, "dataloader.action_stats_path", default=None)
+    if not isinstance(raw_stats_path, str) or not raw_stats_path:
+        raise ValueError("formal LIBERO population requires action_stats_path")
+    stats_candidate = Path(raw_stats_path).expanduser()
+    if stats_candidate.is_symlink() or str(stats_candidate.resolve()) != (
+        LIBERO_PRODUCTION_STATS_PATH
+    ):
+        raise ValueError(
+            "formal LIBERO action_stats_path differs from reserved v2 path"
+        )
+
+
+def validate_libero_production_stats_source_config(cfg: Any) -> None:
+    """Validate all population-defining pins before exclusive publication."""
+
+    config = cfg if OmegaConf.is_config(cfg) else OmegaConf.create(cfg)
+    _validate_libero_production_population_config(config)
 
 
 def validate_libero_training_config(
@@ -50,7 +153,7 @@ def validate_libero_training_config(
     }
     for path, expected in exact.items():
         observed = OmegaConf.select(config, path, default=None)
-        if observed != expected:
+        if type(observed) is not type(expected) or observed != expected:
             raise ValueError(
                 f"LIBERO training contract requires {path}={expected!r}, "
                 f"got {observed!r}"
@@ -61,9 +164,7 @@ def validate_libero_training_config(
         "training.preserve_frozen_input_grad_modules",
         default=None,
     )
-    if preserve_input_grad is None or tuple(preserve_input_grad) != (
-        "video_backbone",
-    ):
+    if preserve_input_grad is None or tuple(preserve_input_grad) != ("video_backbone",):
         raise ValueError(
             "LIBERO training contract requires "
             "training.preserve_frozen_input_grad_modules=['video_backbone']"
@@ -82,6 +183,8 @@ def validate_libero_training_config(
 
     if not require_materialized_stats:
         return
+    validate_libero_production_stats_source_config(config)
+    validate_libero_window_coverage_for_config(config)
     stats_path = OmegaConf.select(config, "dataloader.action_stats_path", default=None)
     expected_sha256 = OmegaConf.select(
         config, "training.action_stats_sha256", default=None
@@ -93,6 +196,43 @@ def validate_libero_training_config(
     observed_sha256 = sha256_file(Path(stats_path))
     if observed_sha256 != expected_sha256.lower():
         raise ValueError("LIBERO action_stats_sha256 differs")
+    payload = load_libero_stats(stats_path)
+    if payload.get("schema_version") != LIBERO_SELECTED_STATS_SCHEMA_VERSION:
+        raise ValueError(
+            "formal LIBERO execution requires exclusion-aware selected-row stats v2"
+        )
+    expected_population_sha256 = OmegaConf.select(
+        config,
+        "training.action_stats_population_sha256",
+        default=None,
+    )
+    if (
+        not isinstance(expected_population_sha256, str)
+        or len(expected_population_sha256) != 64
+    ):
+        raise ValueError(
+            "LIBERO execution requires a pinned action_stats_population_sha256"
+        )
+    observed_population_sha256 = payload["population_manifest"].get(
+        "population_manifest_sha256"
+    )
+    if observed_population_sha256 != expected_population_sha256.lower():
+        raise ValueError("LIBERO action_stats_population_sha256 differs")
+    if dict(payload["population_manifest"].get("counts", {})) != (
+        LIBERO_PRODUCTION_POPULATION_COUNTS
+    ):
+        raise ValueError("formal LIBERO selected population counts differ")
+    validate_libero_selected_stats_for_config(
+        payload,
+        config,
+        verify_live_sources=True,
+    )
 
 
-__all__ = ["validate_libero_training_config"]
+__all__ = [
+    "LIBERO_PRODUCTION_DATASET_ROOTS",
+    "LIBERO_PRODUCTION_POPULATION_COUNTS",
+    "LIBERO_PRODUCTION_STATS_PATH",
+    "validate_libero_production_stats_source_config",
+    "validate_libero_training_config",
+]
