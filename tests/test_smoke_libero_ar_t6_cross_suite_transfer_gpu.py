@@ -14,6 +14,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 RUNNER = ROOT / "scripts/smoke_libero_ar_t6_cross_suite_transfer_gpu.py"
 T5_RUNNER = ROOT / "scripts/smoke_libero_ar_t5_cross_task_transfer_gpu.py"
+DOC = ROOT / "docs/libero/LIBERO_T6_CROSS_SUITE_TRANSFER_20260806.md"
 
 OBJECT_NAME = "libero_object_no_noops_1.0.0_lerobot"
 GOAL_NAME = "libero_goal_no_noops_1.0.0_lerobot"
@@ -752,3 +753,20 @@ def test_t6_result_contract_has_only_the_narrow_cross_suite_claim() -> None:
     ):
         assert forbidden not in source
     assert "this is not part of the frozen T6 primary transfer gate" in source
+
+
+def test_t6_document_records_the_frozen_result() -> None:
+    text = DOC.read_text(encoding="utf-8")
+    for fragment in (
+        "executed / frozen / T6_CROSS_SUITE_TRANSFER_GO",
+        "708b1d8569866608898031f9116566d52fdeb742",
+        "004f444168f26162f012c408193e119a8ff428a64f90e7dbc9ab595df9082903",
+        "67a02fcc85508e03f136e09221a6a9d4",
+        "4855f3771b80349547c985d137426cce79e25597f910eff88e136328424b8b89",
+        "0.1576670424",
+        "0.1767697439",
+        "0.1526860825",
+        "not rollout success",
+    ):
+        assert fragment in text
+    assert "Result placeholder" not in text

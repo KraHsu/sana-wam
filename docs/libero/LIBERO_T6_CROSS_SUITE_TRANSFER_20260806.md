@@ -1,6 +1,6 @@
 # LIBERO T6 Cross-Suite Transfer Screen
 
-Status: **proposed / not executed**
+Status: **executed / frozen / T6_CROSS_SUITE_TRANSFER_GO**
 
 Date: 2026-08-06
 
@@ -368,9 +368,52 @@ fresh root.
   may be diagnosed; any rerun requires a corrected frozen source revision,
   separate authorization, a fresh nonce, and a never-created root.
 
-## 12. Result placeholder
+## 12. Frozen result
 
-No T6 execution root, GPU identity, source commit, runner SHA, loss, verdict,
-or RESULT artifact exists at pre-registration time. Populate this section only
-from the first valid terminal root. If the first authorized root fails, record
-the immutable failure root and stop.
+The first execution completed validly and is frozen. No rerun was used.
+
+- source commit:
+  `708b1d8569866608898031f9116566d52fdeb742`;
+- runner SHA256:
+  `004f444168f26162f012c408193e119a8ff428a64f90e7dbc9ab595df9082903`;
+- config SHA256:
+  `5df45965d6de3a32c5154a8bb4c41d29d20113bbe8908c1a98c8c63a7bff4a45`;
+- physical GPU / UUID:
+  `0 / GPU-1ec28cfb-f501-23f3-f865-275a744ca053`;
+- nonce:
+  `67a02fcc85508e03f136e09221a6a9d4`;
+- immutable root:
+  `/DATA/share/sana_wam_libero_nonformal_screens/t6/708b1d856986/libero-t6-crosssuite3-fixed20-67a02fcc85508e03f136e09221a6a9d4`;
+- RESULT SHA256:
+  `4855f3771b80349547c985d137426cce79e25597f910eff88e136328424b8b89`;
+- terminal state: root mode `0500`, sole `RESULT.json` mode `0400`;
+- typed verdict: `T6_CROSS_SUITE_TRANSFER_GO`.
+
+Paired action-loss results:
+
+| Label | Dataset | Task / episode | Pre | Post | Post/pre | Improved |
+|---|---|---:|---:|---:|---:|---|
+| S1 | Object | 3 / 82 | `14.6965847015` | `2.3171670437` | `0.1576670424` | yes |
+| S2 | Goal | 2 / 70 | `12.0664806366` | `2.1329886913` | `0.1767697439` | yes |
+| S3 | LIBERO-10 | 3 / 259 | `20.4311523438` | `3.1195526123` | `0.1526860825` | yes |
+
+The median ratio is `0.1576670424`; all three samples improved, so the frozen
+primary gate passed. The run recorded exactly 4 preparations, 28 architecture
+forwards, 20 backward calls, and 20 optimizer steps, with zero S1/S2/S3
+samples entering backward or update. All 28 stochastic recipe signatures were
+identical to the frozen signature. All 560 FP32 masters covering 639,653,063
+elements updated across all four trainable roots.
+
+The expected and observed training-core projection SHA256 values both equal
+`e34a2dd0ae2dfe28303dcd9baf64ffc5800d002b0b7646b89dde2aafa132c352`,
+and the current projection is object-equal to the frozen T5 projection. Thus
+the result is attributable to the pre-registered cross-suite probe axis rather
+than a changed Spatial optimization path.
+
+This closes the planned update-free loss-transfer breadth ladder through three
+non-Spatial suites. It does not change the interpretation boundary in Section
+10: the evidence is sample-level loss transfer under one initialization and
+recipe, not rollout success, suite-distribution generalization, benchmark
+performance, stable training, formal admission, or deployment. The next
+architecture-validation question is the separately pre-registered four-suite
+cyclic micro-learnability experiment described in Section 11.
