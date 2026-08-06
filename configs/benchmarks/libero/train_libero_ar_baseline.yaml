@@ -1,10 +1,12 @@
 # LIBERO-native AR baseline training template.
 #
 # This file is a source/config contract, not training authority. Before use,
-# materialize action_stats_path with scripts/build_libero_stats.py and pin its
-# SHA256 in training.action_stats_sha256. The current CACH-A4 reduced path has a
-# strong-stop result; this deployable AR baseline isolates the benchmark/data
-# integration and is not presented as the final CACH architecture.
+# materialize action_stats_path with a still-pending exclusion-aware
+# selected-training-row builder and pin both its provenance and SHA256. The
+# metadata-only scripts/build_libero_stats.py output is smoke-only and must not
+# be used for formal training. The current CACH-A4 reduced path has a strong-stop
+# result; this deployable AR baseline isolates the benchmark/data integration
+# and is not presented as the final CACH architecture.
 
 model:
   architecture:
