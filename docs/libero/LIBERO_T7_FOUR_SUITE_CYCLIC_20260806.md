@@ -1,6 +1,7 @@
 # LIBERO T7 Four-Suite Cyclic Micro-Learnability Screen
 
-Status: **executed / `T7_FOUR_SUITE_CYCLIC_GO`**
+Status: **executed / typed numerical `T7_FOUR_SUITE_CYCLIC_GO` /
+post-run audit qualified**
 
 Date: 2026-08-06
 
@@ -475,7 +476,7 @@ same root.
 The root terminalized with one read-only `RESULT.json` and no `FAILED.json`.
 The canonical result SHA256 is
 `9f5181a30cd0d6b676f09315244f7560cd3902004f5f17ca833330e33cb44d3a`.
-The valid typed verdict is `T7_FOUR_SUITE_CYCLIC_GO`.
+The RESULT's typed verdict is `T7_FOUR_SUITE_CYCLIC_GO`.
 
 | Pair | A pre → post | A ratio | H pre → post | H ratio | Both improved |
 |---|---:|---:|---:|---:|---|
@@ -519,3 +520,14 @@ exactly. The harness does not compare frozen-buffer values across the update
 loop, and it performs full-tensor BF16/master projection equality checks only
 at steps 1 and 20; these are attribution-checking limits, not evidence of an
 observed runtime failure.
+
+An independent post-run source audit therefore classifies this as a verified
+identity/count/numerical-gate GO with incomplete proof of every stronger
+pre-registration validity sentence. In particular, cross-run bytewise fresh
+model/master fingerprints were unavailable, update-loop buffer invariance was
+not recorded, and full projection equality was sampled only at steps 1 and 20.
+The immutable RESULT remains internally consistent and must not be rewritten,
+but this qualification prevents using its typed GO as formal training
+admission. Per the project's architecture-first rule, no same-root rerun or
+non-core audit-only T7 revision is scheduled; the inexpensive checks should be
+carried into any separately registered successor harness.

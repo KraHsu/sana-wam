@@ -58,7 +58,8 @@ REF-GDN-CORRECTED
 9. 在独立的 LIBERO production-shaped `DualSystemARArchitecture` 验证线上，T1 至 T7
    已依次闭合 one-update、fixed-sample 20-update learnability、held-out recipe、同任务
    episode、跨 Spatial task 以及跨 Object/Goal/LIBERO-10 suite 的 update-free action-loss
-   transfer，以及四套件循环微学习；T7 为 `T7_FOUR_SUITE_CYCLIC_GO`。
+   transfer，以及四套件循环微学习；T7 RESULT 的 typed numerical verdict 为
+   `T7_FOUR_SUITE_CYCLIC_GO`，但受 post-run harness audit 限定。
 10. LIBERO T7 不改变 CACH-A4 reduced-path stop，也不是 benchmark success：其证据仅为
     一个初始化、一个 recipe、每套件一个更新样本与一个同任务 fresh episode 的 20-step
     loss-space screen。Object/Goal/LIBERO-10 的 A/H 配对改善，而 Spatial A/H 同时回退；
@@ -702,7 +703,7 @@ motion-sensitive primary；后者正是用于检查前者是否值得扩大投�
   CACH-A4 reduced path = REDUCED_ARCH_STOP
   AV-4 = NOT_UNLOCKED
   review token = CONSUMED
-  independent LIBERO production-shaped AR path = T7_FOUR_SUITE_CYCLIC_GO
+  independent LIBERO production-shaped AR path = T7 typed numerical GO / audit-qualified
 
 未开始或未通过：
   full CACH v0 package validation
@@ -742,7 +743,7 @@ training checkpoint，也没有运行 simulator 或 benchmark evaluator。
 | T4 | 保持 T2/T3 core，同 recipe，3 个 same-task update-held-out episodes | `T4_HELDOUT_SAMPLE_TRANSFER_GO` | ep16/405/40 全部改善；ratio `0.123714 / 0.139309 / 0.123339`，median `0.123714`；T3 core 逐值复现 |
 | T5 | 保持 T3/T4 core，同 recipe，3 个 mechanically selected distinct-task episodes | `T5_CROSS_TASK_TRANSFER_GO` | task7/1/4 的 ep36/325/11 全部改善；ratio `0.148637 / 0.113500 / 0.150387`，median `0.148637`；T4 core 逐值复现 |
 | T6 | 保持 T5 core，同 recipe，Object/Goal/LIBERO-10 各一个 mechanically selected sample | `T6_CROSS_SUITE_TRANSFER_GO` | S1/S2/S3 全部改善；ratio `0.157667 / 0.176770 / 0.152686`，median `0.157667`；T5 core 逐值复现 |
-| T7 | A0-A3 四套件循环 5 轮，共 20 updates；每套件一个同任务 fresh heldout | `T7_FOUR_SUITE_CYCLIC_GO` | A median ratio `0.625211`，H median `0.636552`，3/4 对应套件双改善；Spatial A/H 分别回退 `9.48% / 7.63%` |
+| T7 | A0-A3 四套件循环 5 轮，共 20 updates；每套件一个同任务 fresh heldout | typed numerical `T7_FOUR_SUITE_CYCLIC_GO` / audit-qualified | A median ratio `0.625211`，H median `0.636552`，3/4 对应套件双改善；Spatial A/H 分别回退 `9.48% / 7.63%` |
 
 T4 的 frozen training-core expected/observed projection SHA256 均为
 `e34a2dd0ae2dfe28303dcd9baf64ffc5800d002b0b7646b89dde2aafa132c352`，排除了
@@ -779,6 +780,12 @@ GO 不是 uniform four-suite improvement。运行精确执行 8 prepare / 36 for
 backward / 20 AdamW step，每个 A 恰好 5 次更新、每个 H 为 0；没有 SANA-WAM
 checkpoint、simulator、rollout 或 benchmark evaluation。
 
+独立 post-run audit 重算了 canonical RESULT、source/config/runner pins、manifest、顺序、
+计数和三重数值门，均一致；同时指出更强的预注册 validity 文字没有被全部采集证明：没有
+跨 run 的 bytewise fresh-model/master fingerprint，update loop 没有全程 buffer baseline，
+且全量 BF16/master projection equality 只在 step 1/20 检查。因此 T7 保留 immutable typed
+numerical GO，但严格限定为 architecture signal，不能作为 formal training admission。
+
 主要冻结证据：
 
 | Run | Immutable root | RESULT SHA256 |
@@ -793,10 +800,10 @@ checkpoint、simulator、rollout 或 benchmark evaluation。
 
 当前可以支持的最强结论是：在一次初始化和固定 recipe 下，完整 production-shaped AR
 path 不仅具备单样本 learnability 和多轴 update-free loss transfer，也能用一个 persistent
-optimizer 在 20 次四套件循环更新中通过预注册的 train/fresh 双 median 与 3/4 联合改善门。
+optimizer 在 20 次四套件循环更新中通过 train/fresh 双 median 与 3/4 联合改善数值门。
 但是 Spatial 的训练样本与同任务 fresh episode 同时变差，说明已有明确的套件间干扰或
 顺序/尺度不平衡信号。T7 probes 仍属于训练 metadata 与 normalization population；该结果
 不证明 closed-loop success、LIBERO benchmark performance、suite-level distribution
-generalization、稳定长程优化或正式训练。loss-space architecture ladder 到 T7 已闭合；
+generalization、稳定长程优化或正式训练。loss-space architecture signal ladder 到 T7 已闭合；
 后续若继续，应是另行冻结的 bounded multi-suite training/admission 诊断，优先观察并处理
 Spatial 回退，而不是把 T7 GO 直接升级成正式训练或 benchmark 授权。
