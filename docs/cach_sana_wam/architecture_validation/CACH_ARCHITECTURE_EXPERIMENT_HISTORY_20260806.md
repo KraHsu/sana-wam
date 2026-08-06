@@ -55,6 +55,12 @@ REF-GDN-CORRECTED
    和 multi-seed confirmation 都没有执行。
 8. 项目没有进入正式训练、正式评测、formal admission、Global Stage 3、checkpoint
    训练或部署；不得宣称已有 504-step formal 结果或正式模型完成。
+9. 在独立的 LIBERO production-shaped `DualSystemARArchitecture` 验证线上，T1/T2/T3/T4
+   已依次闭合 one-update、fixed-sample 20-update learnability、held-out recipe transfer
+   和 same-task update-held-out episode transfer；T4 为 `T4_HELDOUT_SAMPLE_TRANSFER_GO`。
+10. LIBERO T4 不改变 CACH-A4 reduced-path stop，也不是 benchmark success：其证据仅为
+    一个初始化、一个 recipe、同一 Spatial task/normalization population 内的 action-loss
+    transfer。跨 task/suite、rollout、正式训练和正式评测仍未执行。
 
 ## 2. 证据等级与命名
 
@@ -704,3 +710,51 @@ motion-sensitive primary；后者正是用于检查前者是否值得扩大投�
 如果继续研发，下一项必须是一个新的、明确注册的 architecture hypothesis 和 fresh
 card/root，而不是再次执行 AV3-R1、延长 A4 预算、选择 checkpoint/window/seed，或复用
 任何旧 root。该下一步尚未由本文选择或授权。
+
+## 13. 后续补记：LIBERO production-shaped AR 验证线
+
+在上述 RoboTwin/CACH-A4 reduced-path 停止后，项目新增了一条独立的 LIBERO
+architecture-validation 线。它运行的是完整 production-shaped
+`DualSystemARArchitecture`：约 5.84B 总参数，冻结 SANA video backbone，只训练
+`action_backbone`、`proprio_encoder`、`proprio_video_embed` 和
+`proprio_action_embed` 共 639,653,063 个参数；video timestep 使用 continuous FP32
+T1，optimizer 使用 persistent FP32 masters，再精确投影到 BF16 model tensors。
+
+这条线不是 AV3-R3 的重跑，也不是把 `REDUCED_ARCH_STOP` 改写成 GO。前者检验的是
+CACH-A4 reduced action-delta operator 的 prospective motion/delta generalization；后者
+检验完整 AR training path 在真实 LIBERO observation/action loss 上是否数值闭合并发生
+有限迁移。两类证据对象、loss 和判定门都不同。
+
+前置 closure 依次完成：CPU real-data smoke、单 GPU update-free forward、gradient-
+checkpointing 传播修复、frozen-video input-gradient 修复、FP32 optimizer-master 修复，
+以及排除 Goal episode 82 后的 selected-row statistics v2。没有加载或保存 SANA-WAM
+training checkpoint，也没有运行 simulator 或 benchmark evaluator。
+
+| 阶段 | 固定问题与预算 | 终态 | 关键结果 |
+|---|---|---|---|
+| T1 | Spatial ep0/start0，fresh init，1 个 AdamW update | one-update PASS | 560/560 FP32 masters 获得 finite nonzero grad 并更新；四个 trainable roots 全覆盖 |
+| T2 | 同一 ep0、同一 recipe，20 updates | `T2_FIXED_SAMPLE_LEARNABILITY_GO` | action loss `13.679719 -> 1.733191`，ratio `0.126698`；训练曲线振荡且 20/20 gradients 被 clip |
+| T3 | 保持 T2 core，增加 3 个 update-free held-out recipes | `T3_HELDOUT_RECIPE_TRANSFER_GO` | 3/3 改善；ratio `0.124502 / 0.416718 / 0.416813`，median `0.416718`；T2 core 逐值复现 |
+| T4 | 保持 T2/T3 core，同 recipe，3 个 same-task update-held-out episodes | `T4_HELDOUT_SAMPLE_TRANSFER_GO` | ep16/405/40 全部改善；ratio `0.123714 / 0.139309 / 0.123339`，median `0.123714`；T3 core 逐值复现 |
+
+T4 的 frozen training-core expected/observed projection SHA256 均为
+`e34a2dd0ae2dfe28303dcd9baf64ffc5800d002b0b7646b89dde2aafa132c352`，排除了
+successor measurements 改变 ep0 update path 的解释。精确执行计数为四次
+`prepare_inputs`、28 次 architecture forward、20 次 backward、20 次 AdamW step；
+三个 held-out episode 从未进入 backward/update，post probe 没有重新 prepare。
+
+主要冻结证据：
+
+| Run | Immutable root | RESULT SHA256 |
+|---|---|---|
+| T1 FP32-master | `/tmp/sana-wam-libero-t1-one-update-fp32master-0337e28-20260806-a3` | `9d9c139fd67baa8c131ad9e6537862536b8262b732c2fda668a7c8b8b6a8621a` |
+| T2 | `/DATA/share/sana_wam_libero_nonformal_screens/t2/2dc1ce730df3/libero-t2-fixed20-20260806-a1` | `67d250cdb13470bea9e9fa53531d3c76c65145e5040dc7a45079d84ac4960a57` |
+| T3 | `/DATA/share/sana_wam_libero_nonformal_screens/t3/ac431f8727ac/libero-t3-heldout3-fixed20-220afb60725d0cfd591bc4fe225cdd21` | `c883608f2a47b6258f824d4d97a94f8a390d03bab671a592fb758eea61b3a01e` |
+| T4 | `/DATA/share/sana_wam_libero_nonformal_screens/t4/7db8182ef46f/libero-t4-heldout3-fixed20-36120c596971575d286d378df42ac564` | `4c33aaff6d202068d77efc0ac406c74198c56e72527cfabdde046fc9a3a4b6f4` |
+
+当前可以支持的最强结论是：在一次初始化、固定 recipe 和一个 Spatial task 内，20 次
+ep0 update 不只降低训练窗口 loss，也跨三个 diffusion recipes、跨三个不同 episode
+降低 action loss。T4 probes 仍属于同一训练 metadata 与 normalization population，
+因此只是 update-held-out，不是严格 dataset holdout。它不证明跨 task/suite、closed-loop
+success、LIBERO benchmark performance、稳定优化或正式训练。下一项最小独立架构问题
+是 same-suite cross-task loss transfer；该候选不因本文而自动获得执行授权。

@@ -1,7 +1,55 @@
 # LIBERO T4 Held-Out Sample Transfer Screen
 
-Status: pre-registered for execution on 2026-08-06. This document claims no
-T4 result before a fresh terminal root has been frozen.
+Status: completed on 2026-08-06 with
+`T4_HELDOUT_SAMPLE_TRANSFER_GO`. The pre-registered section below is preserved;
+the result section was added only after the unique root became terminal and
+read-only.
+
+## Frozen execution result
+
+- Execution source commit:
+  `7db8182ef46fce367f04f66bfbc34690fa86592b`.
+- Runner SHA256:
+  `3d449761861b7fe75816d4d186b2e82402c160422eeb5f490fbb61ed274f088c`.
+- Physical device: GPU 0 / UUID
+  `GPU-1ec28cfb-f501-23f3-f865-275a744ca053`, the same H200 used by T3.
+- Frozen root:
+  `/DATA/share/sana_wam_libero_nonformal_screens/t4/7db8182ef46f/libero-t4-heldout3-fixed20-36120c596971575d286d378df42ac564`.
+- `RESULT.json` SHA256:
+  `4c33aaff6d202068d77efc0ac406c74198c56e72527cfabdde046fc9a3a4b6f4`.
+- Terminal modes: root `0500`, `RESULT.json` `0400`; no `FAILED.json`.
+- Runtime scope matched exactly: four preparations, 28 architecture forwards,
+  20 backwards, 20 optimizer steps, zero held-out samples in backward/update,
+  and zero post-probe re-preparations.
+
+The frozen T3 training-core projection reproduced exactly. Expected and
+observed canonical projection SHA256 are both
+`e34a2dd0ae2dfe28303dcd9baf64ffc5800d002b0b7646b89dde2aafa132c352`.
+This includes the ep0 initial/final loss, both full 20-point curves, all
+non-timing per-step gradient/update/Adam telemetry, optimizer summaries,
+training input shapes and fixed-recipe signatures. The successor probe axis
+therefore did not drift the update path.
+
+| Probe | Pre action loss | Post action loss | Post/pre ratio | Improved |
+| --- | ---: | ---: | ---: | --- |
+| H1 / episode 16 | 13.925467 | 1.722777 | 0.123714 | yes |
+| H2 / episode 405 | 13.151771 | 1.832160 | 0.139309 | yes |
+| H3 / episode 40 | 13.547310 | 1.670912 | 0.123339 | yes |
+
+The median ratio was `0.123714`, all `3/3` probes strictly improved, and the
+pre-registered gate (`median <= 0.95` and at least `2/3` improvements) passed.
+The training sample also reproduced its prior diagnostic reduction from
+`13.679719` to `1.733191` (`0.126698` ratio). There were no secondary
+diagnostic warnings.
+
+This is strong evidence that the full production-shaped
+`DualSystemARArchitecture` update path learns a same-task signal shared across
+these three update-held-out episodes, rather than merely memorizing the ep0
+window. It remains a loss-space result under one initialization and one recipe.
+Because all probes come from the same task and normalization population, it
+does not establish strict dataset holdout, cross-task transfer, rollout success
+or LIBERO benchmark performance. This experiment does not reopen or reverse
+the separate CACH-A4 reduced-path `REDUCED_ARCH_STOP` result.
 
 ## Question
 
