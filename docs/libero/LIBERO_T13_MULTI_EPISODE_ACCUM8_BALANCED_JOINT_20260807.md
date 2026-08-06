@@ -1,6 +1,7 @@
 # LIBERO T13：Multi-Episode Accumulation-8 Balanced-JOINT
 
-状态：**source implementation；尚未执行，未创建运行 root。**
+状态：**已执行；valid frozen non-formal result；科学 verdict 为
+`T13_MULTI_EPISODE_ACCUM8_BALANCED_JOINT_REPLICATED`。**
 
 T13 只验证一个核心问题：在 T12 的四个固定任务上，把单个 update/heldout episode
 扩展为每任务两个 update episode 与两个 heldout episode，并把每个 macro 的八次
@@ -9,8 +10,8 @@ singleton micro-backward 对齐 production 的 `batch_size=1`、
 样本的 action loss。
 
 本 screen 不是正式训练、benchmark 评测、simulator rollout、admission 或部署。
-它允许未来单 GPU 执行时加载冻结 SANA base construction checkpoint，但禁止加载或
-保存 SANA-WAM training checkpoint。
+本次单 GPU 执行允许加载冻结 SANA base construction checkpoint，但禁止加载或保存
+SANA-WAM training checkpoint。
 
 ## 1. 直接前序
 
@@ -132,13 +133,13 @@ T13_MULTI_EPISODE_ACCUM8_JOINT_ARM_VALID
 
 ## 6. Source、root 与解释边界
 
-本阶段只准备三个新增文件：
+本 experiment 的 source surface 只有三个新增文件：
 
 - `docs/libero/LIBERO_T13_MULTI_EPISODE_ACCUM8_BALANCED_JOINT_20260807.md`
 - `scripts/smoke_libero_ar_t13_multi_episode_accum8_balanced_joint_gpu.py`
 - `tests/test_smoke_libero_ar_t13_multi_episode_accum8_balanced_joint_gpu.py`
 
-未来执行 namespace：
+执行 namespace：
 
 ```text
 /DATA/share/sana_wam_libero_nonformal_screens/t13/{source_commit[:12]}/libero-t13-multi-episode-accum8-balanced-joint-fixed20-{nonce}
@@ -149,4 +150,44 @@ root 必须 fresh one-shot；terminal root `0500`，唯一 `RESULT.json` 或 `FA
 
 即使得到 `REPLICATED`，也只支持单 seed、四任务、短程 loss-space 下的多 episode
 accumulation-8 保持结论；不支持 rollout success、LIBERO benchmark score、正式训练
-readiness 或部署能力。当前文档不包含运行结果，因为 T13 尚未执行。
+readiness 或部署能力。
+
+## 7. 冻结运行结果
+
+执行身份：
+
+- source commit：`68fa88157973f59383a87be1cb3107f5824e64cf`
+- runner SHA256：
+  `ddbd141f3c32f9f89c4e936b1432d379cf56f0b886f84f38406fa4481654efb8`
+- immutable root：
+  `/DATA/share/sana_wam_libero_nonformal_screens/t13/68fa88157973/libero-t13-multi-episode-accum8-balanced-joint-fixed20-ce58b18994fa066b49b5e52bbd98b81e`
+- RESULT SHA256：
+  `a75739991561965d212ad98cc2504cabf8696b2dcaf2e0ad5b46aa774ca00763`
+- execution verdict：`T13_MULTI_EPISODE_ACCUM8_JOINT_ARM_VALID`
+- scientific verdict：`T13_MULTI_EPISODE_ACCUM8_BALANCED_JOINT_REPLICATED`
+
+全部 8 个 update 与 8 个 heldout sample 的未舍入 ratio 都严格小于 1：
+
+| suite | update ratios | heldout ratios | four-sample q | T12 q（诊断） |
+|---|---:|---:|---:|---:|
+| Spatial | `0.110386 / 0.101507` | `0.097024 / 0.105478` | `0.103599` | `0.081463` |
+| Object | `0.127670 / 0.121941` | `0.135228 / 0.114424` | `0.124816` | `0.118673` |
+| Goal | `0.127943 / 0.128913` | `0.137259 / 0.132376` | `0.131623` | `0.114098` |
+| LIBERO-10 | `0.079781 / 0.085035` | `0.072352 / 0.078888` | `0.079014` | `0.071433` |
+
+update ratio median 为 `0.11616346529286567`，heldout ratio median 为
+`0.10995106948665566`。四个 T13 `q` 都高于对应 T12 `q`，但该跨 cohort 比较按预注册
+契约只作诊断，既不改变 16/16 严格改善，也不参与 scientific verdict。
+
+运行精确执行 `16 prepare / 192 forward / 160 backward / 20 optimizer step`，其中
+architecture measurement/training forwards 分别为 `32 / 160`；20/20 macro 的八次
+micro-backward 之间均通过 no-mutation 证据。20 个 accumulation-8 macro update 加
+32 次 measurement 耗时 `251.37178307957947 s`。update 阶段 CUDA peak
+allocated/reserved 分别为 `44551804416 / 49673142272` bytes。
+
+本次只加载冻结 SANA base construction checkpoint；没有加载或保存 SANA-WAM training
+checkpoint，没有运行 simulator、rollout、benchmark evaluation 或 formal training。
+唯一 warning 仍是已知的 SANA partial load（`280 missing / 0 unexpected`），没有
+secondary diagnostic warning。该结果把 T12 的单 update/heldout episode 证据扩展为每
+任务两对 episodes，并证明八次 singleton accumulation 的 production boundary 在本次
+短程 loss-space screen 上数值闭合；它不构成正式训练或评测 admission。

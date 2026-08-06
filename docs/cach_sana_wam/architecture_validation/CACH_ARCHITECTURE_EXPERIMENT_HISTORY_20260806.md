@@ -6,7 +6,7 @@
 
 规范主机：`H200`  
 规范工作树：`/home/zch/workspace/sana-wam`  
-主仓 T12 source commit：`bf4e6f43395e0ba2c177d81856ad37f87c6e91fe`
+主仓 T13 source commit：`68fa88157973f59383a87be1cb3107f5824e64cf`
 Sana gitlink：`16b9cec673e3335724ba2d8db25de7f9ed229292`
 
 本文是一份可独立阅读的历史快照，汇总截至当前已经设计的架构、基础实现、所有关键
@@ -19,7 +19,7 @@ predecessor、冻结 root、review token 或 gate 状态。
 
 ## 1. 当前结论
 
-截至 2026-08-06，已实际执行的 action-conditioned 架构主线为：
+截至 2026-08-07，已实际执行的 action-conditioned 架构主线为：
 
 ```text
 REF-GDN-CORRECTED
@@ -56,7 +56,7 @@ REF-GDN-CORRECTED
    和 multi-seed confirmation 都没有执行。
 8. 项目没有进入正式训练、正式评测、formal admission、Global Stage 3、checkpoint
    训练或部署；不得宣称已有 504-step formal 结果或正式模型完成。
-9. 在独立的 LIBERO production-shaped `DualSystemARArchitecture` 验证线上，T1 至 T12
+9. 在独立的 LIBERO production-shaped `DualSystemARArchitecture` 验证线上，T1 至 T13
    已依次闭合 one-update、fixed-sample 20-update learnability、held-out recipe、同任务
    episode、跨 Spatial task 以及跨 Object/Goal/LIBERO-10 suite 的 update-free action-loss
    transfer、四套件循环微学习与相位旋转诊断。T7 的 typed numerical verdict 为
@@ -73,8 +73,10 @@ REF-GDN-CORRECTED
     训练和正式评测仍未执行。
 11. T10 用 exact-balanced simultaneous JOINT objective 消除了 matched sequential overwrite；
     T11 在同任务全新 episodes 上复现，T12 又在四个此前从未 model-facing 的新任务上得到
-    8/8 update/heldout ratio 严格小于 1。T12 的 update/heldout median ratio 分别为
-    `0.099378 / 0.096183`，把该 topology 的证据扩展到新任务身份；仍不等于 rollout、
+    8/8 update/heldout ratio 严格小于 1。T13 保持 T12 任务，将每任务扩为两个 update
+    与两个 heldout episodes，并将八次 singleton micro-backward 对齐 production
+    accumulation-8 boundary 后，16/16 ratio 仍严格小于 1；update/heldout median 分别为
+    `0.116163 / 0.109951`。这把证据扩展到多 episode accumulation，但仍不等于 rollout、
     benchmark 或正式训练结论。
 
 ## 2. 证据等级与命名
@@ -714,7 +716,7 @@ motion-sensitive primary；后者正是用于检查前者是否值得扩大投�
   CACH-A4 reduced path = REDUCED_ARCH_STOP
   AV-4 = NOT_UNLOCKED
   review token = CONSUMED
-  independent LIBERO production-shaped AR path = T12 new-task balanced joint replicated
+  independent LIBERO production-shaped AR path = T13 multi-episode accumulation-8 balanced joint replicated
 
 未开始或未通过：
   full CACH v0 package validation
@@ -760,6 +762,7 @@ training checkpoint，也没有运行 simulator 或 benchmark evaluator。
 | T10 | matched SEQ 与四套件等权 JOINT 各 20 macro steps；每个 macro 固定 A0-A3 四次 micro-backward 后仅一次 update | `T10_BALANCED_JOINT_SIMULTANEOUS_RETENTION_SUPPORTS_OVERWRITE` | SEQ 对 T7 八个 terminal loss 零误差复现；JOINT 的 8/8 `rA/rH<1`，4/4 q 低于 T9 median，3/4 suite componentwise Pareto 优于 SEQ |
 | T11 | 保持 T10 balanced-JOINT core/任务/seed/预算，为四个 suite 换用机械选定的全新 update/probe episodes | `T11_SAME_TASK_NEW_EPISODE_BALANCED_JOINT_REPLICATED` | 新 episodes 上 8/8 `rA/rH<1`，update/held-out median ratio 为 `0.200040 / 0.206788`；4/4 q 均低于 T10 JOINT q |
 | T12 | 保持 T11 balanced-JOINT topology/seed/预算，换用四个此前从未 model-facing 的机械选定新任务，每任务一个 update 与同任务 heldout episode | `T12_NEW_TASK_BALANCED_JOINT_REPLICATED` | 新任务上 8/8 `rA/rH<1`，update/heldout median ratio 为 `0.099378 / 0.096183`；4/4 q 均低于 T11 q（只作诊断） |
+| T13 | 保持 T12 四个任务/seed/20-step objective，每任务扩为两个 update 与两个 heldout episodes；每 macro 八次 singleton micro-backward 对齐 production accumulation-8 boundary | `T13_MULTI_EPISODE_ACCUM8_BALANCED_JOINT_REPLICATED` | 16/16 ratio `<1`，update/heldout median 为 `0.116163 / 0.109951`；4/4 q 略高于 T12（只作跨 cohort 诊断） |
 
 T4 的 frozen training-core expected/observed projection SHA256 均为
 `e34a2dd0ae2dfe28303dcd9baf64ffc5800d002b0b7646b89dde2aafa132c352`，排除了
@@ -893,6 +896,22 @@ step，20/20 no-intra-macro mutation 证据通过。独立审计重算 83 项检
 assets 和全部前序 pins，得到 0 failure、0 Blocker/Major/Minor。没有 SANA-WAM checkpoint、
 simulator、rollout、benchmark evaluation 或 formal training。
 
+T13 保持 T12 的四个任务、initialization seed、loss recipe 和 20-step balanced-JOINT
+objective，但在每任务上机械选择两个 update 与两个 heldout episodes，并把每 macro 的
+八次 singleton micro-backward 对齐 production `batch_size=1`、
+`gradient_accumulation_steps=8` boundary。source commit 为
+`68fa88157973f59383a87be1cb3107f5824e64cf`，runner SHA256 为
+`ddbd141f3c32f9f89c4e936b1432d379cf56f0b886f84f38406fa4481654efb8`。16 个样本的
+ratio 全部严格小于 1；update/heldout median 分别为
+`0.11616346529286567 / 0.10995106948665566`。Spatial、Object、Goal、LIBERO-10 的
+四样本 q 分别为 `0.103599 / 0.124816 / 0.131623 / 0.079014`。4/4 q 均略高于 T12，
+但该跨 cohort 比较预注册为 classifier 外诊断，不改变
+`T13_MULTI_EPISODE_ACCUM8_BALANCED_JOINT_REPLICATED`。运行精确为 16 prepare /
+192 forward / 160 backward / 20 optimizer step，20/20 no-intra-macro mutation 证据
+通过；核心 update/measurement 耗时 `251.37178307957947 s`，update peak
+allocated/reserved 为 `44551804416 / 49673142272` bytes。没有加载或保存 SANA-WAM
+checkpoint，也没有 simulator、rollout、benchmark evaluation 或 formal training。
+
 主要冻结证据：
 
 | Run | Immutable root | RESULT SHA256 |
@@ -913,9 +932,10 @@ simulator、rollout、benchmark evaluation 或 formal training。
 | T10 aggregate | `/DATA/share/sana_wam_libero_nonformal_screens/t10_aggregate/128e1be8cd48/libero-t10-exact-balanced-joint-combined-f77c1cd125343922634395db86812db9` | `8fcd26ea3a59fe6e01cf8f279301c899ed5dab541ada9c57e2ce85888abd147b` |
 | T11 JOINT | `/DATA/share/sana_wam_libero_nonformal_screens/t11/7d53d618234e/libero-t11-same-task-new-episode-balanced-joint-fixed20-05e0d719fbc5c25e66ddf435cb47eba2` | `6da12f2e3622d4e6427070bfd10b3dab9550c338a834b7662309cefea98d7417` |
 | T12 JOINT | `/DATA/share/sana_wam_libero_nonformal_screens/t12/bf4e6f43395e/libero-t12-new-task-balanced-joint-fixed20-09032d945cdf4dac558ab13b9dabafdd` | `c1f045e62c854ab897305fbed504e765bd229d02479d2d11861f210d26abfe08` |
+| T13 JOINT | `/DATA/share/sana_wam_libero_nonformal_screens/t13/68fa88157973/libero-t13-multi-episode-accum8-balanced-joint-fixed20-ce58b18994fa066b49b5e52bbd98b81e` | `a75739991561965d212ad98cc2504cabf8696b2dcaf2e0ad5b46aa774ca00763` |
 
-当前可以支持的最强结论是：在相同 seed 的三次 fresh initialization、三组各八个
-真实样本和固定 recipe 下，完整
+当前可以支持的最强结论是：在相同 seed 的四次 fresh initialization、三组各八个及
+一组十六个真实样本和固定 recipe 下，完整
 production-shaped AR path 不仅具备单样本 learnability 与多轴 update-free loss transfer，
 而且其四套件顺序训练中的共同 position/retention penalty 可被 exact-balanced joint
 objective 消除。T10 的 matched SEQ 精确复现 T7，排除了新 harness 改变历史 sequential
@@ -923,14 +943,16 @@ path 的解释；matched JOINT 在相同 optimizer-step、raw-backward 和累计
 预算下让 8/8 train/fresh ratios 同时低于 1。T11 又在相同任务但全新
 update/probe episodes 上复现了 8/8 同时改善；T12 再在四个从未 model-facing 的新任务
 及其 fresh heldout episodes 上得到 8/8 同时改善，说明该 capacity/retention signal
-既不依赖 T10 的特定 episode 组合，也不局限于 T1-T11 已消费任务。因此 balanced simultaneous multi-suite
-objective 是当前最有证据支持的 successor training topology，继续旋转 sequential
-phase 或只重复 T10 固定样本已不再是高价值核心实验。
+既不依赖 T10 的特定 episode 组合，也不局限于 T1-T11 已消费任务。T13 进一步把每任务
+扩成两个 update 与两个 heldout episodes，并在 production-matched accumulation-8 boundary
+上得到 16/16 ratio 严格改善。因此 balanced simultaneous multi-suite objective 是当前
+最有证据支持的 successor training topology，继续旋转 sequential phase、只重复 T10
+固定样本或再次做单 episode 扩展已不再是高价值核心实验。
 
-该结论仍是 single-seed、short-horizon、non-formal loss-space evidence。T7-T12 probes
-属于训练 metadata 与 normalization population；T12 只增加了每 suite 一个新任务的一对
-episodes，不是严格数据集 holdout。结果不证明 closed-loop success、LIBERO
+该结论仍是 single-seed、short-horizon、non-formal loss-space evidence。T7-T13 probes
+属于训练 metadata 与 normalization population；T12/T13 只覆盖每 suite 一个新任务及
+有限 episodes，不是严格数据集 holdout。结果不证明 closed-loop success、LIBERO
 benchmark performance、suite-level distribution generalization、长程 optimizer stability
-或正式训练。下一步的高价值证据应优先扩展每套件 episode/mini-batch 规模，之后再检查
-fresh seed，并保持 fresh source/root；在那之前不能把 T12 verdict 直接升级成
+或正式训练。单层 episode/mini-batch 扩展已由 T13 完成；下一步高价值核心证据应检查
+fresh initialization seed，并保持 fresh source/root。在那之前不能把 T13 verdict 直接升级成
 正式训练、checkpoint 或 benchmark admission。
