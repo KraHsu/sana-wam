@@ -175,8 +175,15 @@ uv pip install --python .venv/bin/python -r benchmarks/libero/requirements-data.
 ```
 
 This dependency is kept outside `pyproject.toml` and `uv.lock` because those
-files are inputs to frozen predecessor evidence. The command above has not been
-run in this integration phase.
+files are inputs to frozen predecessor evidence. The recorded H200 CPU smoke
+used the pinned data-only requirement; each new environment must still install
+and verify it explicitly.
+
+The subsequent full-2B, real-sample, update-free GPU construction smoke is
+recorded in
+[`docs/libero/LIBERO_AR_REAL_GPU_UPDATE_FREE_SMOKE_20260806.md`](../../docs/libero/LIBERO_AR_REAL_GPU_UPDATE_FREE_SMOKE_20260806.md).
+It validates one finite AR architecture forward, not training or benchmark
+quality.
 
 Normalization stats can be materialized without decoding Parquet or video:
 

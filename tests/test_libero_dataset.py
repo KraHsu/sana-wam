@@ -353,3 +353,4 @@ def test_training_template_matches_benchmark_checkpoint_contract() -> None:
     assert architecture["delta_action"] is False
     assert architecture["action_dim"] == 7
     assert architecture["state_dim"] == 8
+    assert architecture["ar_chunkwise_temporal_ops"] is True

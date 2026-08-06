@@ -20,6 +20,10 @@ model:
     attention_mask_mode: joint
     video_attention_mask_mode: first_frame_causal
     ar_frame_chunk_size: 2
+    # LIBERO episodes end at different lengths, so the final fixed-size window
+    # carries an explicit padded suffix.  The SANA AR padding contract requires
+    # every non-cached temporal operator to stay inside the physical AR chunk.
+    ar_chunkwise_temporal_ops: true
     ar_attn_window: 72
     ar_noisy_cond_prob: 0.5
     ar_cond_max_ratio: 0.3
