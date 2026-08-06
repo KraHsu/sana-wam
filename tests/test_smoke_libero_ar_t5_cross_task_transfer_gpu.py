@@ -403,10 +403,10 @@ def test_t5_pins_t4_and_reports_only_cross_task_semantics() -> None:
     assert ast.unparse(t5_projection).replace("T5", "T4") == ast.unparse(t4_projection)
 
 
-def test_t5_document_is_preregistered_not_result_filled() -> None:
+def test_t5_document_records_the_frozen_result() -> None:
     text = DOC.read_text(encoding="utf-8")
     for fragment in (
-        "proposed / not executed",
+        "executed / frozen GO",
         T4_RESULT_SHA256,
         ELIGIBLE_MANIFEST_SHA256,
         SELECTION_MANIFEST_SHA256,
@@ -418,10 +418,11 @@ def test_t5_document_is_preregistered_not_result_filled() -> None:
         "20",
         "T5_CROSS_TASK_TRANSFER_GO",
         "T5_CROSS_TASK_TRANSFER_INCONCLUSIVE",
+        "5150693a0751200ef431968a863c69f8ca08a7df",
+        "a656aaef1528537527fe830ad7d4107138b29e8e254b5606b43c46a47e323e83",
+        "cf7dd8a1b1cef03511d2026a48e4a271",
     ):
         assert fragment in text
-    assert "Observed loss" not in text
-    assert "T5 RESULT SHA256" not in text
     assert "state_encoder" not in text
     assert all(
         root in text

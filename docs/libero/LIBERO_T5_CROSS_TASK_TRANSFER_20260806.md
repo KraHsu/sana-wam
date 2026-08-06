@@ -1,6 +1,6 @@
 # LIBERO T5 Same-Suite Cross-Task Transfer Screen
 
-Status: **proposed / not executed**
+Status: **executed / frozen GO**
 
 Date: 2026-08-06
 
@@ -240,9 +240,53 @@ strict dataset or normalization holdout, cross-suite transfer, rollout success,
 benchmark success rate, stable training, formal admission, or deployment
 evidence.
 
-## 11. Result placeholder
+## 11. Frozen result
 
-No T5 execution root, GPU identity, source commit, runner SHA, loss, verdict, or
-RESULT artifact exists at preregistration time. Populate this section only from
-the first valid terminal root; otherwise record the immutable failure root and
-stop.
+The first and only T5 execution completed as a valid run.
+
+- Scientific verdict: `T5_CROSS_TASK_TRANSFER_GO`.
+- Source commit: `5150693a0751200ef431968a863c69f8ca08a7df`.
+- Runner SHA256:
+  `a4bbdcf752aa0a34a43ea4f51e7875f7fd160985280a7274b29e36350d9605c1`.
+- GPU: physical GPU 0,
+  `GPU-1ec28cfb-f501-23f3-f865-275a744ca053` (NVIDIA H200).
+- Nonce: `cf7dd8a1b1cef03511d2026a48e4a271`.
+- Immutable root:
+  `/DATA/share/sana_wam_libero_nonformal_screens/t5/5150693a0751/libero-t5-crosstask3-fixed20-cf7dd8a1b1cef03511d2026a48e4a271`.
+- RESULT SHA256:
+  `a656aaef1528537527fe830ad7d4107138b29e8e254b5606b43c46a47e323e83`.
+- Terminal modes: root `0500`, `RESULT.json` `0400`.
+
+Paired action-loss results:
+
+| Label | Identity | Pre | Post | Post/pre | Improved |
+|---|---|---:|---:|---:|---|
+| H1 | task 7 / episode 36 | `15.97777271` | `2.37489486` | `0.14863742` | yes |
+| H2 | task 1 / episode 325 | `16.58133507` | `1.88198090` | `0.11349996` | yes |
+| H3 | task 4 / episode 11 | `19.20838547` | `2.88868594` | `0.15038671` | yes |
+
+The median post/pre ratio was `0.1486374165`; all three samples improved. This
+cleared the frozen `median <= 0.95` and `improved_count >= 2` primary gate.
+
+All validity gates passed:
+
+- eligible and selected manifest SHA256 values reproduced exactly;
+- the current training-core projection equaled frozen T4 exactly, with expected
+  and observed SHA256 both
+  `e34a2dd0ae2dfe28303dcd9baf64ffc5800d002b0b7646b89dde2aafa132c352`;
+- the training-sample result reproduced action loss `13.67971897 -> 1.73319125`
+  and ratio `0.1266978697`;
+- exact counts were 4 preparations, 28 forwards, 20 backwards, and 20 AdamW
+  steps, with 0 cross-task samples entering backward/update and 0
+  post-probe re-preparations;
+- all 28 loss-recipe signatures were identical to the frozen signature;
+- 560 persistent FP32 masters remained finite, reached Adam step 20, and all
+  four trainable roots changed in both FP32 master and BF16 projected probes;
+- training/H1/H2/H3 prompt contexts were distinct. Their token lengths were
+  33/33/36/35 respectively;
+- no simulator, benchmark evaluator, formal training, or SANA-WAM checkpoint
+  load/save ran; GPU 0 was released after terminalization.
+
+This GO advances the architecture-validation line to a separately frozen
+cross-suite loss-transfer question. It does not alter the interpretation limits
+in Section 10 and does not authorize formal training or benchmark claims.

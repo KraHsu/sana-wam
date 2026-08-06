@@ -736,12 +736,23 @@ training checkpoint，也没有运行 simulator 或 benchmark evaluator。
 | T2 | 同一 ep0、同一 recipe，20 updates | `T2_FIXED_SAMPLE_LEARNABILITY_GO` | action loss `13.679719 -> 1.733191`，ratio `0.126698`；训练曲线振荡且 20/20 gradients 被 clip |
 | T3 | 保持 T2 core，增加 3 个 update-free held-out recipes | `T3_HELDOUT_RECIPE_TRANSFER_GO` | 3/3 改善；ratio `0.124502 / 0.416718 / 0.416813`，median `0.416718`；T2 core 逐值复现 |
 | T4 | 保持 T2/T3 core，同 recipe，3 个 same-task update-held-out episodes | `T4_HELDOUT_SAMPLE_TRANSFER_GO` | ep16/405/40 全部改善；ratio `0.123714 / 0.139309 / 0.123339`，median `0.123714`；T3 core 逐值复现 |
+| T5 | 保持 T3/T4 core，同 recipe，3 个 mechanically selected distinct-task episodes | `T5_CROSS_TASK_TRANSFER_GO` | task7/1/4 的 ep36/325/11 全部改善；ratio `0.148637 / 0.113500 / 0.150387`，median `0.148637`；T4 core 逐值复现 |
 
 T4 的 frozen training-core expected/observed projection SHA256 均为
 `e34a2dd0ae2dfe28303dcd9baf64ffc5800d002b0b7646b89dde2aafa132c352`，排除了
 successor measurements 改变 ep0 update path 的解释。精确执行计数为四次
 `prepare_inputs`、28 次 architecture forward、20 次 backward、20 次 AdamW step；
 三个 held-out episode 从未进入 backward/update，post probe 没有重新 prepare。
+
+T5 把 probe 轴扩展到同一 Spatial suite 内三个不同的非训练 task。eligible population
+由冻结 metadata 重建为 9 tasks / 386 episodes，再经过 task-level 和 per-task episode-
+level 两阶段 SHA256 排序，固定得到 task7/ep36、task1/ep325、task4/ep11。三者 action
+loss 分别从 `15.977773 / 16.581335 / 19.208385` 降到
+`2.374895 / 1.881981 / 2.888686`，全部改善；median post/pre 为 `0.1486374165`。
+T5 的 expected/observed training-core projection 仍精确等于
+`e34a2dd0ae2dfe28303dcd9baf64ffc5800d002b0b7646b89dde2aafa132c352`，执行计数仍为
+4 prepare / 28 forward / 20 backward / 20 AdamW step，且三个 cross-task samples
+从未进入 backward/update。
 
 主要冻结证据：
 
@@ -751,10 +762,13 @@ successor measurements 改变 ep0 update path 的解释。精确执行计数为�
 | T2 | `/DATA/share/sana_wam_libero_nonformal_screens/t2/2dc1ce730df3/libero-t2-fixed20-20260806-a1` | `67d250cdb13470bea9e9fa53531d3c76c65145e5040dc7a45079d84ac4960a57` |
 | T3 | `/DATA/share/sana_wam_libero_nonformal_screens/t3/ac431f8727ac/libero-t3-heldout3-fixed20-220afb60725d0cfd591bc4fe225cdd21` | `c883608f2a47b6258f824d4d97a94f8a390d03bab671a592fb758eea61b3a01e` |
 | T4 | `/DATA/share/sana_wam_libero_nonformal_screens/t4/7db8182ef46f/libero-t4-heldout3-fixed20-36120c596971575d286d378df42ac564` | `4c33aaff6d202068d77efc0ac406c74198c56e72527cfabdde046fc9a3a4b6f4` |
+| T5 | `/DATA/share/sana_wam_libero_nonformal_screens/t5/5150693a0751/libero-t5-crosstask3-fixed20-cf7dd8a1b1cef03511d2026a48e4a271` | `a656aaef1528537527fe830ad7d4107138b29e8e254b5606b43c46a47e323e83` |
 
-当前可以支持的最强结论是：在一次初始化、固定 recipe 和一个 Spatial task 内，20 次
-ep0 update 不只降低训练窗口 loss，也跨三个 diffusion recipes、跨三个不同 episode
-降低 action loss。T4 probes 仍属于同一训练 metadata 与 normalization population，
-因此只是 update-held-out，不是严格 dataset holdout。它不证明跨 task/suite、closed-loop
-success、LIBERO benchmark performance、稳定优化或正式训练。下一项最小独立架构问题
-是 same-suite cross-task loss transfer；该候选不因本文而自动获得执行授权。
+当前可以支持的最强结论是：在一次初始化和固定 recipe 下，Spatial task0/ep0 的 20 次
+update 不只降低训练窗口 loss，也跨三个 diffusion recipes、跨同任务 episode，并进一步
+跨三个 mechanically selected Spatial task/episode 降低 action loss。T5 probes 仍属于
+同一 suite、训练 metadata 与 normalization population，而且 task text 与视觉 episode
+同时变化，因此不是纯语言 task isolation 或严格 dataset holdout。它不证明 cross-suite、
+closed-loop success、LIBERO benchmark performance、稳定优化或正式训练。下一项最小独立
+架构问题是 cross-suite update-free loss transfer；它需要新的冻结选择、root 和判定契约，
+不因 T5 GO 自动获得正式训练或 benchmark 授权。
