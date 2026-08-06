@@ -87,8 +87,10 @@ def load_and_validate_config(path: str | os.PathLike[str]) -> dict[str, Any]:
         "camera_height": 256,
         "camera_width": 256,
         "state_dim": STATE_DIM,
+        "state_mode": "libero_eef_axis_angle_gripper",
         "action_dim": ACTION_DIM,
         "rotate_images_180": True,
+        "training_video_rotation_degrees": 0,
         "action_representation": "relative_delta_pose",
         "one_server_request_per_env_step": True,
         "client_action_queue": False,
@@ -155,6 +157,7 @@ def load_and_validate_config(path: str | os.PathLike[str]) -> dict[str, Any]:
         "benchmark": "libero",
         "dataloader_type": "libero",
         "action_mode": "libero_relative_eef",
+        "state_mode": "libero_eef_axis_angle_gripper",
         "normalize_required": True,
         "state_dim": STATE_DIM,
         "state_layout": config.get("state_layout"),
@@ -162,6 +165,20 @@ def load_and_validate_config(path: str | os.PathLike[str]) -> dict[str, Any]:
         "action_layout": config.get("action_layout"),
         "action_representation": "relative_delta_pose",
         "action_output_space": "denormalized_checkpoint_units",
+        "normalization": {
+            "action": {
+                "active": True,
+                "mode": "min-max",
+                "stats_key": "libero_relative_eef",
+                "dim": ACTION_DIM,
+            },
+            "state": {
+                "active": True,
+                "mode": "min-max",
+                "stats_key": "libero_eef_axis_angle_gripper",
+                "dim": STATE_DIM,
+            },
+        },
         "gripper": config.get("gripper"),
         "multiview": True,
         "camera_layout": [
@@ -171,6 +188,15 @@ def load_and_validate_config(path: str | os.PathLike[str]) -> dict[str, Any]:
         ],
         "camera_mapping": config.get("camera_mapping"),
         "missing_right_camera_fill": "black",
+        "training_video_rotation_degrees": 0,
+        "simulator_video_rotation_degrees": 180,
+        "training_dataset_names": [
+            "libero_spatial_no_noops_1.0.0_lerobot",
+            "libero_object_no_noops_1.0.0_lerobot",
+            "libero_goal_no_noops_1.0.0_lerobot",
+            "libero_10_no_noops_1.0.0_lerobot",
+        ],
+        "excluded_training_episodes": ["libero_goal_no_noops_1.0.0_lerobot:82"],
     }
     if expected_server_contract != expected_contract_fields:
         raise ValueError(

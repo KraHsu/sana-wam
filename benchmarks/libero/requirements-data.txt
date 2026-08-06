@@ -1,0 +1,2 @@
+# Kept separate because pyproject.toml / uv.lock are frozen CACH evidence inputs.
+pyarrow==23.0.1

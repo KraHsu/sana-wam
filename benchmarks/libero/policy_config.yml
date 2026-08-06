@@ -23,6 +23,7 @@ model_noise_base_seed: 2026080601
 # used by the H200 LeRobot conversion.
 send_state: true
 state_dim: 8
+state_mode: libero_eef_axis_angle_gripper
 state_layout:
   - eef_x
   - eef_y
@@ -34,6 +35,9 @@ state_layout:
   - gripper_qpos_1
 
 rotate_images_180: true
+# Stored LeRobot training MP4s are already canonical and must not be rotated;
+# only live simulator observations use the 180-degree conversion above.
+training_video_rotation_degrees: 0
 camera_mapping:
   agentview_image: head_camera
   robot0_eye_in_hand_image: left_wrist_camera
@@ -67,6 +71,7 @@ expected_server_contract:
   benchmark: libero
   dataloader_type: libero
   action_mode: libero_relative_eef
+  state_mode: libero_eef_axis_angle_gripper
   normalize_required: true
   state_dim: 8
   state_layout:
@@ -89,6 +94,17 @@ expected_server_contract:
     - open_gripper
   action_representation: relative_delta_pose
   action_output_space: denormalized_checkpoint_units
+  normalization:
+    action:
+      active: true
+      mode: min-max
+      stats_key: libero_relative_eef
+      dim: 7
+    state:
+      active: true
+      mode: min-max
+      stats_key: libero_eef_axis_angle_gripper
+      dim: 8
   gripper:
     model_open: 1.0
     model_closed: 0.0
@@ -105,6 +121,18 @@ expected_server_contract:
     robot0_eye_in_hand_image: left_wrist_camera
     missing: right_wrist_camera
   missing_right_camera_fill: black
+  training_video_rotation_degrees: 0
+  simulator_video_rotation_degrees: 180
+  training_dataset_names:
+    - libero_spatial_no_noops_1.0.0_lerobot
+    - libero_object_no_noops_1.0.0_lerobot
+    - libero_goal_no_noops_1.0.0_lerobot
+    - libero_10_no_noops_1.0.0_lerobot
+  # This exact HF snapshot has a corrupt wrist video for Goal episode 82. The
+  # available upstream patch belongs to a different 169-frame revision, while
+  # this snapshot has 129 state/action rows, so the complete episode is omitted.
+  excluded_training_episodes:
+    - libero_goal_no_noops_1.0.0_lerobot:82
 
 # The policy server owns action chunking and cache state. The benchmark client
 # sends the current observation on every environment step.

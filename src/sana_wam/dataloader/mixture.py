@@ -462,12 +462,18 @@ class MixtureDataset(BaseActionDataset):
 
 
 def build_training_dataset(config: Any, split: str = "train") -> BaseActionDataset:
-    """Build a regular RoboTwin dataset or a weighted mixture from config."""
+    """Build a native dataset or a homogeneous weighted mixture from config."""
     dataset_type = str(_get(config, "type", "robotwin"))
     if dataset_type == "robotwin":
         return MultiTaskRoboTwinDataset.from_config(config, split=split)
     if dataset_type == "robotwin_history_dagger":
         return RoboTwinHistoryDaggerDataset.from_config(config, split=split)
+    if dataset_type == "libero":
+        # Lazy import keeps the regular RoboTwin path independent of the
+        # optional Parquet dependency used only when samples are decoded.
+        from sana_wam.dataloader.libero_dataset import LiberoLeRobotDataset
+
+        return LiberoLeRobotDataset.from_config(config, split=split)
     if dataset_type != "mixture":
         raise ValueError(f"unsupported dataloader type: {dataset_type!r}")
 

@@ -326,10 +326,6 @@ class PolicyServer:
             if isinstance(action, np.ndarray)
             else list(action),
             "step": self._request_count,
-            "episode_key": self._active_episode_key,
-            "model_noise_seed": self._engine_runtime_info().get(
-                "current_model_noise_seed"
-            ),
             "latency_ms": round(latency_ms, 2),
             "policy": _public_policy_step_info(self._policy.last_step_info),
         }
@@ -484,26 +480,6 @@ class PolicyServer:
         def select(path, default=None):
             return OmegaConf.select(cfg, path, default=default)
 
-        def plain(path, default=None):
-            value = select(path, default)
-            if OmegaConf.is_config(value):
-                return OmegaConf.to_container(value, resolve=True)
-            return value
-
-        architecture = getattr(self.engine, "architecture", None)
-        action_dim = select("model.architecture.action_dim")
-        if action_dim is None:
-            action_dim = select("model.params.action_dim")
-        if action_dim is None:
-            action_dim = getattr(architecture, "action_dim", None)
-        if action_dim is None:
-            action_dim = getattr(self.engine, "_action_dim", None)
-        state_dim = select("model.architecture.state_dim")
-        if state_dim is None:
-            state_dim = select("model.params.state_dim")
-        if state_dim is None:
-            state_dim = getattr(architecture, "state_dim", None)
-
         rerank_runtime = getattr(self.engine, "runtime_info", {})
         if callable(rerank_runtime):
             rerank_runtime = rerank_runtime()
@@ -542,15 +518,8 @@ class PolicyServer:
             "num_frames": select("inference.num_frames"),
             "video_num_frames": select("inference.video_num_frames"),
             "video_stride": select("dataloader.video_stride", 1),
-            "dataloader_type": select("dataloader.type"),
-            "action_dim": action_dim,
-            "state_dim": state_dim,
             "action_mode": select("dataloader.action_mode"),
             "normalize_mode": select("dataloader.normalize_mode"),
-            "multiview": bool(select("dataloader.multiview", False)),
-            "camera_layout": plain("dataloader.camera_layout"),
-            "target_camera": select("dataloader.target_camera"),
-            "benchmark_contract": plain("dataloader.benchmark_contract"),
             "action_tokens_per_chunk": getattr(
                 self.engine, "_action_tokens_per_chunk", None
             ),

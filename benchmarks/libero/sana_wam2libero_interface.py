@@ -198,6 +198,7 @@ def validate_server_contract(
     top_level_expectations = {
         "dataloader_type": expected.get("dataloader_type"),
         "action_mode": expected.get("action_mode"),
+        "state_mode": expected.get("state_mode"),
         "action_dim": expected.get("action_dim"),
         "state_dim": expected.get("state_dim"),
         "multiview": expected.get("multiview"),
@@ -215,6 +216,29 @@ def validate_server_contract(
         or str(normalize_mode).strip().lower() in {"", "none", "null"}
     ):
         raise RuntimeError("LIBERO checkpoint requires active action normalization")
+    expected_normalizers = expected.get("normalization")
+    actual_normalizers = identity.get("normalizers")
+    if not isinstance(expected_normalizers, Mapping) or not isinstance(
+        actual_normalizers, Mapping
+    ):
+        raise RuntimeError("LIBERO checkpoint normalizer identity is missing")
+    for stream in ("action", "state"):
+        wanted = expected_normalizers.get(stream)
+        actual = actual_normalizers.get(stream)
+        if not isinstance(wanted, Mapping) or not isinstance(actual, Mapping):
+            raise RuntimeError(f"LIBERO {stream} normalizer identity is missing")
+        for key, wanted_value in (
+            ("active", wanted.get("active")),
+            ("configured_mode", wanted.get("mode")),
+            ("dim", wanted.get("dim")),
+        ):
+            if actual.get(key) != wanted_value:
+                raise RuntimeError(
+                    f"LIBERO {stream} normalizer mismatch for {key}: "
+                    f"expected {wanted_value!r}, got {actual.get(key)!r}"
+                )
+    if actual_normalizers["state"].get("explicit") is not True:
+        raise RuntimeError("LIBERO state normalizer must be independently configured")
     noise_mode = identity.get("episode_noise_mode")
     if noise_mode not in {"ambient", "paired"}:
         raise RuntimeError(

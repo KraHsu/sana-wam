@@ -159,6 +159,7 @@ def _server_info(contract: dict | None = None) -> dict:
                 "benchmark_contract": expected,
                 "dataloader_type": "libero",
                 "action_mode": "libero_relative_eef",
+                "state_mode": "libero_eef_axis_angle_gripper",
                 "action_dim": 7,
                 "state_dim": 8,
                 "multiview": True,
@@ -168,6 +169,20 @@ def _server_info(contract: dict | None = None) -> dict:
                     "right_wrist_camera",
                 ],
                 "normalize_mode": "min-max",
+                "normalizers": {
+                    "action": {
+                        "active": True,
+                        "configured_mode": "min-max",
+                        "dim": 7,
+                        "explicit": True,
+                    },
+                    "state": {
+                        "active": True,
+                        "configured_mode": "min-max",
+                        "dim": 8,
+                        "explicit": True,
+                    },
+                },
                 "episode_noise_mode": "paired",
             }
         },

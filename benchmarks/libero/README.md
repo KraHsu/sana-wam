@@ -1,9 +1,9 @@
 # LIBERO benchmark adapter
 
 This directory connects the LIBERO simulator to an **already-running**
-sana-wam policy server. It is deliberately a benchmark client, not a simulator
-installation, training launcher, checkpoint converter, or policy server
-launcher.
+sana-wam policy server. The simulator remains isolated here; repository-level
+LIBERO data and server launchers are listed below and do not install LIBERO or
+start training implicitly.
 
 ## Current status and evidence boundary
 
@@ -33,6 +33,7 @@ checkout HEAD.
 | `sana_wam2libero_interface.py` | Thin HTTP client and pure LIBERO conversions; imports no simulator package. |
 | `eval_policy.py` | Deterministic LIBERO task/initial-state rollout loop; imports LIBERO lazily. |
 | `single_eval.sh` | Validates the launch arguments and enters the dedicated simulator environment. |
+| `requirements-data.txt` | PyArrow pin for a separately authorized native-data environment update. |
 
 ## Frozen benchmark contract
 
@@ -63,7 +64,15 @@ robosuite/GR00T data-conversion formula byte-for-semantics: it does not replace
 
 The policy checkpoint's single-view/multi-view preprocessing remains
 server-owned. Its training configuration must use the same two-view mapping and
-missing-right-camera convention as the client.
+missing-right-camera convention as the client. Stored LeRobot MP4s are already
+in canonical training orientation and are decoded without rotation; only live
+simulator images are rotated 180 degrees by the benchmark adapter.
+
+Action and proprioception have separate normalization contracts. Actions use
+the `libero_relative_eef` 7D stats entry, while the 8D state uses
+`libero_eef_axis_angle_gripper`. Deployment reports both actually constructed
+normalizers through `/info`; a config declaration without matching runtime
+normalizers is rejected before simulator construction.
 
 ### Actions
 
@@ -136,6 +145,62 @@ The remaining frozen simulator identity is:
 | Environment seed | 0 |
 | Render height | 256 |
 | Render width | 256 |
+
+## Training data path
+
+The repository now includes a native LeRobot v2.1 loader and a deployable AR
+baseline source template:
+
+```text
+src/sana_wam/dataloader/libero_dataset.py
+src/sana_wam/dataloader/libero_stats.py
+src/sana_wam/train/libero_contract.py
+src/sana_wam/deploy/libero_model_loader.py
+src/sana_wam/deploy/libero_policy_server.py
+scripts/build_libero_stats.py
+scripts/train_libero.py
+scripts/deploy_libero.py
+configs/benchmarks/libero/train_libero_ar_baseline.yaml
+```
+
+The loader reads `observation.state[t] -> action[t]` exactly. It does not reuse
+RoboTwin's absolute-state `t+1` label convention. Numeric rows are loaded lazily
+with optional PyArrow, and the two AV1 videos are decoded with PyAV. Install the
+data-only optional dependency in the sana-wam training environment before an
+authorized data smoke:
+
+```bash
+uv pip install --python .venv/bin/python -r benchmarks/libero/requirements-data.txt
+```
+
+This dependency is kept outside `pyproject.toml` and `uv.lock` because those
+files are inputs to frozen predecessor evidence. The command above has not been
+run in this integration phase.
+
+Normalization stats can be materialized without decoding Parquet or video:
+
+```bash
+python scripts/build_libero_stats.py \
+  --output /DATA/share/LIBERO/sana_wam_libero_all_minmax_stats.npy \
+  /DATA/share/LIBERO/libero/libero_spatial_no_noops_1.0.0_lerobot \
+  /DATA/share/LIBERO/libero/libero_object_no_noops_1.0.0_lerobot \
+  /DATA/share/LIBERO/libero/libero_goal_no_noops_1.0.0_lerobot \
+  /DATA/share/LIBERO/libero/libero_10_no_noops_1.0.0_lerobot
+```
+
+The current H200 Goal snapshot has a corrupted wrist video for episode 82.
+The Isaac-GR00T patch available locally belongs to a different 169-frame
+revision, while this snapshot has 129 state/action rows, so it must not be
+copied over the shared data. The frozen initial training contract excludes the
+complete episode (`libero_goal_no_noops_1.0.0_lerobot:82`). The loader rejects
+using that snapshot without the exclusion and also rejects the incompatible
+patch. No shared dataset file is modified.
+
+The generic Trainer and policy-server sources are likewise frozen predecessor
+inputs. LIBERO therefore enters through the dedicated launchers, which validate
+the 7D/8D contract and install a composite deploy normalizer: 7D action
+history/output uses action stats, while 8D proprioception uses independent state
+stats. Do not launch a LIBERO checkpoint through the generic deploy entrypoint.
 
 ## Environment
 

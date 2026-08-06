@@ -66,7 +66,10 @@ The LIBERO benchmark adapter is documented in
 dedicated LIBERO/robosuite simulator environment to the same HTTP server, but
 requires a LIBERO-native 8D-state/7D-relative-action checkpoint and matching
 normalization statistics. Existing RoboTwin 14D/20D checkpoints are rejected;
-the adapter does not convert them or claim a LIBERO result.
+the adapter does not convert them or claim a LIBERO result. A native LeRobot
+v2.1 training loader, metadata-to-stats builder, strict LIBERO-only train/deploy
+launchers, and non-authorizing AR baseline template now live beside that
+adapter; no LIBERO training or evaluation run has been started.
 
 ## Canonical reference baseline
 
