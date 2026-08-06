@@ -1,13 +1,12 @@
 # LIBERO T8 Phase-Rotated Recency Screen
 
-Status: **proposed / pre-registered / not executed**
+Status: **executed once / valid non-formal screen / mixed inconclusive**
 
 Date: 2026-08-06
 
-This document is the complete pre-registration for T8. It authorizes no run by
-itself. A later execution authority must bind a frozen source commit, runner
-SHA256, one never-created root, a fresh nonce, and one idle physical GPU before
-any CUDA or model execution.
+Sections 1-13 preserve the complete T8 pre-registration. Section 14 records the
+single authorized execution without changing any frozen predicate or threshold.
+This document authorizes no successor run by itself.
 
 ## 1. Scientific question
 
@@ -581,12 +580,65 @@ training readiness, admission, or deployment.
 
 No outcome authorizes a same-root rerun, automatic dose extension, alternate
 order, sample replacement, formal training, SANA-WAM training checkpointing,
-or evaluation. Any
-successor must be separately pre-registered with a fresh source identity,
-fresh nonce, and never-created root.
+or evaluation. Any successor must be separately pre-registered with a fresh
+source identity, fresh nonce, and never-created root.
 
 ## 14. Current state
 
-T8 is **proposed and not executed**. No result, failure artifact, run root,
-nonce, runner SHA, GPU assignment, SANA-WAM training checkpoint, rollout, or
-benchmark metric exists under this authority.
+T8 executed exactly once and produced a valid frozen non-formal result. There
+was no retry, automatic extension, alternate schedule, or same-root rerun.
+
+- source commit: `9cd1c490d14b3c2437e82225ee8cfdf58646837e`;
+- runner SHA256:
+  `9ec74d83c8443d78d2ba765dd766f82a96cccef894ae63d08cf9e2a8dbf97669`;
+- root:
+  `/DATA/share/sana_wam_libero_nonformal_screens/t8/9cd1c490d14b/libero-t8-phase-rotated-fixed20-2e1efcc69bc552affb5c85b7feeb5175`;
+- RESULT SHA256:
+  `bfdb852e14a5bd9b1c8e776be9f4ff108899eae65d557cebe42b06f1991b0a18`;
+- physical GPU 0 / UUID
+  `GPU-1ec28cfb-f501-23f3-f865-275a744ca053`;
+- validity: `valid_run=true`, `execution_result=PASS`, `harness_result=PASS`;
+- typed verdict: `T8_PHASE_ROTATED_MIXED_INCONCLUSIVE`.
+
+The run matched the exact 8 prepare / 44 forward / 24 update-free measurement /
+20 backward / 20 AdamW-step budget. All eight starting losses reproduced
+exactly, all 20 full-tensor FP32-master-to-BF16 projections passed, global
+buffers remained unchanged, and H0-H3 received zero updates. The terminal A/H
+ratios were:
+
+| Suite | phase A / H | terminal A / H | overwrite penalty | terminal pair |
+|---|---|---|---:|---|
+| Spatial | `0.661098 / 0.630339` | `0.661098 / 0.630339` | `1.000000` | improved |
+| Object | `0.627326 / 0.618242` | `1.580494 / 1.597984` | `2.551829` | regressed |
+| Goal | `0.821394 / 0.827440` | `0.596465 / 0.599601` | `0.725401` | improved |
+| LIBERO-10 | `0.228250 / 0.219789` | `0.256395 / 0.247745` | `1.125215` | improved |
+
+Spatial was rescued on both endpoints and two nonterminal suites met the
+`>=1.02` overwrite threshold, but `rho_recency=0.4` was below `0.8`; therefore
+`terminal_recency_supported=false`. The T7/T8 suite-rank correlation was
+`0.7999999999999998`, but Spatial did not double-regress, so
+`suite_effect_supported=false`. The diagnostic-only joint gate passed with A
+median `0.6287817650`, H median `0.6149701490`, and 3/4 corresponding suite
+pairs improved.
+
+The result is evidence of strong phase-sensitive interference: making Spatial
+most recent rescued it, while making Object oldest produced a large overwrite.
+It does not satisfy the pre-registered monotone recency classification because
+Goal improved further despite two trailing updates. It remains a one-seed,
+eight-sample loss-space architecture screen—not formal training, rollout,
+benchmark evaluation, SANA-WAM training-checkpoint evidence, admission, or
+deployment authority.
+
+An independent post-run audit recomputed the canonical JSON, all frozen pins,
+budgets, ratios, both Spearman statistics, and the typed verdict without a
+numerical discrepancy. It also found one reporting-strength gap: Section 8
+asked for a serialized buffer-version assertion after every individual event,
+while the harness records initial/final global maps plus update-free probe-group
+snapshots, not a per-event map sequence. Initial and final buffer identities,
+data pointers, and monotonic Torch `_version` values were identical, so no
+buffer mutation was observed; nevertheless the stronger per-event reporting
+claim was not fully evidenced. The immutable result is therefore retained as
+audit-qualified non-formal architecture evidence and is not rerun or promoted
+to admission. T8 also inherits T7's temporary T1 predecessor pin under `/tmp`;
+that file existed with the exact required SHA at execution time but is not a
+durable evidence location.

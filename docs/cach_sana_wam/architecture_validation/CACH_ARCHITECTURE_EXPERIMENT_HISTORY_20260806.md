@@ -5,7 +5,7 @@
 整理日期：2026-08-06  
 规范主机：`H200`  
 规范工作树：`/home/zch/workspace/sana-wam`  
-主仓 T7 执行 source commit：`d19109a2314f8e7186571afed6b4acd816d7cfab`
+主仓 T8 执行 source commit：`9cd1c490d14b3c2437e82225ee8cfdf58646837e`
 Sana gitlink：`16b9cec673e3335724ba2d8db25de7f9ed229292`
 
 本文是一份可独立阅读的历史快照，汇总截至当前已经设计的架构、基础实现、所有关键
@@ -55,16 +55,18 @@ REF-GDN-CORRECTED
    和 multi-seed confirmation 都没有执行。
 8. 项目没有进入正式训练、正式评测、formal admission、Global Stage 3、checkpoint
    训练或部署；不得宣称已有 504-step formal 结果或正式模型完成。
-9. 在独立的 LIBERO production-shaped `DualSystemARArchitecture` 验证线上，T1 至 T7
+9. 在独立的 LIBERO production-shaped `DualSystemARArchitecture` 验证线上，T1 至 T8
    已依次闭合 one-update、fixed-sample 20-update learnability、held-out recipe、同任务
    episode、跨 Spatial task 以及跨 Object/Goal/LIBERO-10 suite 的 update-free action-loss
-   transfer，以及四套件循环微学习；T7 RESULT 的 typed numerical verdict 为
-   `T7_FOUR_SUITE_CYCLIC_GO`，但受 post-run harness audit 限定。
-10. LIBERO T7 不改变 CACH-A4 reduced-path stop，也不是 benchmark success：其证据仅为
+   transfer、四套件循环微学习与相位旋转诊断。T7 的 typed numerical verdict 为
+   `T7_FOUR_SUITE_CYCLIC_GO`（受 post-run audit 限定）；T8 的有效终态为
+   `T8_PHASE_ROTATED_MIXED_INCONCLUSIVE`。
+10. LIBERO T7/T8 不改变 CACH-A4 reduced-path stop，也不是 benchmark success：其证据仅为
     一个初始化、一个 recipe、每套件一个更新样本与一个同任务 fresh episode 的 20-step
-    loss-space screen。Object/Goal/LIBERO-10 的 A/H 配对改善，而 Spatial A/H 同时回退；
-    probes 仍属于四套件数据和 normalization population；rollout、suite distribution
-    generalization、正式训练和正式评测仍未执行。
+    loss-space screen。T7 中 Spatial A/H 同时回退；T8 只旋转循环相位后 Spatial 被救回，
+    但最旧的 Object A/H 转为回退，预注册的单调 recency 判据没有通过。probes 仍属于
+    四套件数据和 normalization population；rollout、suite distribution generalization、
+    正式训练和正式评测仍未执行。
 
 ## 2. 证据等级与命名
 
@@ -703,7 +705,7 @@ motion-sensitive primary；后者正是用于检查前者是否值得扩大投�
   CACH-A4 reduced path = REDUCED_ARCH_STOP
   AV-4 = NOT_UNLOCKED
   review token = CONSUMED
-  independent LIBERO production-shaped AR path = T7 typed numerical GO / audit-qualified
+  independent LIBERO production-shaped AR path = T8 valid / phase-rotated mixed inconclusive
 
 未开始或未通过：
   full CACH v0 package validation
@@ -744,6 +746,7 @@ training checkpoint，也没有运行 simulator 或 benchmark evaluator。
 | T5 | 保持 T3/T4 core，同 recipe，3 个 mechanically selected distinct-task episodes | `T5_CROSS_TASK_TRANSFER_GO` | task7/1/4 的 ep36/325/11 全部改善；ratio `0.148637 / 0.113500 / 0.150387`，median `0.148637`；T4 core 逐值复现 |
 | T6 | 保持 T5 core，同 recipe，Object/Goal/LIBERO-10 各一个 mechanically selected sample | `T6_CROSS_SUITE_TRANSFER_GO` | S1/S2/S3 全部改善；ratio `0.157667 / 0.176770 / 0.152686`，median `0.157667`；T5 core 逐值复现 |
 | T7 | A0-A3 四套件循环 5 轮，共 20 updates；每套件一个同任务 fresh heldout | typed numerical `T7_FOUR_SUITE_CYCLIC_GO` / audit-qualified | A median ratio `0.625211`，H median `0.636552`，3/4 对应套件双改善；Spatial A/H 分别回退 `9.48% / 7.63%` |
+| T8 | 同一 A/H、同一剂量，仅把循环相位旋转为 `[Object,Goal,LIBERO-10,Spatial] × 5`，并在各套件第五次更新后加 phase probes | `T8_PHASE_ROTATED_MIXED_INCONCLUSIVE` | Spatial A/H 被救回，Object A/H 转为回退；2/3 nonterminal overwrite 过阈值，但 `rho_recency=0.4` 未过 `0.8` |
 
 T4 的 frozen training-core expected/observed projection SHA256 均为
 `e34a2dd0ae2dfe28303dcd9baf64ffc5800d002b0b7646b89dde2aafa132c352`，排除了
@@ -786,6 +789,26 @@ checkpoint、simulator、rollout 或 benchmark evaluation。
 且全量 BF16/master projection equality 只在 step 1/20 检查。因此 T7 保留 immutable typed
 numerical GO，但严格限定为 architecture signal，不能作为 formal training admission。
 
+T8 保持 T7 的模型、初始化、recipe、八个样本和每样本五次更新，只旋转循环终端相位。
+执行 source commit 为 `9cd1c490d14b3c2437e82225ee8cfdf58646837e`，runner SHA256 为
+`9ec74d83c8443d78d2ba765dd766f82a96cccef894ae63d08cf9e2a8dbf97669`。
+所有套件在自身第五次更新后的 A/H phase probe 都改善；终端 Spatial ratio 为
+`0.661098 / 0.630339`，而 Object 为 `1.580494 / 1.597984`。Object 与 LIBERO-10 的
+overwrite penalty 分别为 `2.551829 / 1.125215`，但 Goal 在两个 trailing updates 后继续
+改善，使 `rho_recency=0.4`，故 primary recency predicate 为 false；Spatial 没有双回退，
+故 suite-effect predicate 也为 false。诊断性 joint gate 仍通过：A/H median 分别为
+`0.6287817650 / 0.6149701490`，3/4 套件双改善。运行严格为 8 prepare / 44 forward /
+24 update-free measurements / 20 backward / 20 optimizer steps，未加载或保存
+SANA-WAM checkpoint，也未运行 rollout 或 benchmark evaluation；仅执行一次，没有重跑。
+
+独立 T8 post-run audit 对 canonical JSON、冻结 pins、预算、全部 ratio、两个 Spearman 和
+typed verdict 的复算均无数值差异。审计同时限定：预注册要求逐 event 序列化 buffer-version
+assertion，实际 RESULT 只保存 initial/final global map 和 probe-group snapshot；未观察到任何
+buffer identity/data pointer/单调 `_version` 变化，但更强的逐 event 报告契约没有被完整采集。
+因此 T8 与 T7 一样保留 immutable、audit-qualified non-formal evidence，不据此重跑或解锁
+formal admission。T8 还继承了 T7 位于 `/tmp` 的 T1 predecessor pin；执行时文件及 SHA
+正确，但该位置不是持久证据存储。
+
 主要冻结证据：
 
 | Run | Immutable root | RESULT SHA256 |
@@ -797,13 +820,14 @@ numerical GO，但严格限定为 architecture signal，不能作为 formal trai
 | T5 | `/DATA/share/sana_wam_libero_nonformal_screens/t5/5150693a0751/libero-t5-crosstask3-fixed20-cf7dd8a1b1cef03511d2026a48e4a271` | `a656aaef1528537527fe830ad7d4107138b29e8e254b5606b43c46a47e323e83` |
 | T6 | `/DATA/share/sana_wam_libero_nonformal_screens/t6/708b1d856986/libero-t6-crosssuite3-fixed20-67a02fcc85508e03f136e09221a6a9d4` | `4855f3771b80349547c985d137426cce79e25597f910eff88e136328424b8b89` |
 | T7 | `/DATA/share/sana_wam_libero_nonformal_screens/t7/d19109a2314f/libero-t7-foursuite-cyclic-fixed20-61e0a0ff817970e994b0875be4840ed6` | `9f5181a30cd0d6b676f09315244f7560cd3902004f5f17ca833330e33cb44d3a` |
+| T8 | `/DATA/share/sana_wam_libero_nonformal_screens/t8/9cd1c490d14b/libero-t8-phase-rotated-fixed20-2e1efcc69bc552affb5c85b7feeb5175` | `bfdb852e14a5bd9b1c8e776be9f4ff108899eae65d557cebe42b06f1991b0a18` |
 
 当前可以支持的最强结论是：在一次初始化和固定 recipe 下，完整 production-shaped AR
 path 不仅具备单样本 learnability 和多轴 update-free loss transfer，也能用一个 persistent
 optimizer 在 20 次四套件循环更新中通过 train/fresh 双 median 与 3/4 联合改善数值门。
-但是 Spatial 的训练样本与同任务 fresh episode 同时变差，说明已有明确的套件间干扰或
-顺序/尺度不平衡信号。T7 probes 仍属于训练 metadata 与 normalization population；该结果
-不证明 closed-loop success、LIBERO benchmark performance、suite-level distribution
-generalization、稳定长程优化或正式训练。loss-space architecture signal ladder 到 T7 已闭合；
-后续若继续，应是另行冻结的 bounded multi-suite training/admission 诊断，优先观察并处理
-Spatial 回退，而不是把 T7 GO 直接升级成正式训练或 benchmark 授权。
+T8 进一步表明该联合门的主要回退对象会随终端相位从 Spatial 转移到 Object，支持存在
+明显的顺序敏感干扰，但不足以支持预注册的单调 terminal-recency 或稳定 suite-effect
+分类。T7/T8 probes 仍属于训练 metadata 与 normalization population；结果不证明
+closed-loop success、LIBERO benchmark performance、suite-level distribution
+generalization、稳定长程优化或正式训练。任何后续实验仍需 fresh source/root，不能把
+T7 GO 或 T8 的诊断性 joint gate 直接升级成正式训练或 benchmark 授权。
