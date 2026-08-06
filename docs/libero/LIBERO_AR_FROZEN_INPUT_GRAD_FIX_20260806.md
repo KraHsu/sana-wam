@@ -65,6 +65,52 @@ parameters, and gradient checkpointing enabled. The action loss produced a
 finite nonzero `proprio_video_embed` gradient while every video parameter
 remained frozen with no gradient.
 
-This is source and CPU closure only. The separately authorized fresh-root GPU
-rerun is the next step and is still non-formal architecture validation, not
-training or benchmark evidence.
+## Fresh-root GPU rerun
+
+The separately authorized rerun passed on physical GPU 0 / UUID
+`GPU-1ec28cfb-f501-23f3-f865-275a744ca053`.
+
+- Source commit: `fce4bd90943d935123925a869efde8939cd54d46`
+- Config SHA256:
+  `80b6b7c7562be47953ed9972ab1c6bd56b3890811d46314375cc8132a60f9a7f`
+- Runner SHA256:
+  `03b36d83a3b095dd71d154e6df5d3cfb423a3f584ec8fd41adb1e29474c54f0b`
+- Root: `/tmp/sana-wam-libero-t1-one-update-fce4bd9-20260806-a2`
+- `RESULT.json` SHA256:
+  `79e8f1201eef5f550da7287ad614933938877fd4ee54778b7377d027f7ee0086`
+- Frozen modes: root `0500`, result `0400`
+
+The full 5.840B-parameter AR architecture constructed from the pinned published
+SANA base. Exactly 639,653,063 action/proprioception parameters were trainable;
+all video-backbone parameters remained frozen. The fixed Spatial episode-0
+sample produced a finite action loss of `13.992515563964844`. Backward produced
+finite nonzero gradients for all 560 trainable tensors and all four configured
+roots, with no missing gradients. The pre-clip global norm was `1272.0`; the
+configured clipping operation then preceded exactly one AdamW step. All
+trainable parameters and optimizer state remained finite, frozen parameter
+versions were unchanged, and both optimizer groups had an observed numerical
+update.
+
+T1 reached the video timestep embedder as FP32 with fractional values, while
+action timesteps remained BF16. Peak update memory was approximately 17.14 GB
+allocated / 17.97 GB reserved. Model/data construction took 39.95 seconds and
+the single loss-forward/backward/update section took 2.03 seconds. GPU memory
+returned to zero after process exit.
+
+## Remaining precision and evidence boundaries
+
+Changed-value probes observed `action_backbone`, `proprio_action_embed`, and
+`proprio_video_embed`, but did not observe a changed scalar under
+`proprio_encoder`, despite that root having finite nonzero gradients. The run
+used direct BF16 model parameters with no FP32 optimizer masters
+(`optimizer_master_parameter_count=0`). This does not invalidate the wiring
+closure or the two optimizer-group update assertion, but it is a precision risk
+to close before formal training; the probe result must not be reported as proof
+that every allowlisted root made a numerically effective first-step update.
+
+The run used metadata-bootstrap normalization stats, one real sample, one
+microbatch, positive base learning rates, and no production warmup or gradient
+accumulation equivalence. It did not load or save a SANA-WAM checkpoint, enter a
+training loop, run a simulator, or perform benchmark evaluation. The PASS is
+non-formal architecture wiring evidence, not training admission or LIBERO
+performance evidence.
