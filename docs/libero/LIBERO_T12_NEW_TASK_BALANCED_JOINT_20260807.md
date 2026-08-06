@@ -1,6 +1,6 @@
 # LIBERO T12：新任务 balanced-JOINT 复现
 
-状态：**source staging；尚未执行，未创建运行 root。**
+状态：**已执行并冻结；独立终态审计 PASS。**
 
 T12 只回答一个核心问题：T10/T11 已验证的 balanced simultaneous objective，
 在四个此前没有进入 T1–T11 model-facing measurement 或 backward 的任务上，是否仍能
@@ -194,3 +194,44 @@ zero-shot cross-task transfer。
 
 本 screen 仍是 single-seed、每 suite 一对样本的 non-formal loss-space screen；任何
 结果都不支持 rollout success、LIBERO benchmark score、正式训练 readiness 或部署能力。
+
+## 8. 冻结执行结果
+
+执行 source commit 为
+`bf4e6f43395e0ba2c177d81856ad37f87c6e91fe`，runner SHA256 为
+`baf19d25d39412a6be02ce35d5c06cae1e8a3089d1c005c35768ca0e0f3581d0`。
+唯一 immutable root 为：
+
+```text
+/DATA/share/sana_wam_libero_nonformal_screens/t12/bf4e6f43395e/libero-t12-new-task-balanced-joint-fixed20-09032d945cdf4dac558ab13b9dabafdd
+```
+
+root 权限为 `0500`，其中唯一 `RESULT.json` 权限为 `0400`；canonical RESULT
+为 `206463` bytes，SHA256 为
+`c1f045e62c854ab897305fbed504e765bd229d02479d2d11861f210d26abfe08`。
+
+| suite | update pre -> post / rA | heldout pre -> post / rH | q |
+|---|---:|---:|---:|
+| Spatial | `23.049805 -> 1.946394 / 0.084443` | `21.838432 -> 1.713945 / 0.078483` | `0.081463` |
+| Object | `14.306948 -> 1.663654 / 0.116283` | `14.717048 -> 1.781702 / 0.121064` | `0.118673` |
+| Goal | `17.906252 -> 2.046931 / 0.114314` | `14.562132 -> 1.658381 / 0.113883` | `0.114098` |
+| LIBERO-10 | `21.811209 -> 1.554468 / 0.071269` | `21.760113 -> 1.557974 / 0.071598` | `0.071433` |
+
+update 与 heldout ratio 的 median 分别为 `0.09937836518588988` 与
+`0.09618303049104597`。8/8 未舍入 ratio 均为正、有限且严格小于 1，因此有效执行 verdict
+为 `T12_NEW_TASK_JOINT_ARM_VALID`，严格三分支唯一产生科学 verdict
+`T12_NEW_TASK_BALANCED_JOINT_REPLICATED`。4/4 q 都低于 T11 q，但该比较按契约只作诊断，
+不参与科学分类。
+
+运行精确执行 8 次 `prepare_inputs`、96 次 architecture forward（16 measurement +
+80 training）、80 次 backward 与 20 次 optimizer step；20/20 macro 的四次
+micro-backward 之间均无 model/master/optimizer-state mutation。核心 20-step 更新加
+16 次 measurement 耗时 `125.30427186563611 s`；update peak allocated/reserved 为
+`32521337344 / 37557895168` bytes。未执行 simulator、rollout、benchmark evaluation
+或 formal training，也未加载或保存 SANA-WAM training checkpoint。
+
+独立只读终态审计重算 83 项检查并得到 `83 PASS / 0 failure`，Blocker、Major、Minor
+均为 0。审计重新构造 eligible/selection manifests，重哈希 24/24 selected
+parquet/MP4 assets、SANA base assets、T11 direct predecessor 与 T10 underlying pins，
+并复算预算、全部 ratio 和严格 verdict。唯一 informational warning 是已知的 SANA base
+partial load（280 missing / 0 unexpected，来自 fresh AR additions）；secondary warning 为 0。
