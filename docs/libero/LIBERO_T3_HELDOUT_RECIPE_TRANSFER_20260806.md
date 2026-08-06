@@ -1,7 +1,7 @@
 # LIBERO T3 Held-Out Recipe Transfer Screen
 
-Status: pre-registered for execution on 2026-08-06. This document claims no T3
-result until a unique terminal root has been frozen.
+Status: completed on 2026-08-06 with frozen verdict
+`T3_HELDOUT_RECIPE_TRANSFER_GO`.
 
 ## Question
 
@@ -117,3 +117,75 @@ must not load, resume or save a SANA-WAM checkpoint. It may not call
 `Trainer.train`, run a simulator or benchmark evaluator, create a formal
 training root, or claim sample/benchmark generalization. T3 does not authorize
 formal training or the next experiment.
+
+## Executed identity and evidence
+
+- Execution source commit:
+  `ac431f8727ac345c3bd0ad4a442e53801310fd81`.
+- Runner SHA256:
+  `0db0bfe086bc4b5ea92462e4832f0c448408656cca819796ec253f6226b4c017`.
+- Config SHA256:
+  `5df45965d6de3a32c5154a8bb4c41d29d20113bbe8908c1a98c8c63a7bff4a45`.
+- GPU: physical GPU 0,
+  `GPU-1ec28cfb-f501-23f3-f865-275a744ca053` (`NVIDIA H200`).
+- Nonce: `220afb60725d0cfd591bc4fe225cdd21`.
+- Frozen root:
+  `/DATA/share/sana_wam_libero_nonformal_screens/t3/ac431f8727ac/libero-t3-heldout3-fixed20-220afb60725d0cfd591bc4fe225cdd21`.
+- `RESULT.json` SHA256:
+  `c883608f2a47b6258f824d4d97a94f8a390d03bab671a592fb758eea61b3a01e`.
+- Terminal permissions: root `0500`, result `0400`; no `FAILED.json` exists.
+- Pre-execution validation: Ruff passed and all 72 `test_libero_*.py` CPU
+  tests passed. The source commit was pushed before GPU execution.
+- Post-process GPU check: 0 MiB used and 0% utilization.
+
+## Result
+
+All three held-out recipes improved, and the primary gate passed without a
+borderline result:
+
+| Recipe | Seed | Pre loss | Post loss | Post/pre | Drop |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| H1 | 897500337 | 19.774147 | 2.461924 | 0.124502 | 87.55% |
+| H2 | 2142397805 | 9.396403 | 3.915653 | 0.416718 | 58.33% |
+| H3 | 1238092489 | 8.799880 | 3.667903 | 0.416813 | 58.32% |
+
+- Improved count: `3/3`, versus the required `2/3`.
+- Median paired ratio: `0.41671822538936226`, versus the maximum `0.95`.
+- Pre/post captured signatures matched within each pair, and the training
+  recipe plus H1/H2/H3 produced four distinct recipe identities.
+- All 28 RNG contexts restored caller Python/NumPy/Torch CPU/CUDA state.
+- Pre/post probe snapshots confirmed no change to parameter, master, buffer,
+  module-mode or optimizer-state identity/version; no probe created gradients.
+- Exactly 28 architecture forwards, 20 backward calls and 20 optimizer steps
+  completed. Final Adam counters were all 20 and cumulative BF16-visible
+  changes covered all four trainable roots.
+
+The secondary training-recipe diagnostics reproduced T2 exactly: initial loss
+`13.679718971252441`, the complete 20-point pre-update loss curve, all recorded
+pre-clip gradient norms, final loss `1.7331912517547607`, and sampled master-root
+coverage were value-identical to the frozen T2 result. There were no secondary
+diagnostic warnings. This is strong evidence that the six added measurements
+did not perturb the update path.
+
+Model/dataset construction took `39.0128 s`; the 20 updates plus eight
+measurements took `34.8056 s`. Peak update allocation/reservation was
+29.19/31.49 GB (27.19/29.33 GiB), within the selected H200.
+
+## Interpretation
+
+T3 closes the narrow stochastic-recipe transfer question: on the same real
+LIBERO window, parameters updated using recipe `20260826` improved all three
+mechanically selected, gradient-held-out recipes. The T2 result was therefore
+not merely memorization of one sampled diffusion/noise realization.
+
+This still says nothing about a different observation/action window. It also
+does not remove T2's optimization warning: the unchanged training curve still
+spiked by 221.8x after the first update and all 20 gradients hit clipping.
+
+The smallest next architecture experiment is T4 held-out-sample transfer:
+retain the entire T2 training core and training recipe, but measure three
+pre-frozen real windows from the same Spatial suite and task, different episodes
+and start 0, before and after the 20 updates. Those samples must remain
+update-free and use the training recipe so only the sample axis changes. A
+learning-rate stability experiment remains separate and should not be combined
+with T4.
