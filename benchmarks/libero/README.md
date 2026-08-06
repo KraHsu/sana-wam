@@ -158,6 +158,7 @@ src/sana_wam/train/libero_contract.py
 src/sana_wam/deploy/libero_model_loader.py
 src/sana_wam/deploy/libero_policy_server.py
 scripts/build_libero_stats.py
+scripts/smoke_libero_data.py
 scripts/train_libero.py
 scripts/deploy_libero.py
 configs/benchmarks/libero/train_libero_ar_baseline.yaml
@@ -201,6 +202,9 @@ inputs. LIBERO therefore enters through the dedicated launchers, which validate
 the 7D/8D contract and install a composite deploy normalizer: 7D action
 history/output uses action stats, while 8D proprioception uses independent state
 stats. Do not launch a LIBERO checkpoint through the generic deploy entrypoint.
+
+The fixed CPU real-data smoke and its evidence boundary are recorded in
+[`docs/libero/LIBERO_CPU_REAL_DATA_SMOKE_20260806.md`](../../docs/libero/LIBERO_CPU_REAL_DATA_SMOKE_20260806.md).
 
 ## Environment
 
