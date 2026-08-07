@@ -321,11 +321,17 @@ class ARInferenceEngine(BaseInferenceEngine):
         if override is not None:
             tokens = int(override)
         else:
-            raw = int(
-                OmegaConf.select(cfg, "inference.num_frames", default=None)
-                or OmegaConf.select(cfg, "dataloader.num_frames", default=33)
+            explicit_horizon = OmegaConf.select(
+                cfg, "dataloader.action_horizon", default=None
             )
-            total_actions = raw - 1  # dataset keeps frame 0 as proprio, 1.. as actions
+            if explicit_horizon is not None:
+                total_actions = int(explicit_horizon)
+            else:
+                raw = int(
+                    OmegaConf.select(cfg, "inference.num_frames", default=None)
+                    or OmegaConf.select(cfg, "dataloader.num_frames", default=33)
+                )
+                total_actions = raw - 1
             if total_actions % num_chunks != 0:
                 raise ValueError(
                     f"action count {total_actions} not divisible by num_chunks={num_chunks} "

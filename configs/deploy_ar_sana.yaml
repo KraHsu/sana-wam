@@ -48,7 +48,7 @@ inference:
   cache_feedback_fallback: predicted  # predicted | error
   generation_zero_rerank:
     enabled: false
-  # ar_action_tokens_per_chunk: 24    # optional override; else derived from num_frames / num_chunks
+  # LIBERO derives 28 tokens from the checkpoint action_horizon; do not override.
 
 # ---------------------------------------------------------------------------
 # Policy execution — GREEDY IS MANDATORY for the AR engine.

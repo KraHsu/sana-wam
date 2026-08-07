@@ -45,6 +45,22 @@ def _make_engine(arch, video_steps, action_steps, seed, tokens):
     )
 
 
+def test_action_tokens_derive_from_explicit_training_horizon() -> None:
+    from sana_wam.deploy.ar_engine import ARInferenceEngine
+
+    engine = object.__new__(ARInferenceEngine)
+    engine._video_num_frames = 5
+    engine._temporal_compression = 4
+    engine._fcs = 2
+    cfg = OmegaConf.create(
+        {
+            "inference": {"num_frames": 17},
+            "dataloader": {"num_frames": 17, "action_horizon": 28},
+        }
+    )
+    assert engine._resolve_action_tokens_per_chunk(cfg) == 28
+
+
 @requires_sana
 def test_action_scheduler_consumes_explicit_deploy_shift() -> None:
     from sana_wam.deploy.ar_engine import ARInferenceEngine

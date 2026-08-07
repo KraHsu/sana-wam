@@ -433,6 +433,11 @@ def build_libero_server_from_config(
         raise ValueError(
             "causal LIBERO requires DualSystemARArchitecture + ARInferenceEngine"
         )
+    if getattr(engine, "_action_tokens_per_chunk", None) != 28:
+        raise ValueError(
+            "causal LIBERO runtime must resolve exactly 28 action tokens per chunk"
+        )
+
     server = LiberoPolicyServer(
         engine=engine,
         cfg=merged,
