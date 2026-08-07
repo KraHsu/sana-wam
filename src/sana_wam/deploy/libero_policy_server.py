@@ -101,9 +101,18 @@ def validate_libero_train_deploy_parity(training_cfg: Any, runtime_cfg: Any) -> 
     if isinstance(num_frames, bool) or not isinstance(num_frames, int) or num_frames < 2:
         raise ValueError("LIBERO checkpoint must record dataloader.num_frames >= 2")
 
+    action_horizon = OmegaConf.select(
+        training_cfg, "dataloader.action_horizon", default=None
+    )
+    if (
+        isinstance(action_horizon, bool)
+        or not isinstance(action_horizon, int)
+        or action_horizon < 1
+    ):
+        raise ValueError("LIBERO checkpoint must record a positive action_horizon")
+
     exact = {
         "policy.history_len": num_frames,
-        "policy.execute_horizon": None,
         "policy.temporal_ensemble": False,
         "inference.ar_obs_chunk_mode": "rolling_buffer",
         "inference.ar_obs_latent_band": "auto",
@@ -135,10 +144,10 @@ def validate_libero_train_deploy_parity(training_cfg: Any, runtime_cfg: Any) -> 
         "model.video_backbone.continuous_timestep_conditioning": True,
         "model.action_backbone.attn_kernel": "linear_relu",
         "dataloader.causal_temporal": True,
-        "dataloader.action_horizon": 28,
+        "dataloader.action_horizon": action_horizon,
         "dataloader.require_full_action_horizon": True,
         "dataloader.include_terminal_full_horizon": True,
-        "dataloader.window_stride": 28,
+        "dataloader.window_stride": action_horizon,
         "dataloader.video_context_mode": "causal_past",
         "dataloader.video_stride": 4,
         "dataloader.temporal_compression": 4,
@@ -152,6 +161,19 @@ def validate_libero_train_deploy_parity(training_cfg: Any, runtime_cfg: Any) -> 
                 f"LIBERO train/deploy parity requires {path}={expected!r}, "
                 f"got {_plain(observed)!r}"
             )
+
+    execute_horizon = OmegaConf.select(
+        runtime_cfg, "policy.execute_horizon", default=None
+    )
+    if execute_horizon is not None and (
+        isinstance(execute_horizon, bool)
+        or not isinstance(execute_horizon, int)
+        or execute_horizon < 1
+        or execute_horizon > action_horizon
+    ):
+        raise ValueError(
+            "LIBERO policy.execute_horizon must be null or in [1, action_horizon]"
+        )
 
     action_steps = OmegaConf.select(runtime_cfg, "inference.action_steps", default=None)
     if isinstance(action_steps, bool) or not isinstance(action_steps, int) or action_steps < 1:
@@ -186,13 +208,8 @@ def validate_libero_train_deploy_parity(training_cfg: Any, runtime_cfg: Any) -> 
     chunks = latent_frames // frame_chunk_size
     if chunks != 1:
         raise ValueError("causal single-chunk LIBERO requires one video chunk")
-    action_horizon = OmegaConf.select(
-        training_cfg, "dataloader.action_horizon", default=None
-    )
-    if num_frames != 17 or action_horizon != 28:
-        raise ValueError("LIBERO causal history/action-horizon geometry differs")
-    if action_horizon // chunks != 28:
-        raise ValueError("LIBERO action-token geometry differs from 28 tokens/chunk")
+    if num_frames != 17:
+        raise ValueError("LIBERO causal history geometry differs")
 
     frozen = OmegaConf.select(
         training_cfg, "training.deployment_contract", default=None
@@ -216,11 +233,11 @@ def validate_libero_train_deploy_parity(training_cfg: Any, runtime_cfg: Any) -> 
         "video_context_mode": "causal_past",
         "video_num_frames": expected_video_frames,
         "video_chunks_per_window": 1,
-        "action_horizon": 28,
-        "anchor_stride": 28,
+        "action_horizon": action_horizon,
+        "anchor_stride": action_horizon,
         "full_horizon_only": True,
-        "action_tokens_per_chunk": 28,
-        "action_horizon_rope": "unique_0_to_27",
+        "action_tokens_per_chunk": action_horizon,
+        "action_horizon_rope": f"unique_0_to_{action_horizon - 1}",
         "ar_attention_window": 1,
         "resolution": [384, 320],
     }
@@ -289,7 +306,9 @@ class LiberoPolicyServer(PolicyServer):
                     "temporal_compression": select(
                         "dataloader.temporal_compression"
                     ),
-                    "action_horizon_rope": "unique_0_to_27",
+                    "action_horizon_rope": (
+                        f"unique_0_to_{int(select('dataloader.action_horizon', 28)) - 1}"
+                    ),
                     "expert_vs_closed_loop_observation_values_may_differ": True,
                 },
                 "normalizers": {

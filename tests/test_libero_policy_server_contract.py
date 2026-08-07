@@ -166,6 +166,24 @@ def test_train_deploy_parity_accepts_matching_temporal_contract() -> None:
     validate_libero_train_deploy_parity(training, runtime)
 
 
+def test_train_deploy_parity_accepts_bounded_receding_horizon() -> None:
+    training, runtime = _parity_configs()
+    runtime.policy.execute_horizon = 8
+    validate_libero_train_deploy_parity(training, runtime)
+
+
+@pytest.mark.parametrize("execute_horizon", [True, 0, 29])
+def test_train_deploy_parity_rejects_invalid_receding_horizon(
+    execute_horizon,
+) -> None:
+    training, runtime = _parity_configs()
+    runtime.policy.execute_horizon = execute_horizon
+    with pytest.raises(
+        ValueError, match="policy.execute_horizon must be null or in"
+    ):
+        validate_libero_train_deploy_parity(training, runtime)
+
+
 def test_train_deploy_parity_rejects_history_drift() -> None:
     training, runtime = _parity_configs()
     runtime.policy.history_len = 64
