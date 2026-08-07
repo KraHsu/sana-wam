@@ -1,7 +1,7 @@
 # LIBERO T16：Paired One-Task Chunk-Closed-Loop Smoke
 
-状态：**source 根因修复与 static closure 已完成；首次 T16 root 在 PRE rollout 前
-fail-closed 冻结，尚未构造 simulator、未执行 rollout 或参数更新；fresh-root 复核尚未运行。**
+状态：**T16 已完成；最终 fresh-root execution/interface PASS，source、simulator、
+paired closed-loop 和 20×accum8 update 均有效。该单任务单初态结果不是正式 benchmark。**
 
 T16 是 T15 后的第一个行为证据门槛：在同一 fresh-init 模型进程内，先从
 一个固定 LIBERO simulator state 做 pre-update rollout，再原样执行 T15 的
@@ -220,6 +220,40 @@ target 为 `{-1,+1}`；continuous diffusion 输出本来就不受该范围硬约
 `39a8bac724cf37a4187564afede69fecfd493a8429b867b71c5b9852a6b6f872`、
 `4395ddc2b3ff01404c64dae1d1a46714d9e61db0a9ed40316bb398065c2ea07e`。
 H200 CPU contract suite 为 `43 passed`；Ruff、py_compile 和 diff check 均通过。
+
+### 7.2 最终 T16-R2 结果
+
+最终 source commit 为 `93e5d1cb3121e42fc021b5fb616fbe0dd94090c1`，nonce
+`cb1ec6d46d85612dfa8523ecabe93e77`，terminal root 为：
+
+```text
+/DATA/share/sana_wam_libero_nonformal_screens/t16/93e5d1cb3121/libero-t16-paired-one-task-chunk-closed-loop-fixed32-cb1ec6d46d85612dfa8523ecabe93e77
+```
+
+root/唯一 `RESULT.json` 分别冻结为 `0500`/`0400`；RESULT SHA256 为
+`5e2f5d61f7715f952f1762c04f5ad99891f9eda1ae5256310498c23146bcc471`。
+execution/harness 均 PASS，最终 verdict 为
+`T16_PAIRED_ONE_TASK_CHUNK_CLOSED_LOOP_INTERFACE_VALID`；scientific diagnostic 为
+`T16_PAIRED_ONE_TASK_UPDATE_EFFECT_OBSERVED`。
+
+核心结果：
+
+- PRE/POST 都从逐字节相同 reset fingerprint 出发，各完成 32 policy/env steps，
+  generation steps 均精确为 `[1,29]`；paired generation noise signatures 相同。
+- 中间精确完成 20 macro optimizer steps、160 forward/backward accumulation，
+  FP32 optimizer master 有限且 4 个 trainable roots 均更新。
+- 8 个 update samples 和 8 个 same-task heldout samples 的 post/pre loss ratio
+  全部严格小于 1；median ratio 分别为 `0.0517542070`、`0.0730358128`。
+- 相同初态第一 action 的 PRE/POST L2 为 `6.2480444081`，轨迹发生变化；两臂
+  都未 success/done，累计 reward 均为 `0`，因此不得宣称 20-step 模型已学会任务。
+- raw gripper score 超出训练 `[0,1]` support 的执行步由 PRE `26/32` 降为 POST
+  `4/32`，只作为校准 diagnostic；所有 score 均 finite 并按固定 threshold 执行。
+- 实际 scope 为 64 simulator steps、4 model generations；未加载/保存 SANA-WAM
+  checkpoint，未执行正式训练或 benchmark evaluation。
+
+T16 的核心架构与真实闭环接口门槛至此结束。下一步不再追加 architecture-validation
+细节实验，直接完成正式训练所需的最小 admission 后启动训练，并用独立 LIBERO
+checkpoint 做正式 benchmark evaluation。
 
 ## 8. 预算、root 和终态
 
