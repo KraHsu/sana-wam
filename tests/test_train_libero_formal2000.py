@@ -15,7 +15,7 @@ RUNNER = ROOT / "scripts/train_libero_formal2000.py"
 TRAINER = ROOT / "src/sana_wam/train/trainer.py"
 RUN_ROOT = (
     "/DATA/share/sana_wam_libero_training/formal2000/"
-    "libero-ar-formal2000-single-gpu-2000-dba67fee2b53ecce092898c0a70144c4"
+    "libero-ar-formal2000-r1-single-gpu-2000-ced0769ce3a32b441cda12a04929d6f9"
 )
 
 
@@ -42,6 +42,11 @@ def test_formal2000_config_is_single_gpu_fresh_init_final_only() -> None:
         "training.formal_libero_training": True,
         "training.formal_non_resumable": True,
         "training.optimizer_master_weights": True,
+        "model.architecture.video_on_path_loss_weight": 0.0,
+        "model.architecture.video_trajectory_endpoint_weight": 0.0,
+        "model.architecture.video_trajectory_velocity_weight": 0.0,
+        "model.architecture.video_trajectory_consistency_weight": 0.0,
+        "model.architecture.video_local_expansion_weight": 0.0,
         "training.seed": 20260807,
         "dataloader.seed": 20260806,
     }
@@ -60,8 +65,9 @@ def test_formal2000_config_is_single_gpu_fresh_init_final_only() -> None:
 def test_runner_binds_one_root_t16_and_no_resume() -> None:
     source = RUNNER.read_text()
     ast.parse(source)
-    assert source.count("dba67fee2b53ecce092898c0a70144c4") >= 2
+    assert source.count("ced0769ce3a32b441cda12a04929d6f9") >= 2
     assert "5e2f5d61f7715f952f1762c04f5ad99891f9eda1ae5256310498c23146bcc471" in source
+    assert "0a62b6a66ba152285d751795330d90a93558c2ca851706be0549dbd6966831c2" in source
     assert "T16_PAIRED_ONE_TASK_CHUNK_CLOSED_LOOP_INTERFACE_VALID" in source
     assert "Trainer(cfg, exact_output_dir=str(RUN_ROOT))" in source
     assert "checkpoint_step_2000.safetensors" in source

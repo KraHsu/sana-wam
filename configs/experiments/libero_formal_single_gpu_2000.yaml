@@ -30,6 +30,14 @@ model:
     ar_bootstrap_clean_prefix: true
     proprio_action_dropout_prob: 0.0
     action_loss_weighting: low_noise
+    # Formal R1 is action-only.  Keeping the internal diagnostic video loss at
+    # its historical default 1.0 incorrectly rejects valid one-action tail
+    # windows even though training.lambda_video is zero.
+    video_on_path_loss_weight: 0.0
+    video_trajectory_endpoint_weight: 0.0
+    video_trajectory_velocity_weight: 0.0
+    video_trajectory_consistency_weight: 0.0
+    video_local_expansion_weight: 0.0
     joint_graft: false
     joint_graft_idx: null
     joint_graft_every_n: 0
@@ -151,7 +159,7 @@ dataloader:
       - libero_goal_no_noops_1.0.0_lerobot:82
 
 training:
-  output_dir: /DATA/share/sana_wam_libero_training/formal2000/libero-ar-formal2000-single-gpu-2000-dba67fee2b53ecce092898c0a70144c4
+  output_dir: /DATA/share/sana_wam_libero_training/formal2000/libero-ar-formal2000-r1-single-gpu-2000-ced0769ce3a32b441cda12a04929d6f9
   max_steps: 2000
   save_steps: 0
   save_at_steps: []
@@ -162,6 +170,8 @@ training:
   formal_libero_training: true
   formal_non_resumable: true
   formal_predecessor_t16_result_sha256: 5e2f5d61f7715f952f1762c04f5ad99891f9eda1ae5256310498c23146bcc471
+  formal_failed_predecessor_sha256: 0a62b6a66ba152285d751795330d90a93558c2ca851706be0549dbd6966831c2
+  formal_revision_reason: disable_unused_video_on_path_loss_for_action_only_tail_windows
   batch_size: 1
   gradient_accumulation_steps: 8
   num_workers: 4

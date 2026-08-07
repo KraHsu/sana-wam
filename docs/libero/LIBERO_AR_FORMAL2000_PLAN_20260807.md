@@ -24,9 +24,17 @@ model architecture actually fails.
   failed; a rerun would require a separately authorized fresh root and fresh
   initialization.
 
-The single allowed root is
-`/DATA/share/sana_wam_libero_training/formal2000/libero-ar-formal2000-single-gpu-2000-dba67fee2b53ecce092898c0a70144c4`
-with nonce `dba67fee2b53ecce092898c0a70144c4`.
+R0 reached optimizer step 1, then exposed a real tail window for which the
+unused internal video diagnostic required a target even though
+`training.lambda_video=0`.  R0 is frozen failed with FAILED SHA256
+`0a62b6a66ba152285d751795330d90a93558c2ca851706be0549dbd6966831c2`.
+R1 makes the action-only contract explicit with
+`video_on_path_loss_weight=0.0`; the existing padding regression test proves
+that a bootstrap-only video tail remains valid when an action target exists.
+
+The R1 single allowed root is
+`/DATA/share/sana_wam_libero_training/formal2000/libero-ar-formal2000-r1-single-gpu-2000-ced0769ce3a32b441cda12a04929d6f9`
+with nonce `ced0769ce3a32b441cda12a04929d6f9`.
 
 ## Admission and result boundary
 
