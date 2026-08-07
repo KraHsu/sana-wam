@@ -15,7 +15,7 @@ RUNNER = ROOT / "scripts/train_libero_formal2000.py"
 TRAINER = ROOT / "src/sana_wam/train/trainer.py"
 RUN_ROOT = (
     "/DATA/share/sana_wam_libero_training/formal2000/"
-    "libero-ar-formal2000-r1-single-gpu-2000-ced0769ce3a32b441cda12a04929d6f9"
+    "libero-ar-formal2000-r2-single-gpu-2000-41151d523f774bf3f0dc281df56ca8b7"
 )
 
 
@@ -42,6 +42,7 @@ def test_formal2000_config_is_single_gpu_fresh_init_final_only() -> None:
         "training.formal_libero_training": True,
         "training.formal_non_resumable": True,
         "training.optimizer_master_weights": True,
+        "training.optimizer_foreach": False,
         "model.architecture.video_on_path_loss_weight": 0.0,
         "model.architecture.video_trajectory_endpoint_weight": 0.0,
         "model.architecture.video_trajectory_velocity_weight": 0.0,
@@ -65,9 +66,11 @@ def test_formal2000_config_is_single_gpu_fresh_init_final_only() -> None:
 def test_runner_binds_one_root_t16_and_no_resume() -> None:
     source = RUNNER.read_text()
     ast.parse(source)
-    assert source.count("ced0769ce3a32b441cda12a04929d6f9") >= 2
+    assert source.count("41151d523f774bf3f0dc281df56ca8b7") >= 2
     assert "5e2f5d61f7715f952f1762c04f5ad99891f9eda1ae5256310498c23146bcc471" in source
     assert "0a62b6a66ba152285d751795330d90a93558c2ca851706be0549dbd6966831c2" in source
+    assert "e778230115fa595895ba16e5d8bc5aac545b426277e69b02f4681c34cfe6603a" in source
+    assert '"training.optimizer_foreach": False' in source
     assert "T16_PAIRED_ONE_TASK_CHUNK_CLOSED_LOOP_INTERFACE_VALID" in source
     assert "Trainer(cfg, exact_output_dir=str(RUN_ROOT))" in source
     assert "checkpoint_step_2000.safetensors" in source
@@ -94,6 +97,34 @@ def test_trainer_exact_output_seam_is_not_legacy_timestamp() -> None:
     assert "self._checkpoint_due" in source
     assert "formal LIBERO training did not complete exactly 2000 steps" in source
     assert "formal LIBERO checkpoint already exists" in source
+    assert "del batch, loss, lv, la, result" in source
+    assert "autograd_graph_released_before_optimizer" in source
+
+
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [(None, None), (False, False), (True, True)],
+)
+def test_optimizer_foreach_setting_accepts_only_optional_boolean(
+    configured: bool | None,
+    expected: bool | None,
+) -> None:
+    from sana_wam.train.trainer import Trainer
+
+    trainer = Trainer.__new__(Trainer)
+    payload = {} if configured is None else {"optimizer_foreach": configured}
+    trainer.t = OmegaConf.create(payload)
+    assert trainer._optimizer_foreach_setting() is expected
+
+
+@pytest.mark.parametrize("configured", ["false", 0, 1, [], {}])
+def test_optimizer_foreach_setting_rejects_non_boolean(configured: object) -> None:
+    from sana_wam.train.trainer import Trainer
+
+    trainer = Trainer.__new__(Trainer)
+    trainer.t = OmegaConf.create({"optimizer_foreach": configured})
+    with pytest.raises(ValueError, match="optimizer_foreach must be a boolean"):
+        trainer._optimizer_foreach_setting()
 
 
 def test_exact_output_validator_accepts_only_matching_real_directory(

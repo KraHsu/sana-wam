@@ -31,10 +31,10 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "third_party" / "Sana"))
 
 CONFIG_RELATIVE_PATH = "configs/experiments/libero_formal_single_gpu_2000.yaml"
-RUN_NONCE = "ced0769ce3a32b441cda12a04929d6f9"
+RUN_NONCE = "41151d523f774bf3f0dc281df56ca8b7"
 RUN_ROOT = Path(
     "/DATA/share/sana_wam_libero_training/formal2000/"
-    "libero-ar-formal2000-r1-single-gpu-2000-ced0769ce3a32b441cda12a04929d6f9"
+    "libero-ar-formal2000-r2-single-gpu-2000-41151d523f774bf3f0dc281df56ca8b7"
 )
 EXPECTED_SANA_COMMIT = "16b9cec673e3335724ba2d8db25de7f9ed229292"
 EXPECTED_GPU_INDEX = 7
@@ -66,6 +66,11 @@ FAILED_R0_ROOT = Path(
     "libero-ar-formal2000-single-gpu-2000-dba67fee2b53ecce092898c0a70144c4"
 )
 FAILED_R0_SHA256 = "0a62b6a66ba152285d751795330d90a93558c2ca851706be0549dbd6966831c2"
+FAILED_R1_ROOT = Path(
+    "/DATA/share/sana_wam_libero_training/formal2000/"
+    "libero-ar-formal2000-r1-single-gpu-2000-ced0769ce3a32b441cda12a04929d6f9"
+)
+FAILED_R1_SHA256 = "e778230115fa595895ba16e5d8bc5aac545b426277e69b02f4681c34cfe6603a"
 STATS_SHA256 = "e5d985903539c1767a246e63c629b214c47c395d2000dee44122b8a0672253c7"
 STATS_POPULATION_SHA256 = (
     "7ed9772facf261299022e55169bcdaaa49fe3a7a20e0057e08cf419b5e584146"
@@ -323,6 +328,37 @@ def _verify_failed_r0() -> dict[str, Any]:
     return {**manifest, "root": str(FAILED_R0_ROOT)}
 
 
+def _verify_failed_r1() -> dict[str, Any]:
+    if os.path.realpath(FAILED_R1_ROOT) != str(FAILED_R1_ROOT):
+        raise RuntimeError("failed formal R1 ancestry contains a symlink")
+    metadata = os.lstat(FAILED_R1_ROOT)
+    if not stat.S_ISDIR(metadata.st_mode) or stat.S_IMODE(metadata.st_mode) != 0o500:
+        raise RuntimeError("failed formal R1 root is not frozen mode 0500")
+    expected_files = {"ATTEMPT.json", "FAILED.json", "TRAIN.log"}
+    if set(os.listdir(FAILED_R1_ROOT)) != expected_files:
+        raise RuntimeError("failed formal R1 root contents changed")
+    for name in expected_files:
+        child = os.lstat(FAILED_R1_ROOT / name)
+        if not stat.S_ISREG(child.st_mode) or stat.S_IMODE(child.st_mode) != 0o400:
+            raise RuntimeError(f"failed formal R1 file is not frozen: {name}")
+    failed_path = FAILED_R1_ROOT / "FAILED.json"
+    manifest = _verify_file(failed_path, FAILED_R1_SHA256)
+    payload = json.loads(failed_path.read_bytes())
+    traceback_text = payload.get("traceback", "")
+    if (
+        payload.get("valid_run") is not False
+        or payload.get("verdict") != "FAILED_CLOSED_NON_RESUMABLE"
+        or payload.get("error_type") != "OutOfMemoryError"
+        or "CUDA out of memory" not in payload.get("error", "")
+        or "_multi_tensor_adam" not in traceback_text
+        or "_foreach_sqrt" not in traceback_text
+        or payload.get("training_started") is not True
+        or payload.get("automatic_rerun_permitted") is not False
+    ):
+        raise RuntimeError("failed formal R1 receipt semantics changed")
+    return {**manifest, "root": str(FAILED_R1_ROOT)}
+
+
 def _config_value(cfg, path: str):
     return OmegaConf.select(cfg, path, default=None)
 
@@ -347,9 +383,10 @@ def _verify_config(expected_config_sha256: str):
         "training.formal_libero_training": True,
         "training.formal_non_resumable": True,
         "training.formal_predecessor_t16_result_sha256": T16_RESULT_SHA256,
-        "training.formal_failed_predecessor_sha256": FAILED_R0_SHA256,
+        "training.formal_failed_predecessor_sha256": FAILED_R1_SHA256,
+        "training.formal_failed_predecessor_r0_sha256": FAILED_R0_SHA256,
         "training.formal_revision_reason": (
-            "disable_unused_video_on_path_loss_for_action_only_tail_windows"
+            "disable_adamw_foreach_after_r1_optimizer_peak_oom"
         ),
         "model.architecture.video_on_path_loss_weight": 0.0,
         "model.architecture.video_trajectory_endpoint_weight": 0.0,
@@ -357,6 +394,7 @@ def _verify_config(expected_config_sha256: str):
         "model.architecture.video_trajectory_consistency_weight": 0.0,
         "model.architecture.video_local_expansion_weight": 0.0,
         "training.optimizer_master_weights": True,
+        "training.optimizer_foreach": False,
         "training.seed": 20260807,
         "dataloader.seed": 20260806,
         "training.debug": False,
@@ -690,6 +728,7 @@ def main() -> None:
     )
     t16 = _verify_t16()
     failed_r0 = _verify_failed_r0()
+    failed_r1 = _verify_failed_r1()
     cfg = _verify_config(args.expected_config_sha256)
     assets = _verify_assets()
 
@@ -712,11 +751,12 @@ def main() -> None:
                 "source": source,
                 "predecessor_t16": t16,
                 "failed_predecessor_r0": failed_r0,
+                "failed_predecessor_r1": failed_r1,
                 "assets": assets,
                 "gpu": {**gpu_before, "lock_path": lock_path},
                 "training": {
                     "fresh_initialization": True,
-                    "optimizer": "AdamW_FP32_master",
+                    "optimizer": "AdamW_FP32_master_foreach_false",
                     "optimizer_steps": 2000,
                     "gradient_accumulation_steps": 8,
                     "intermediate_checkpoints": 0,
@@ -767,6 +807,11 @@ def main() -> None:
             )
             if any(summary.get(key) is not True for key in required_finite):
                 raise RuntimeError("formal2000 final numerical state is not finite")
+            if (
+                summary.get("optimizer_foreach") is not False
+                or summary.get("autograd_graph_released_before_optimizer") is not True
+            ):
+                raise RuntimeError("formal2000 memory-peak revision was not active")
 
             checkpoints = sorted(RUN_ROOT.glob("checkpoint_step_*.safetensors"))
             expected_checkpoint = RUN_ROOT / "checkpoint_step_2000.safetensors"
@@ -813,6 +858,7 @@ def main() -> None:
                 "source": source,
                 "predecessor_t16": t16,
                 "failed_predecessor_r0": failed_r0,
+                "failed_predecessor_r1": failed_r1,
                 "base_load": base_load,
                 "trainable_partition": partition,
                 "training": {

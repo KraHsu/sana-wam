@@ -1450,6 +1450,13 @@ class Trainer:
             )
         return optimizer_groups, pairs
 
+    def _optimizer_foreach_setting(self) -> bool | None:
+        """Return the explicitly configured AdamW foreach policy, if any."""
+        raw = self.t.get("optimizer_foreach", None)
+        if raw is not None and type(raw) is not bool:
+            raise ValueError("training.optimizer_foreach must be a boolean or null")
+        return raw
+
     @staticmethod
     def _sync_master_gradients(pairs) -> None:
         for model_parameter, master in pairs:
@@ -2318,10 +2325,12 @@ class Trainer:
             raise RuntimeError(
                 "governed training requires one FP32 optimizer master per model parameter"
             )
+        optimizer_foreach = self._optimizer_foreach_setting()
         optimizer = torch.optim.AdamW(
             optimizer_groups,
             weight_decay=float(t.get("weight_decay", 0.0)),
             betas=(0.9, 0.95),
+            foreach=optimizer_foreach,
         )
         base_lrs = [g["lr"] for g in optimizer.param_groups]
 
@@ -2344,6 +2353,7 @@ class Trainer:
         for parameter in params:
             parameter.grad = None
         trajectory_state_counts: dict[int, int] = {}
+        formal_libero_metrics: dict[str, Any] | None = None
         while step < max_steps:
             if governed_training:
                 torch.cuda.reset_peak_memory_stats(self.device)
@@ -2401,6 +2411,34 @@ class Trainer:
                             trajectory_state_counts.get(index, 0) + 1
                         )
                 (loss / grad_accum).backward()
+                if formal_libero:
+                    # The T16 update core releases each completed autograd graph
+                    # before AdamW.  Preserve only detached scalar diagnostics so
+                    # the final micro graph cannot overlap the optimizer peak.
+                    formal_libero_metrics = {
+                        key: (
+                            value.detach() if isinstance(value, torch.Tensor) else value
+                        )
+                        for key, value in {
+                            "loss": loss,
+                            "loss_video": lv,
+                            "loss_action": la,
+                            "loss_video_on_path": result.get("loss_video_on_path"),
+                            "loss_video_trajectory_endpoint": result.get(
+                                "loss_video_trajectory_endpoint"
+                            ),
+                            "loss_video_trajectory_velocity": result.get(
+                                "loss_video_trajectory_velocity"
+                            ),
+                            "loss_video_trajectory_consistency": result.get(
+                                "loss_video_trajectory_consistency"
+                            ),
+                            "video_trajectory_supervised_state_index": result.get(
+                                "video_trajectory_supervised_state_index"
+                            ),
+                        }.items()
+                    }
+                    del batch, loss, lv, la, result
 
             self._allreduce_grads(params)
             if grad_clip > 0:
@@ -2557,6 +2595,15 @@ class Trainer:
                 parameter.grad = None
 
             if _rank() == 0 and (step % 10 == 0 or step == 1):
+                if formal_libero:
+                    if formal_libero_metrics is None:
+                        raise RuntimeError("formal LIBERO metrics were not captured")
+                    loss = formal_libero_metrics["loss"]
+                    lv = formal_libero_metrics["loss_video"]
+                    la = formal_libero_metrics["loss_action"]
+                    diagnostic_result = formal_libero_metrics
+                else:
+                    diagnostic_result = result
                 logger.info(
                     "step %d/%d  loss=%.4f  video=%.4f  action=%.4f  lr=%.2e",
                     step,
@@ -2566,16 +2613,26 @@ class Trainer:
                     float(la) if la is not None else 0.0,
                     optimizer.param_groups[0]["lr"],
                 )
-                endpoint = result.get("loss_video_trajectory_endpoint")
+                endpoint = diagnostic_result.get("loss_video_trajectory_endpoint")
                 if endpoint is not None:
                     logger.info(
                         "trajectory components  on_path=%.4f  endpoint=%.4f  "
                         "velocity=%.4f  consistency=%.4f  state=%d",
-                        float(result.get("loss_video_on_path", 0.0)),
+                        float(diagnostic_result.get("loss_video_on_path", 0.0)),
                         float(endpoint),
-                        float(result.get("loss_video_trajectory_velocity", 0.0)),
-                        float(result.get("loss_video_trajectory_consistency", 0.0)),
-                        int(result.get("video_trajectory_supervised_state_index", -1)),
+                        float(
+                            diagnostic_result.get("loss_video_trajectory_velocity", 0.0)
+                        ),
+                        float(
+                            diagnostic_result.get(
+                                "loss_video_trajectory_consistency", 0.0
+                            )
+                        ),
+                        int(
+                            diagnostic_result.get(
+                                "video_trajectory_supervised_state_index", -1
+                            )
+                        ),
                     )
 
             if not formal_phase6 and not formal_libero and self._checkpoint_due(
@@ -2603,7 +2660,9 @@ class Trainer:
                     "formal LIBERO training did not complete exactly 2000 steps "
                     "without an intermediate save"
                 )
-            final_loss = float(result["loss"].detach().float().item())
+            if formal_libero_metrics is None:
+                raise RuntimeError("formal LIBERO final metrics are missing")
+            final_loss = float(formal_libero_metrics["loss"].float().item())
             finite_state = {
                 "final_loss_finite": math.isfinite(final_loss),
                 "model_parameters_finite": self._phase6_tensors_finite(params),
@@ -2625,6 +2684,8 @@ class Trainer:
                     float(group["lr"]) for group in optimizer.param_groups
                 ],
                 "optimizer_steps": step,
+                "optimizer_foreach": optimizer_foreach,
+                "autograd_graph_released_before_optimizer": True,
                 "peak_memory_reserved_bytes": int(
                     torch.cuda.max_memory_reserved(self.device)
                 ),
