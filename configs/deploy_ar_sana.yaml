@@ -3,9 +3,9 @@
 #
 # scripts/deploy.py and policy_server.build_server_from_config dispatch to
 # the AR inference engine for this architecture (see sana_wam/deploy/ar_engine.py).
-# The engine is STATEFUL closed-loop: one AR step per generate(), persistent
-# KV cache across steps. That imposes two hard requirements below — greedy
-# policy mode and async disabled — see sana_wam/deploy/ar_engine.py.
+# The causal single-chunk LIBERO policy performs one fresh video-0 -> action-1
+# graph per generate().  Greedy execution and synchronous inference keep the
+# 28-action cadence identical to training.
 # ---------------------------------------------------------------------------
 checkpoint_path: null          # --ckpt-dir on the CLI overrides this.
 device: cuda:0
@@ -21,6 +21,10 @@ server:
 # scripts/deploy.py); the engine also recomputes them defensively.
 # ---------------------------------------------------------------------------
 inference:
+  num_frames: 17             # past/current raw observations in one causal window
+  video_num_frames: 5        # range(0, 17, video_stride=4) -> 2 VAE latents
+  height: 384
+  width: 320
   video_steps: 4              # retained for compatibility; closed-loop uses observed video
   action_steps: 20            # full-noise action denoising validation
   # null matches training's ambient noise; set an int only for deterministic debugging.
@@ -33,16 +37,17 @@ inference:
 
   # --- AR deploy-semantics knobs (eval-verification targets; handoff §2c) ---
   ar_obs_chunk_mode: rolling_buffer   # rolling_buffer (default) | repeat_frame (debug)
-  ar_obs_latent_band: auto            # auto (leading@step0, trailing after — training-matched) | leading | trailing
-  # per_step (default): each chunk's per-chunk AdaLN proprio delta = current measured
-  #   state — in-distribution with proprio_per_chunk training. single: latch the
-  #   episode's first state for ALL chunks (off-distribution for the per-chunk deltas;
-  #   only matches the clip-level context token — debug/ablation only).
+  ar_obs_latent_band: auto            # the single two-latent chunk is both leading and trailing
+  ar_reset_cache_each_generation: true
+  # The causal one-chunk training graph uses the current action-anchor state for
+  # both its global proprio token and its per-chunk AdaLN condition.
   ar_proprio_mode: per_step
   # Use model-predicted confirmed action cache by default. ``measured`` replaces
   # the previous action frame with the achieved proprio trajectory at next chunk.
   cache_feedback_mode: predicted    # predicted | measured
   cache_feedback_fallback: predicted  # predicted | error
+  generation_zero_rerank:
+    enabled: false
   # ar_action_tokens_per_chunk: 24    # optional override; else derived from num_frames / num_chunks
 
 # ---------------------------------------------------------------------------
@@ -54,9 +59,8 @@ inference:
 policy:
   execute_horizon: null       # null => greedy: drain the full chunk, then re-generate
   temporal_ensemble: false    # MUST be false for AR
-  # obs_history must hold a full raw frame window (>= dataloader.num_frames) so the
-  # engine can rebuild the obs clip at the training pixel cadence (video_stride).
-  history_len: 64
+  # Exact causal training input: the previous 16 observations plus current.
+  history_len: 17
 
 # ---------------------------------------------------------------------------
 # Deploy-time optimizations.

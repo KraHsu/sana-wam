@@ -10,7 +10,9 @@ third_party/Sana like the rollout-engine tests.
 
 from __future__ import annotations
 
+import hashlib
 import json
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -41,6 +43,23 @@ def _make_engine(arch, video_steps, action_steps, seed, tokens):
     return ARInferenceEngine(
         cfg=_engine_cfg(video_steps, action_steps, seed, tokens), architecture=arch
     )
+
+
+@requires_sana
+def test_action_scheduler_consumes_explicit_deploy_shift() -> None:
+    from sana_wam.deploy.ar_engine import ARInferenceEngine
+
+    arch, _vb, _ab = _build_arch()
+    cfg = _engine_cfg(video_steps=2, action_steps=3, seed=0, tokens=2)
+    cfg.inference.shift = 3.0
+    engine = ARInferenceEngine(cfg=cfg, architecture=arch)
+    u = 2.0 / 3.0
+    expected = 3.0 * u / (1.0 + 2.0 * u)
+    assert engine._action_scheduler_shift == 3.0
+    assert engine._a_sigmas[1] == pytest.approx(expected)
+    assert engine._action_scheduler_sigmas_sha256 == hashlib.sha256(
+        np.asarray(engine._a_sigmas, dtype="<f8").tobytes(order="C")
+    ).hexdigest()
 
 
 def _make_engine_with_cadence(arch, *, num_frames, video_stride, video_num_frames):
@@ -111,6 +130,133 @@ def test_history113_ablation_restores_full_training_cadence():
     )
     assert short.count(103) == 26
     assert short[-3:] == [104, 108, 112]
+
+
+def test_rolling_context_proprio_matches_video_window_start() -> None:
+    from sana_wam.deploy.ar_engine import ARInferenceEngine
+
+    engine = object.__new__(ARInferenceEngine)
+    engine.architecture = SimpleNamespace(
+        uses_proprioception=True,
+        normalize_deploy_proprio=lambda value: np.asarray(value, dtype=np.float32),
+    )
+    engine._proprio_mode = "per_step"
+    engine._raw_num_frames = 113
+    engine._device = torch.device("cpu")
+    engine._dtype = torch.float32
+
+    history = [
+        {"image": index, "state": np.asarray([index], dtype=np.float32)}
+        for index in range(141)
+    ]
+    conditions = {
+        "obs_history": history,
+        "proprio_state": np.asarray([140], dtype=np.float32),
+    }
+    current = engine._prep_proprio(conditions["proprio_state"])
+    context = engine._prep_window_context_proprio(conditions, fallback=current)
+    assert context.item() == 28.0
+    assert current.item() == 140.0
+    assert engine._recent_frames(conditions)[0] == 28
+
+    short = {
+        "obs_history": history[:29],
+        "proprio_state": np.asarray([28], dtype=np.float32),
+    }
+    current_short = engine._prep_proprio(short["proprio_state"])
+    context_short = engine._prep_window_context_proprio(
+        short, fallback=current_short
+    )
+    assert context_short.item() == 0.0
+    assert current_short.item() == 28.0
+
+
+def test_context_proprio_rejects_history_tail_mismatch() -> None:
+    from sana_wam.deploy.ar_engine import ARInferenceEngine
+
+    engine = object.__new__(ARInferenceEngine)
+    engine.architecture = SimpleNamespace(
+        uses_proprioception=True,
+        normalize_deploy_proprio=lambda value: np.asarray(value, dtype=np.float32),
+    )
+    engine._proprio_mode = "per_step"
+    engine._raw_num_frames = 113
+    engine._device = torch.device("cpu")
+    engine._dtype = torch.float32
+    conditions = {
+        "obs_history": [{"image": 0, "state": np.asarray([1], dtype=np.float32)}],
+        "proprio_state": np.asarray([2], dtype=np.float32),
+    }
+    with pytest.raises(ValueError, match="differs from obs_history tail"):
+        engine._prep_window_context_proprio(
+            conditions, fallback=torch.tensor([[2.0]])
+        )
+
+
+def test_causal_single_chunk_uses_current_proprio_for_both_paths() -> None:
+    from sana_wam.deploy.ar_engine import ARInferenceEngine
+
+    engine = object.__new__(ARInferenceEngine)
+    engine.architecture = SimpleNamespace(uses_proprioception=True)
+    engine._proprio_mode = "per_step"
+    engine._reset_cache_each_generation = True
+    current = torch.tensor([[9.0]])
+    conditions = {
+        "obs_history": [
+            {"image": index, "state": np.asarray([index], dtype=np.float32)}
+            for index in range(29)
+        ],
+        "proprio_state": np.asarray([28], dtype=np.float32),
+    }
+    assert engine._prep_window_context_proprio(conditions, fallback=current) is current
+
+
+def test_fresh_single_chunk_boundary_rebases_cache_but_not_episode_index() -> None:
+    from sana_wam.deploy.ar_engine import ARInferenceEngine
+
+    class Cache:
+        resets = 0
+
+        def reset(self):
+            self.resets += 1
+
+    engine = object.__new__(ARInferenceEngine)
+    engine._reset_cache_each_generation = True
+    engine._episode_generation_index = 3
+    engine._step_c = 1
+    engine._cache = Cache()
+    engine._pending_action_feedback = {
+        "action_tokens": 28,
+        "generated_at_policy_step": 56,
+    }
+    engine._last_feedback = {"status": "predicted"}
+    engine._begin_fresh_single_chunk_generation(
+        {"executed_steps_since_generate": 28, "policy_step": 84}
+    )
+    assert engine._cache.resets == 1
+    assert engine._step_c == 0
+    assert engine._episode_generation_index == 3
+    assert engine._pending_action_feedback is None
+    assert engine._last_feedback == {
+        "status": "fresh_cache",
+        "reason": "causal_single_chunk_boundary",
+    }
+
+
+@requires_sana
+def test_action_horizon_rope_has_unique_slots_and_shared_noisy_clean_phases() -> None:
+    arch, _vb, _ab = _build_arch()
+    arch._ar_action_horizon_rope = True
+    frame_ids = torch.cat(
+        [torch.ones(28, dtype=torch.long), torch.ones(28, dtype=torch.long)]
+    )
+    positions = arch._action_rope_positions(
+        frame_ids, action_tokens_per_chunk=28
+    )
+    assert positions[:28].tolist() == list(range(28))
+    assert positions[28:].tolist() == list(range(28))
+    assert torch.equal(positions[:28], positions[28:])
+    assert not torch.equal(positions, frame_ids)
 
 
 @requires_sana
@@ -202,7 +348,7 @@ def test_engine_reset_is_reproducible():
 
 @requires_sana
 def test_engine_step_matches_ar_rollout_with_proprio():
-    """F4 path: engine threads proprio identically to ar_rollout (per-step states)."""
+    """Engine and rollout route window-context and current AdaLN proprio identically."""
     import torch.nn as nn
 
     torch.manual_seed(0)
@@ -222,12 +368,14 @@ def test_engine_step_matches_ar_rollout_with_proprio():
         torch.randn(B, S, generator=torch.Generator().manual_seed(10)),
         torch.randn(B, S, generator=torch.Generator().manual_seed(11)),
     ]
+    context_proprios = [proprios[0], proprios[0]]
 
     ref = arch.ar_rollout(
         obs_seq,
         context=context,
         seq_lens=seq_lens,
         proprio_states=proprios,
+        context_proprio_states=context_proprios,
         frame_chunk_size=fcs,
         attn_window=72,
         video_steps=2,
@@ -238,7 +386,13 @@ def test_engine_step_matches_ar_rollout_with_proprio():
 
     engine = _make_engine(arch, video_steps=2, action_steps=2, seed=3, tokens=2)
     for c, obs in enumerate(obs_seq):
-        a = engine._step_with_obs_latent(obs, context, seq_lens, proprio=proprios[c])
+        a = engine._step_with_obs_latent(
+            obs,
+            context,
+            seq_lens,
+            proprio=proprios[c],
+            context_proprio=context_proprios[c],
+        )
         torch.testing.assert_close(a, ref[c], atol=1e-6, rtol=1e-5)
 
 

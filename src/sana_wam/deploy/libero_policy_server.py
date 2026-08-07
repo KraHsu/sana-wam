@@ -23,11 +23,43 @@ _CRITICAL_CHECKPOINT_PATHS = (
     "dataloader.camera_layout",
     "dataloader.target_camera",
     "dataloader.benchmark_contract",
+    "dataloader.num_frames",
+    "dataloader.action_horizon",
+    "dataloader.require_full_action_horizon",
+    "dataloader.include_terminal_full_horizon",
+    "dataloader.window_stride",
+    "dataloader.video_context_mode",
+    "dataloader.video_stride",
+    "dataloader.temporal_compression",
+    "dataloader.causal_temporal",
+    "dataloader.height",
+    "dataloader.width",
+    "model.architecture.framework",
+    "model.architecture.variant",
     "model.architecture.action_dim",
     "model.architecture.state_dim",
     "model.architecture.use_proprioception",
     "model.architecture.delta_action",
+    "model.architecture.attention_mask_mode",
+    "model.architecture.video_attention_mask_mode",
+    "model.architecture.ar_frame_chunk_size",
+    "model.architecture.ar_chunkwise_temporal_ops",
+    "model.architecture.ar_attn_window",
+    "model.architecture.ar_action_horizon_rope",
+    "model.architecture.ar_noisy_cond_prob",
+    "model.architecture.ar_cond_max_ratio",
+    "model.architecture.proprio_per_chunk",
+    "model.architecture.proprio_action_dropout_prob",
+    "model.architecture.ar_bootstrap_clean_prefix",
+    "model.architecture.action_loss_weighting",
+    "model.video_backbone.attn_kernel",
+    "model.video_backbone.continuous_timestep_conditioning",
+    "model.action_backbone.attn_kernel",
 )
+
+_LIBERO_TEMPORAL_ALIGNMENT = "causal_past_video_0_to_future_action_1"
+_ACTION_SCHEDULER_SHIFT = 5.0
+_ACTION_TRAIN_TIMESTEPS = 1000
 
 
 def _plain(value: Any) -> Any:
@@ -54,6 +86,149 @@ def reject_libero_checkpoint_contract_overrides(
             raise ValueError(
                 f"deploy config cannot override LIBERO checkpoint identity field {path}"
             )
+
+
+def validate_libero_train_deploy_parity(training_cfg: Any, runtime_cfg: Any) -> None:
+    """Pin the causal single-chunk training/deployment implementation graph.
+
+    This establishes identical input indexing, block geometry, horizon identity,
+    proprio sources and action scheduler.  Expert observations and closed-loop
+    observations can still have different values; that scientific distribution
+    gap is not disguised as implementation parity.
+    """
+
+    num_frames = OmegaConf.select(training_cfg, "dataloader.num_frames", default=None)
+    if isinstance(num_frames, bool) or not isinstance(num_frames, int) or num_frames < 2:
+        raise ValueError("LIBERO checkpoint must record dataloader.num_frames >= 2")
+
+    exact = {
+        "policy.history_len": num_frames,
+        "policy.execute_horizon": None,
+        "policy.temporal_ensemble": False,
+        "inference.ar_obs_chunk_mode": "rolling_buffer",
+        "inference.ar_obs_latent_band": "auto",
+        "inference.ar_reset_cache_each_generation": True,
+        "inference.ar_proprio_mode": "per_step",
+        "inference.cache_feedback_mode": "predicted",
+        "inference.cache_feedback_fallback": "predicted",
+        "inference.num_frames": num_frames,
+        "inference.height": 384,
+        "inference.width": 320,
+        "inference.generation_zero_rerank.enabled": False,
+        "optimization.async_inference.mode": "none",
+        "optimization.decode_video": False,
+        "model.architecture.framework": "dual_system",
+        "model.architecture.variant": "autoregressive",
+        "model.architecture.attention_mask_mode": "joint",
+        "model.architecture.video_attention_mask_mode": "first_frame_causal",
+        "model.architecture.ar_frame_chunk_size": 2,
+        "model.architecture.ar_chunkwise_temporal_ops": True,
+        "model.architecture.ar_attn_window": 1,
+        "model.architecture.ar_action_horizon_rope": True,
+        "model.architecture.ar_noisy_cond_prob": 0.0,
+        "model.architecture.ar_cond_max_ratio": 0.0,
+        "model.architecture.proprio_per_chunk": True,
+        "model.architecture.proprio_action_dropout_prob": 0.0,
+        "model.architecture.ar_bootstrap_clean_prefix": True,
+        "model.architecture.action_loss_weighting": "none",
+        "model.video_backbone.attn_kernel": "linear_relu",
+        "model.video_backbone.continuous_timestep_conditioning": True,
+        "model.action_backbone.attn_kernel": "linear_relu",
+        "dataloader.causal_temporal": True,
+        "dataloader.action_horizon": 28,
+        "dataloader.require_full_action_horizon": True,
+        "dataloader.include_terminal_full_horizon": True,
+        "dataloader.window_stride": 28,
+        "dataloader.video_context_mode": "causal_past",
+        "dataloader.video_stride": 4,
+        "dataloader.temporal_compression": 4,
+        "dataloader.height": 384,
+        "dataloader.width": 320,
+    }
+    for path, expected in exact.items():
+        observed = OmegaConf.select(runtime_cfg, path, default="__ABSENT__")
+        if _plain(observed) != expected:
+            raise ValueError(
+                f"LIBERO train/deploy parity requires {path}={expected!r}, "
+                f"got {_plain(observed)!r}"
+            )
+
+    action_steps = OmegaConf.select(runtime_cfg, "inference.action_steps", default=None)
+    if isinstance(action_steps, bool) or not isinstance(action_steps, int) or action_steps < 1:
+        raise ValueError("LIBERO deployment requires positive integer action_steps")
+    shift = OmegaConf.select(runtime_cfg, "inference.shift", default=None)
+    if isinstance(shift, bool) or not isinstance(shift, (int, float)):
+        raise ValueError("LIBERO deployment requires numeric inference.shift")
+    if float(shift) != _ACTION_SCHEDULER_SHIFT:
+        raise ValueError(
+            "LIBERO action scheduler shift differs from the training scheduler"
+        )
+    if OmegaConf.select(
+        runtime_cfg, "inference.ar_action_tokens_per_chunk", default=None
+    ) is not None:
+        raise ValueError(
+            "LIBERO deployment must derive action_tokens_per_chunk from training geometry"
+        )
+    video_num_frames = OmegaConf.select(
+        runtime_cfg, "inference.video_num_frames", default=None
+    )
+    expected_video_frames = (num_frames - 1) // 4 + 1
+    if video_num_frames != expected_video_frames:
+        raise ValueError(
+            "LIBERO deploy video_num_frames differs from training pixel cadence"
+        )
+    latent_frames = 1 + (expected_video_frames - 1) // 4
+    frame_chunk_size = OmegaConf.select(
+        training_cfg, "model.architecture.ar_frame_chunk_size", default=None
+    )
+    if latent_frames % frame_chunk_size != 0:
+        raise ValueError("LIBERO latent frames do not divide into AR chunks")
+    chunks = latent_frames // frame_chunk_size
+    if chunks != 1:
+        raise ValueError("causal single-chunk LIBERO requires one video chunk")
+    action_horizon = OmegaConf.select(
+        training_cfg, "dataloader.action_horizon", default=None
+    )
+    if num_frames != 17 or action_horizon != 28:
+        raise ValueError("LIBERO causal history/action-horizon geometry differs")
+    if action_horizon // chunks != 28:
+        raise ValueError("LIBERO action-token geometry differs from 28 tokens/chunk")
+
+    frozen = OmegaConf.select(
+        training_cfg, "training.deployment_contract", default=None
+    )
+    if frozen is None:
+        raise ValueError("causal LIBERO checkpoint lacks deployment_contract")
+    expected_contract = {
+        "schema_version": "sana-wam-libero-causal-single-chunk-parity-v1",
+        "history_len": num_frames,
+        "action_steps": action_steps,
+        "action_scheduler_shift": _ACTION_SCHEDULER_SHIFT,
+        "action_scheduler_train_timesteps": _ACTION_TRAIN_TIMESTEPS,
+        "temporal_alignment": _LIBERO_TEMPORAL_ALIGNMENT,
+        "ar_obs_chunk_mode": "rolling_buffer",
+        "ar_obs_latent_band": "auto",
+        "ar_reset_cache_each_generation": True,
+        "ar_proprio_mode": "per_step",
+        "cache_feedback_mode": "predicted",
+        "context_proprio_source": "current",
+        "chunk_proprio_source": "current",
+        "video_context_mode": "causal_past",
+        "video_num_frames": expected_video_frames,
+        "video_chunks_per_window": 1,
+        "action_horizon": 28,
+        "anchor_stride": 28,
+        "full_horizon_only": True,
+        "action_tokens_per_chunk": 28,
+        "action_horizon_rope": "unique_0_to_27",
+        "ar_attention_window": 1,
+        "resolution": [384, 320],
+    }
+    observed_contract = _plain(frozen)
+    if observed_contract != expected_contract:
+        raise ValueError(
+            "saved LIBERO deployment_contract differs from runtime semantics"
+        )
 
 
 class LiberoPolicyServer(PolicyServer):
@@ -88,6 +263,35 @@ class LiberoPolicyServer(PolicyServer):
                 "camera_layout": _plain(select("dataloader.camera_layout")),
                 "target_camera": select("dataloader.target_camera"),
                 "benchmark_contract": _plain(select("dataloader.benchmark_contract")),
+                "train_deploy_parity": {
+                    "schema_version": (
+                        "sana-wam-libero-causal-single-chunk-parity-v1"
+                    ),
+                    "history_len": identity.get("history_len"),
+                    "action_steps": identity.get("action_steps"),
+                    "action_scheduler_shift": _ACTION_SCHEDULER_SHIFT,
+                    "action_scheduler_train_timesteps": _ACTION_TRAIN_TIMESTEPS,
+                    "action_loss_weighting": select(
+                        "model.architecture.action_loss_weighting"
+                    ),
+                    "temporal_alignment": _LIBERO_TEMPORAL_ALIGNMENT,
+                    "ar_obs_chunk_mode": identity.get("ar_obs_chunk_mode"),
+                    "ar_obs_latent_band": identity.get("ar_obs_latent_band"),
+                    "ar_proprio_mode": identity.get("ar_proprio_mode"),
+                    "cache_feedback_mode": identity.get("cache_feedback_mode"),
+                    "reset_cache_each_generation": identity.get(
+                        "reset_cache_each_generation"
+                    ),
+                    "context_proprio_source": "current",
+                    "chunk_proprio_source": "current",
+                    "video_context_mode": select("dataloader.video_context_mode"),
+                    "video_stride": select("dataloader.video_stride"),
+                    "temporal_compression": select(
+                        "dataloader.temporal_compression"
+                    ),
+                    "action_horizon_rope": "unique_0_to_27",
+                    "expert_vs_closed_loop_observation_values_may_differ": True,
+                },
                 "normalizers": {
                     "action": {
                         "active": True,
@@ -173,22 +377,7 @@ def build_libero_server_from_config(
     reject_libero_checkpoint_contract_overrides(training_cfg, deploy_cfg)
     _normalize_compile_mode_in_cfg(deploy_cfg)
 
-    configured_name = OmegaConf.select(deploy_cfg, "checkpoint_name", default=None)
-    if (
-        ckpt_name is not None
-        and configured_name is not None
-        and ckpt_name != configured_name
-    ):
-        raise ValueError("CLI and deploy config checkpoint_name disagree")
-    selected_name = ckpt_name if ckpt_name is not None else configured_name
-    selected_path, selected_name = resolve_libero_checkpoint_path(
-        checkpoint_dir, selected_name
-    )
-    checkpoint_sha256 = sha256_file(selected_path)
-
-    training_cfg, architecture = load_libero_from_checkpoint_dir(
-        str(checkpoint_dir), device=device, ckpt_name=selected_name
-    )
+    # Resolve and reject configuration drift before constructing the 2B model.
     dataloader_cfg = OmegaConf.select(training_cfg, "dataloader")
     inference_cfg = OmegaConf.select(
         deploy_cfg, "inference", default=OmegaConf.create({})
@@ -203,13 +392,47 @@ def build_libero_server_from_config(
         if OmegaConf.select(inference_cfg, field, default=None) is None:
             OmegaConf.update(inference_cfg, field, value, merge=False)
     OmegaConf.update(deploy_cfg, "inference", inference_cfg, merge=True)
+    validate_libero_train_deploy_parity(
+        training_cfg, OmegaConf.merge(training_cfg, deploy_cfg)
+    )
 
+    configured_name = OmegaConf.select(deploy_cfg, "checkpoint_name", default=None)
+    if (
+        ckpt_name is not None
+        and configured_name is not None
+        and ckpt_name != configured_name
+    ):
+        raise ValueError("CLI and deploy config checkpoint_name disagree")
+    selected_name = ckpt_name if ckpt_name is not None else configured_name
+    selected_path, selected_name = resolve_libero_checkpoint_path(
+        checkpoint_dir, selected_name
+    )
+    checkpoint_sha256 = sha256_file(selected_path)
+    saved_config_sha256 = sha256_file(config_path)
+    stats_path = Path(
+        str(OmegaConf.select(training_cfg, "dataloader.action_stats_path"))
+    ).expanduser()
+    if stats_path.is_symlink() or not stats_path.is_file():
+        raise ValueError(f"invalid LIBERO action-stats artifact: {stats_path}")
+    action_stats_sha256 = sha256_file(stats_path)
+
+    training_cfg, architecture = load_libero_from_checkpoint_dir(
+        str(checkpoint_dir), device=device, ckpt_name=selected_name
+    )
     merged = OmegaConf.merge(training_cfg, deploy_cfg)
+    validate_libero_train_deploy_parity(training_cfg, merged)
     engine = build_engine(
         cfg=merged,
         architecture=architecture,
         training_cfg=training_cfg,
     )
+    if (
+        type(architecture).__name__ != "DualSystemARArchitecture"
+        or type(engine).__name__ != "ARInferenceEngine"
+    ):
+        raise ValueError(
+            "causal LIBERO requires DualSystemARArchitecture + ARInferenceEngine"
+        )
     server = LiberoPolicyServer(
         engine=engine,
         cfg=merged,
@@ -220,6 +443,9 @@ def build_libero_server_from_config(
             "checkpoint_path": str(selected_path),
             "checkpoint_size": selected_path.stat().st_size,
             "checkpoint_sha256": checkpoint_sha256,
+            "saved_config_sha256": saved_config_sha256,
+            "action_stats_path": str(stats_path.resolve()),
+            "action_stats_sha256": action_stats_sha256,
         }
     )
     return server
@@ -229,4 +455,5 @@ __all__ = [
     "LiberoPolicyServer",
     "build_libero_server_from_config",
     "reject_libero_checkpoint_contract_overrides",
+    "validate_libero_train_deploy_parity",
 ]

@@ -42,9 +42,10 @@ Deploy-semantics knobs (eval-verification targets, handoff §2c F3/F4):
   whose obs is assigned rope[0,1]) and the trailing latents (latest chunk) after —
   matching how training assigns the first-chunk vs continuation-chunk band.
   ``leading`` / ``trailing`` force one band (F3 eval A/B).
-- ``inference.ar_proprio_mode``: ``per_step`` (default) conditions each chunk on
-  the current robot state; ``single`` latches the episode's first state (exact
-  training-clip parity). This is the F4 train/inference choice to A/B at eval.
+- ``inference.ar_proprio_mode``: ``per_step`` (default) uses the rolling
+  113-frame window's oldest state for the clip-level context token and the
+  current state for per-chunk AdaLN, matching training's two proprio paths.
+  ``single`` latches the episode's first state as a debug ablation.
 - Every realized observation chunk ``c`` emits the aligned action chunk ``c``.
   In interleaved frame ids this is video ``2c`` followed by action ``2c+1``;
   closed-loop deployment must not skip action frame 3 or replace the observed
@@ -55,6 +56,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import math
 from collections import OrderedDict
 from numbers import Integral
 from typing import Optional
@@ -107,6 +109,12 @@ class ARInferenceEngine(BaseInferenceEngine):
         denoise_steps = int(_inf("denoise_steps", 4) or 4)
         self._video_steps = int(_inf("video_steps", denoise_steps) or denoise_steps)
         self._action_steps = int(_inf("action_steps", denoise_steps) or denoise_steps)
+        self._action_scheduler_shift = float(_inf("shift", 5.0))
+        if (
+            not math.isfinite(self._action_scheduler_shift)
+            or self._action_scheduler_shift <= 0.0
+        ):
+            raise ValueError("inference.shift must be a positive finite number")
         seed_cfg = _inf("seed", None)
         self._seed: Optional[int] = None if seed_cfg is None else int(seed_cfg)
         self._episode_noise_mode = (
@@ -171,6 +179,9 @@ class ARInferenceEngine(BaseInferenceEngine):
             )
         self._obs_chunk_mode = str(_inf("ar_obs_chunk_mode", "rolling_buffer"))
         self._proprio_mode = str(_inf("ar_proprio_mode", "per_step"))
+        self._reset_cache_each_generation = bool(
+            _inf("ar_reset_cache_each_generation", False)
+        )
         # Which latent band of the freshly-encoded clip is the current obs chunk.
         #   auto (default) = leading at step 0, trailing after — matches training,
         #     whose chunk 0 is lat[0:fcs] (incl. the causal first-frame token) @ rope[0,1]
@@ -205,6 +216,17 @@ class ARInferenceEngine(BaseInferenceEngine):
         # --- action geometry (from the trained backbone, never the YAML literal) ---
         self._action_dim = int(arch.action_dim)
         self._action_tokens_per_chunk = self._resolve_action_tokens_per_chunk(cfg)
+        latent_frames = 1 + (
+            self._video_num_frames - 1
+        ) // self._temporal_compression
+        self._video_chunks_per_window = latent_frames // self._fcs
+        if self._reset_cache_each_generation and (
+            latent_frames != self._fcs or self._video_chunks_per_window != 1
+        ):
+            raise ValueError(
+                "ar_reset_cache_each_generation requires exactly one video chunk "
+                f"per causal window, got latent_frames={latent_frames}, fcs={self._fcs}"
+            )
 
         # Optional outcome-trained best-of-N selection is deliberately restricted
         # to generation zero, which is the only distribution represented by its
@@ -253,6 +275,7 @@ class ARInferenceEngine(BaseInferenceEngine):
         self._prompt_ctx_cache: "OrderedDict[str, tuple[torch.Tensor, torch.Tensor]]" = OrderedDict()
         self._latched_proprio: Optional[np.ndarray] = None
         self._init_schedules_and_cache()
+        self._episode_generation_index = 0
 
         logger.info(
             "ARInferenceEngine ready: fcs=%d window=%d video_steps=%d action_steps=%d "
@@ -324,9 +347,14 @@ class ARInferenceEngine(BaseInferenceEngine):
         vb.scheduler.set_timesteps(self._video_steps)
         self._v_sigmas = [float(s) for s in vb.scheduler.sigmas.tolist()] + [0.0]
         self._v_ts = vb.scheduler.timesteps
-        ab.scheduler.set_timesteps(self._action_steps)
+        ab.scheduler.set_timesteps(
+            self._action_steps, shift=self._action_scheduler_shift
+        )
         self._a_sigmas = [float(s) for s in ab.scheduler.sigmas.tolist()] + [0.0]
         self._a_ts = ab.scheduler.timesteps
+        self._action_scheduler_sigmas_sha256 = hashlib.sha256(
+            np.asarray(self._a_sigmas, dtype="<f8").tobytes(order="C")
+        ).hexdigest()
 
         self._cache = ARLinearStateCache(num_layers=vb.num_layers, window=self._window)
         self._gen = self._make_generator()
@@ -377,9 +405,10 @@ class ARInferenceEngine(BaseInferenceEngine):
 
     def _prepare_generation_rng(self, generation_index: int) -> Optional[int]:
         """Select the RNG stream used by this generation and return its seed."""
-        if generation_index != self._step_c:
+        if generation_index != self._episode_generation_index:
             raise RuntimeError(
-                f"generation RNG index {generation_index} != AR step {self._step_c}"
+                "generation RNG index "
+                f"{generation_index} != episode generation {self._episode_generation_index}"
             )
         if generation_index == 0:
             seed = self._current_noise_seed
@@ -425,6 +454,7 @@ class ARInferenceEngine(BaseInferenceEngine):
         return {
             "cache": self._cache.snapshot(),
             "step_c": self._step_c,
+            "episode_generation_index": self._episode_generation_index,
             "pending_action_feedback": self._copy_branch_value(
                 self._pending_action_feedback
             ),
@@ -438,6 +468,7 @@ class ARInferenceEngine(BaseInferenceEngine):
     def _restore_rollout_state(self, state: dict) -> None:
         self._cache.restore_snapshot(state["cache"])
         self._step_c = int(state["step_c"])
+        self._episode_generation_index = int(state["episode_generation_index"])
         self._pending_action_feedback = self._copy_branch_value(
             state["pending_action_feedback"]
         )
@@ -460,12 +491,17 @@ class ARInferenceEngine(BaseInferenceEngine):
         seq_lens,
         proprio,
         *,
+        context_proprio=None,
         feedback_plan: Optional[dict],
     ) -> dict:
         """Branch one pristine generation-zero state and retain only the winner."""
         if not self._generation_zero_rerank_enabled or self._outcome_ranker is None:
             raise RuntimeError("generation-zero reranker is not enabled")
-        if self._step_c != 0 or self._generation_zero_rerank_count != 0:
+        if (
+            self._step_c != 0
+            or self._episode_generation_index != 0
+            or self._generation_zero_rerank_count != 0
+        ):
             raise RuntimeError("outcome reranking is permitted exactly once at AR step zero")
         if self._current_noise_seed is None or self._gen is None:
             raise RuntimeError(
@@ -489,6 +525,7 @@ class ARInferenceEngine(BaseInferenceEngine):
                     context,
                     seq_lens,
                     proprio,
+                    context_proprio=context_proprio,
                     feedback_plan=feedback_plan,
                 )
                 actions_normalized = self._pending_action_feedback[
@@ -568,6 +605,7 @@ class ARInferenceEngine(BaseInferenceEngine):
         seq_lens,
         proprio,
         feedback_plan: Optional[dict] = None,
+        context_proprio=None,
     ) -> torch.Tensor:
         """One AR step from a ready obs *latent* — the loop body of ``ar_rollout``.
 
@@ -621,7 +659,11 @@ class ARInferenceEngine(BaseInferenceEngine):
 
         try:
             self._cache.clear_pred()
-            step_ctx, step_mask = arch._rollout_step_context(context, seq_lens, proprio)
+            if context_proprio is None:
+                context_proprio = proprio
+            step_ctx, step_mask = arch._rollout_step_context(
+                context, seq_lens, context_proprio
+            )
             # F4: per-step proprio AdaLN deltas (in-distribution with per-chunk training).
             v_pe, a_pe = arch._rollout_proprio_deltas(proprio)
 
@@ -703,6 +745,37 @@ class ARInferenceEngine(BaseInferenceEngine):
             raise
 
     # ----------------------------------------------------------------- generate
+    def _begin_fresh_single_chunk_generation(self, conditions: dict) -> None:
+        """Discard the prior one-chunk cache at an exact greedy boundary.
+
+        The episode-global RNG / telemetry index remains monotonic.  Only the
+        model-local state is rebased so every request has the same video-0 ->
+        action-1 graph used by causal single-chunk training.
+        """
+
+        if not getattr(self, "_reset_cache_each_generation", False):
+            return
+        if self._episode_generation_index == 0:
+            if self._step_c != 0:
+                raise RuntimeError("fresh single-chunk episode starts at local step zero")
+            return
+        if self._step_c != 1:
+            raise RuntimeError(
+                "fresh single-chunk deployment expected one completed local chunk"
+            )
+        cadence = self._feedback_cadence(conditions)
+        if cadence != "ok":
+            raise RuntimeError(
+                f"invalid fresh single-chunk generation cadence: {cadence}"
+            )
+        self._cache.reset()
+        self._step_c = 0
+        self._pending_action_feedback = None
+        self._last_feedback = {
+            "status": "fresh_cache",
+            "reason": "causal_single_chunk_boundary",
+        }
+
     @torch.no_grad()
     def generate(self, conditions: dict) -> dict:
         if self._episode_noise_mode == "paired" and self._current_noise_seed is None:
@@ -711,21 +784,27 @@ class ARInferenceEngine(BaseInferenceEngine):
             )
         fallbacks_before = self._feedback_fallbacks
         try:
+            self._begin_fresh_single_chunk_generation(conditions)
             feedback_plan, feedback = self._prepare_action_cache_feedback(conditions)
             prompt = conditions.get("prompt", "") or ""
             obs_latent = self._build_obs_chunk(conditions)
             context, seq_lens = self._encode_prompt(prompt)
             proprio = self._prep_proprio(conditions.get("proprio_state"))
+            context_proprio = self._prep_window_context_proprio(
+                conditions, fallback=proprio
+            )
 
-            chunk_index = self._step_c
-            generation_noise_seed = self._prepare_generation_rng(chunk_index)
+            local_chunk_index = self._step_c
+            generation_index = self._episode_generation_index
+            generation_noise_seed = self._prepare_generation_rng(generation_index)
             rerank_telemetry = None
-            if self._generation_zero_rerank_enabled and chunk_index == 0:
+            if self._generation_zero_rerank_enabled and generation_index == 0:
                 rerank_telemetry = self._rerank_generation_zero(
                     obs_latent,
                     context,
                     seq_lens,
                     proprio,
+                    context_proprio=context_proprio,
                     feedback_plan=feedback_plan,
                 )
             else:
@@ -734,6 +813,7 @@ class ARInferenceEngine(BaseInferenceEngine):
                     context,
                     seq_lens,
                     proprio,
+                    context_proprio=context_proprio,
                     feedback_plan=feedback_plan,
                 )
             if feedback_plan is None:
@@ -747,14 +827,18 @@ class ARInferenceEngine(BaseInferenceEngine):
                 "predicted_actions_normalized"
             ].copy()
             actions = self._pending_action_feedback["predicted_actions"].copy()
+            self._episode_generation_index += 1
             telemetry = {
-                "chunk_index": chunk_index,
+                "chunk_index": generation_index,
+                "episode_generation_index": generation_index,
+                "local_chunk_index": local_chunk_index,
                 "action_frame_id": self._pending_action_feedback["frame_id"],
                 "predicted_actions_normalized": actions_normalized,
                 "predicted_actions": actions,
                 "cache_feedback": feedback,
                 "cache": self._cache.info(),
                 "ar_step_after": self._step_c,
+                "episode_generation_after": self._episode_generation_index,
                 "generation_noise_schedule": self._generation_noise_schedule,
                 "generation_noise_seed": generation_noise_seed,
             }
@@ -915,6 +999,9 @@ class ARInferenceEngine(BaseInferenceEngine):
         frame_ids = torch.full(
             (actions.shape[1],), frame_id, dtype=torch.long, device=self._device
         )
+        rope_positions = self.architecture._action_rope_positions(
+            frame_ids, action_tokens_per_chunk=actions.shape[1]
+        )
         a_proprio = plan["a_proprio"]
         extra = (
             {} if a_proprio is None else {"token_proprio_emb": a_proprio[:, None, :]}
@@ -929,7 +1016,7 @@ class ARInferenceEngine(BaseInferenceEngine):
                     1, actions.shape[1], device=self._device, dtype=self._dtype
                 ),
                 frame_ids=frame_ids,
-                rope_positions=frame_ids,
+                rope_positions=rope_positions,
                 **extra,
             )
             self._driver.run_ar_chunk_through_backbone(
@@ -1003,15 +1090,57 @@ class ARInferenceEngine(BaseInferenceEngine):
             .unsqueeze(0)
         )
 
+    def _prep_window_context_proprio(self, conditions: dict, *, fallback):
+        """Prepare the clip-level proprio token for the configured causal graph.
+
+        Causal single-chunk training uses the action anchor's current state for
+        both the global token and its sole per-chunk AdaLN branch.  The legacy
+        multi-chunk path retains its rolling-window source.
+        """
+
+        if not self.architecture.uses_proprioception or self._proprio_mode == "single":
+            return fallback
+        if getattr(self, "_reset_cache_each_generation", False):
+            return fallback
+        observations = self._recent_observations(conditions)
+        if not observations:
+            return fallback
+        if observations[0].get("state") is None:
+            raise ValueError("oldest rolling-window observation is missing proprio state")
+        current_raw = conditions.get("proprio_state")
+        latest_raw = observations[-1].get("state")
+        if current_raw is None or latest_raw is None:
+            raise ValueError("current rolling-window observation is missing proprio state")
+        if not np.array_equal(
+            np.asarray(latest_raw, dtype=np.float32).reshape(-1),
+            np.asarray(current_raw, dtype=np.float32).reshape(-1),
+        ):
+            raise ValueError("current proprio_state differs from obs_history tail")
+        window_start_state = observations[0]["state"]
+        norm = self.architecture.normalize_deploy_proprio(
+            np.asarray(window_start_state, dtype=np.float32).reshape(-1)
+        )
+        return (
+            torch.from_numpy(np.asarray(norm, dtype=np.float32))
+            .to(device=self._device, dtype=self._dtype)
+            .unsqueeze(0)
+        )
+
+    def _recent_observations(self, conditions: dict) -> list[dict]:
+        """Return the exact oldest-to-newest raw window used for video encoding."""
+
+        observations = [
+            obs
+            for obs in (conditions.get("obs_history") or [])
+            if isinstance(obs, dict) and obs.get("image") is not None
+        ]
+        return observations[-self._raw_num_frames :]
+
     def _recent_frames(self, conditions: dict) -> list:
         """Per-sim-step head frames, oldest→newest. Prefers ``obs_history`` (WAMPolicy
         appends one every step) over the single ``first_frame_image`` so the obs clip
         can be rebuilt at the training pixel cadence."""
-        frames = [
-            o.get("image")
-            for o in (conditions.get("obs_history") or [])
-            if isinstance(o, dict) and o.get("image") is not None
-        ]
+        frames = [obs["image"] for obs in self._recent_observations(conditions)]
         if not frames:
             ff = conditions.get("first_frame_image")
             if ff:
@@ -1093,6 +1222,7 @@ class ARInferenceEngine(BaseInferenceEngine):
         self._episode_context = context
         self._cache.reset()
         self._step_c = 0
+        self._episode_generation_index = 0
         self._gen = self._make_generator()
         self._latched_proprio = None
         self._pending_action_feedback = None
@@ -1138,7 +1268,20 @@ class ARInferenceEngine(BaseInferenceEngine):
             "cache_feedback_fallback": self._cache_feedback_fallback,
             "cache_feedback_commits": self._feedback_commits,
             "cache_feedback_fallbacks": self._feedback_fallbacks,
+            "action_steps": self._action_steps,
+            "action_scheduler_shift": self._action_scheduler_shift,
+            "action_scheduler_sigmas": list(self._a_sigmas),
+            "action_scheduler_sigmas_sha256": self._action_scheduler_sigmas_sha256,
+            "temporal_alignment": "observed_video_2c_to_action_2c_plus_1",
+            "proprio_context_mode": (
+                "current"
+                if self._reset_cache_each_generation
+                else "rolling_window_oldest"
+            ),
+            "reset_cache_each_generation": self._reset_cache_each_generation,
+            "video_chunks_per_window": self._video_chunks_per_window,
             "ar_step": self._step_c,
+            "episode_generation_index": self._episode_generation_index,
             "generation_zero_rerank": {
                 "enabled": self._generation_zero_rerank_enabled,
                 "candidate_count": self._generation_zero_rerank_candidate_count,

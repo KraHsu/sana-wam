@@ -480,10 +480,11 @@ class PolicyServer:
         def select(path, default=None):
             return OmegaConf.select(cfg, path, default=default)
 
-        rerank_runtime = getattr(self.engine, "runtime_info", {})
-        if callable(rerank_runtime):
-            rerank_runtime = rerank_runtime()
-        rerank_identity = dict(rerank_runtime or {}).get(
+        engine_runtime = getattr(self.engine, "runtime_info", {})
+        if callable(engine_runtime):
+            engine_runtime = engine_runtime()
+        engine_runtime = dict(engine_runtime or {})
+        rerank_identity = engine_runtime.get(
             "generation_zero_rerank", {}
         )
         return {
@@ -514,10 +515,18 @@ class PolicyServer:
                 "inference.ar_obs_chunk_mode", "rolling_buffer"
             ),
             "ar_obs_latent_band": select("inference.ar_obs_latent_band", "auto"),
+            "reset_cache_each_generation": engine_runtime.get(
+                "reset_cache_each_generation"
+            ),
             "ar_proprio_mode": select("inference.ar_proprio_mode", "per_step"),
             "num_frames": select("inference.num_frames"),
             "video_num_frames": select("inference.video_num_frames"),
+            "height": select("inference.height"),
+            "width": select("inference.width"),
+            "video_context_mode": select("dataloader.video_context_mode"),
             "video_stride": select("dataloader.video_stride", 1),
+            "temporal_compression": select("dataloader.temporal_compression", 4),
+            "causal_temporal": select("dataloader.causal_temporal"),
             "action_mode": select("dataloader.action_mode"),
             "normalize_mode": select("dataloader.normalize_mode"),
             "action_tokens_per_chunk": getattr(
@@ -525,6 +534,27 @@ class PolicyServer:
             ),
             "ar_frame_chunk_size": getattr(self.engine, "_fcs", None),
             "ar_attention_window": getattr(self.engine, "_window", None),
+            "action_horizon_rope": bool(
+                getattr(
+                    getattr(self.engine, "architecture", None),
+                    "_ar_action_horizon_rope",
+                    False,
+                )
+            ),
+            "action_scheduler_shift": engine_runtime.get(
+                "action_scheduler_shift"
+            ),
+            "action_scheduler_sigmas": engine_runtime.get(
+                "action_scheduler_sigmas"
+            ),
+            "action_scheduler_sigmas_sha256": engine_runtime.get(
+                "action_scheduler_sigmas_sha256"
+            ),
+            "temporal_alignment": engine_runtime.get("temporal_alignment"),
+            "context_proprio_source": engine_runtime.get(
+                "proprio_context_mode"
+            ),
+            "chunk_proprio_source": "current",
             "generation_zero_rerank": rerank_identity,
         }
 

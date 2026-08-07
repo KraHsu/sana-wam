@@ -10,7 +10,10 @@ from omegaconf import OmegaConf
 
 from sana_wam.dataloader.transforms.normalize import ActionNormalizer, Normalizer
 from sana_wam.deploy.libero_model_loader import LiberoActionStateNormalizer
-from sana_wam.deploy.libero_policy_server import LiberoPolicyServer
+from sana_wam.deploy.libero_policy_server import (
+    LiberoPolicyServer,
+    validate_libero_train_deploy_parity,
+)
 from sana_wam.deploy.policy_server import PolicyServer
 
 
@@ -148,3 +151,55 @@ def test_libero_predict_echoes_active_episode_and_model_seed(
     response = server.predict({})
     assert response["episode_key"] == "libero/run/test"
     assert response["model_noise_seed"] == 1234
+
+
+def _parity_configs():
+    training = OmegaConf.load(
+        "configs/experiments/libero_formal_r5_8gpu_epoch1.yaml"
+    )
+    runtime = OmegaConf.merge(training, OmegaConf.load("configs/deploy_ar_sana.yaml"))
+    return training, runtime
+
+
+def test_train_deploy_parity_accepts_matching_temporal_contract() -> None:
+    training, runtime = _parity_configs()
+    validate_libero_train_deploy_parity(training, runtime)
+
+
+def test_train_deploy_parity_rejects_history_drift() -> None:
+    training, runtime = _parity_configs()
+    runtime.policy.history_len = 64
+    with pytest.raises(ValueError, match="policy.history_len=17"):
+        validate_libero_train_deploy_parity(training, runtime)
+
+
+def test_train_deploy_parity_rejects_frozen_action_step_drift() -> None:
+    training, runtime = _parity_configs()
+    runtime.inference.action_steps = 4
+    with pytest.raises(ValueError, match="deployment_contract"):
+        validate_libero_train_deploy_parity(training, runtime)
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "match"),
+    [
+        ("model.architecture.variant", "cross_attention", "variant"),
+        ("inference.height", 320, "height"),
+        ("inference.generation_zero_rerank.enabled", True, "rerank"),
+        ("inference.ar_reset_cache_each_generation", False, "reset_cache"),
+    ],
+)
+def test_train_deploy_parity_rejects_policy_escape_hatches(
+    path: str, value, match: str
+) -> None:
+    training, runtime = _parity_configs()
+    OmegaConf.update(runtime, path, value, merge=False)
+    with pytest.raises(ValueError, match=match):
+        validate_libero_train_deploy_parity(training, runtime)
+
+
+def test_default_ar_deploy_config_matches_formal_libero_context() -> None:
+    cfg = OmegaConf.load("configs/deploy_ar_sana.yaml")
+    assert cfg.policy.history_len == 17
+    assert cfg.inference.action_steps == 20
+    assert cfg.inference.ar_reset_cache_each_generation is True

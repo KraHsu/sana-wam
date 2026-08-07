@@ -122,17 +122,31 @@ def _write_stats(tmp_path: Path, roots: list[Path]) -> Path:
     return path
 
 
-def _dataset(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> LiberoLeRobotDataset:
-    root = _make_root(tmp_path)
+def _dataset(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    video_context_mode: str = "future_window",
+    frame_count: int = 5,
+    window_stride: int = 1,
+    action_horizon: int | None = None,
+    require_full_action_horizon: bool = False,
+    include_terminal_full_horizon: bool = False,
+) -> LiberoLeRobotDataset:
+    root = _make_root(tmp_path, frame_count=frame_count)
     stats_path = _write_stats(tmp_path, [root])
-    states = np.arange(5 * LIBERO_STATE_DIM, dtype=np.float32).reshape(5, 8)
+    states = np.arange(frame_count * LIBERO_STATE_DIM, dtype=np.float32).reshape(
+        frame_count, 8
+    )
     states = states / 100.0
-    actions = np.arange(5 * LIBERO_ACTION_DIM, dtype=np.float32).reshape(5, 7)
+    actions = np.arange(frame_count * LIBERO_ACTION_DIM, dtype=np.float32).reshape(
+        frame_count, 7
+    )
     actions = actions / 100.0
-    actions[:, -1] = [1.0, 0.0, 1.0, 0.0, 1.0]
+    actions[:, -1] = np.arange(frame_count) % 2 == 0
 
     def read_arrays(_self, _episode):
-        return states.copy(), actions.copy(), np.zeros(5, dtype=np.int64)
+        return states.copy(), actions.copy(), np.zeros(frame_count, dtype=np.int64)
 
     def read_video(_self, _path, requested):
         frames = {}
@@ -153,8 +167,12 @@ def _dataset(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> LiberoLeRobotDa
         action_stats_path=stats_path,
         benchmark_contract=_contract(),
         num_frames=5,
+        action_horizon=action_horizon,
+        require_full_action_horizon=require_full_action_horizon,
+        include_terminal_full_horizon=include_terminal_full_horizon,
+        video_context_mode=video_context_mode,
         video_stride=1,
-        window_stride=1,
+        window_stride=window_stride,
         height=96,
         width=96,
         val_ratio=0.0,
@@ -223,6 +241,64 @@ def test_dataset_tail_padding_masks_without_crossing_episode(
     assert sample["end_frame"] == 5
     assert sample["action_mask"].tolist() == [True, False, False, False]
     assert sample["video_mask"].tolist() == [True, True, False, False, False]
+
+
+def test_causal_past_video_uses_only_history_and_repeat_left_padding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dataset = _dataset(tmp_path, monkeypatch, video_context_mode="causal_past")
+    requested: list[list[int]] = []
+
+    def read_video(_self, _path, indices):
+        values = list(indices)
+        requested.append(values)
+        return {
+            index: Image.fromarray(
+                np.full((8, 8, 3), index, dtype=np.uint8), mode="RGB"
+            )
+            for index in values
+        }
+
+    monkeypatch.setattr(LiberoLeRobotDataset, "_read_video_indices", read_video)
+
+    bootstrap = dataset[2]
+    assert requested[-2:] == [[0, 1, 2], [0, 1, 2]]
+    assert bootstrap["video_context_mode"] == "causal_past"
+    assert bootstrap["video_context_start_frame"] == 0
+    assert bootstrap["video_context_end_frame"] == 3
+    assert bootstrap["video_mask"].tolist() == [True] * 5
+    # num_frames=5 at anchor 2 requests [0, 0, 0, 1, 2].
+    assert [int(np.asarray(frame)[0, 0, 0]) for frame in bootstrap["video"]] == [
+        0,
+        0,
+        0,
+        1,
+        2,
+    ]
+
+    requested.clear()
+    tail = dataset[3]
+    assert requested[-2:] == [[0, 1, 2, 3], [0, 1, 2, 3]]
+    assert tail["video_context_end_frame"] == 4
+    assert tail["action_mask"].tolist() == [True, False, False, False]
+    assert tail["video_mask"].tolist() == [True] * 5
+
+
+def test_full_horizon_anchor_grid_adds_one_terminal_window_without_padding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dataset = _dataset(
+        tmp_path,
+        monkeypatch,
+        video_context_mode="causal_past",
+        frame_count=11,
+        window_stride=4,
+        action_horizon=4,
+        require_full_action_horizon=True,
+        include_terminal_full_horizon=True,
+    )
+    assert [start for _episode, start in dataset._windows] == [0, 4, 6]
+    assert all(dataset[index]["action_mask"].all() for index in range(len(dataset)))
 
 
 def test_parquet_identity_columns_guard_video_row_alignment(

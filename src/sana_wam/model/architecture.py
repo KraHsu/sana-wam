@@ -248,6 +248,12 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
 
         self._ar_frame_chunk_size = int(_get("ar_frame_chunk_size", 1))
         self._ar_attn_window = int(_get("ar_attn_window", 10_000))
+        # Frame ids encode block causality; optional within-chunk RoPE encodes
+        # the action horizon slot.  Without this, all actions in one chunk are
+        # permutation-equivariant because they share a frame id.
+        self._ar_action_horizon_rope = bool(
+            _get("ar_action_horizon_rope", False)
+        )
         self._ar_noisy_cond_prob = float(_get("ar_noisy_cond_prob", 0.5))
         # Clean-copy "cond" timestep is sampled in [0, ar_cond_max_ratio · num_train_ts)
         # when the noisy_cond_prob bernoulli fires (LingBot-style robustness aug).
@@ -451,6 +457,19 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
         for m in (self.proprio_video_embed, self.proprio_action_embed):
             nn.init.zeros_(m.weight)
             nn.init.zeros_(m.bias)
+
+    def _action_rope_positions(
+        self, frame_ids: Tensor, *, action_tokens_per_chunk: int
+    ) -> Tensor:
+        """Separate action horizon identity from block-causal frame identity."""
+
+        if not self._ar_action_horizon_rope:
+            return frame_ids
+        if action_tokens_per_chunk <= 0:
+            raise ValueError("action_tokens_per_chunk must be positive")
+        return torch.arange(
+            frame_ids.numel(), device=frame_ids.device, dtype=torch.long
+        ).remainder(action_tokens_per_chunk)
 
     def _maybe_init_action_video_memory_adapter(self) -> None:
         """Create the optional identity-init action video-memory read adapter."""
@@ -710,9 +729,10 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
         dup_actions = torch.cat([noisy_actions, clean_actions], dim=1)  # (B, 2Ta, Ad)
         token_timesteps = torch.cat([a_noisy_ts, a_clean_ts], dim=1)  # (B, 2Ta)
 
-        # frame_ids / rope positions for the duplicated action stream: chunk
-        # index with modality parity (2c+1), identical for a token's noisy/clean
-        # copies so they share a rotary phase.
+        # Frame ids retain block-causal modality parity (2c+1).  When enabled,
+        # RoPE positions separately identify horizon slots 0..H-1; noisy and
+        # clean copies of one slot therefore share a phase while distinct
+        # actions no longer collapse to a permutation-equivariant set.
         chunk_of_token = (
             torch.arange(Ta, device=dup_actions.device) // action_tokens_per_chunk
         )
@@ -720,6 +740,9 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
         action_frame_ids = torch.cat(
             [action_frame_ids_single, action_frame_ids_single]
         )  # (2Ta,)
+        action_rope_positions = self._action_rope_positions(
+            action_frame_ids, action_tokens_per_chunk=action_tokens_per_chunk
+        )
 
         action_context = pipeline_inputs.get("context")
         action_context_mask = pipeline_inputs.get("context_mask")
@@ -771,7 +794,7 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
             context_mask=action_context_mask,
             token_timesteps=token_timesteps,
             frame_ids=action_frame_ids,
-            rope_positions=action_frame_ids,
+            rope_positions=action_rope_positions,
             token_proprio_emb=token_proprio_emb,
         )
 
@@ -2067,10 +2090,12 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
         context: Tensor,
         seq_lens: Optional[Tensor] = None,
         proprio_states=None,
+        context_proprio_states=None,
         frame_chunk_size: Optional[int] = None,
         attn_window: Optional[int] = None,
         video_steps: int = 4,
         action_steps: int = 4,
+        action_shift: float = 5.0,
         action_tokens_per_chunk: int = 1,
         seed: Optional[int] = None,
     ):
@@ -2133,7 +2158,7 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
 
         # Flow-matching schedules (descending sigmas, 0 appended as final target).
         _ = video_steps  # closed-loop observed-action path predicts no video chunk
-        ab.scheduler.set_timesteps(action_steps)
+        ab.scheduler.set_timesteps(action_steps, shift=action_shift)
         a_sigmas = [float(s) for s in ab.scheduler.sigmas.tolist()] + [0.0]
         a_ts = ab.scheduler.timesteps
 
@@ -2151,8 +2176,15 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
                 if isinstance(proprio_states, (list, tuple))
                 else proprio_states
             )
+            context_proprio_c = (
+                context_proprio_states[c]
+                if isinstance(context_proprio_states, (list, tuple))
+                else context_proprio_states
+            )
+            if context_proprio_c is None:
+                context_proprio_c = proprio_c
             step_ctx, step_mask = self._rollout_step_context(
-                context, seq_lens, proprio_c
+                context, seq_lens, context_proprio_c
             )
             # F4: per-step proprio AdaLN deltas (one robot state per step).
             v_pe, a_pe = self._rollout_proprio_deltas(proprio_c)
@@ -2355,6 +2387,9 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
         frame_ids = torch.full(
             (action_tokens,), frame_id, dtype=torch.long, device=device
         )
+        rope_positions = self._action_rope_positions(
+            frame_ids, action_tokens_per_chunk=action_tokens
+        )
         ctx_mask = context_mask
         tpe = (
             None if a_proprio is None else a_proprio[:, None, :]
@@ -2372,7 +2407,7 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
                 context_mask=ctx_mask,
                 token_timesteps=token_ts,
                 frame_ids=frame_ids,
-                rope_positions=frame_ids,
+                rope_positions=rope_positions,
                 **a_extra,
             )
             driver.run_ar_chunk_through_backbone(
@@ -2405,7 +2440,7 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
                 batch, action_tokens, device=device, dtype=dtype
             ),
             frame_ids=frame_ids,
-            rope_positions=frame_ids,
+            rope_positions=rope_positions,
             **a_extra,
         )
         driver.run_ar_chunk_through_backbone(

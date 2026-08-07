@@ -232,6 +232,10 @@ class LiberoLeRobotDataset(BaseActionDataset):
             "action_stats_path",
             "benchmark_contract",
             "num_frames",
+            "action_horizon",
+            "require_full_action_horizon",
+            "include_terminal_full_horizon",
+            "video_context_mode",
             "video_stride",
             "window_stride",
             "height",
@@ -283,6 +287,16 @@ class LiberoLeRobotDataset(BaseActionDataset):
             action_stats_path=_get(config, "action_stats_path", None),
             benchmark_contract=_get(config, "benchmark_contract", None),
             num_frames=int(_get(config, "num_frames", 33)),
+            action_horizon=_get(config, "action_horizon", None),
+            require_full_action_horizon=bool(
+                _get(config, "require_full_action_horizon", False)
+            ),
+            include_terminal_full_horizon=bool(
+                _get(config, "include_terminal_full_horizon", False)
+            ),
+            video_context_mode=str(
+                _get(config, "video_context_mode", "future_window")
+            ),
             video_stride=int(_get(config, "video_stride", 4)),
             window_stride=int(_get(config, "window_stride", 1)),
             height=int(_get(config, "height", 384)),
@@ -321,6 +335,10 @@ class LiberoLeRobotDataset(BaseActionDataset):
         action_stats_path: str | Path | None,
         benchmark_contract: Mapping[str, Any] | None,
         num_frames: int = 33,
+        action_horizon: int | None = None,
+        require_full_action_horizon: bool = False,
+        include_terminal_full_horizon: bool = False,
+        video_context_mode: str = "future_window",
         video_stride: int = 4,
         window_stride: int = 1,
         height: int = 384,
@@ -377,7 +395,22 @@ class LiberoLeRobotDataset(BaseActionDataset):
         self._action_dim = LIBERO_ACTION_DIM
         self._state_dim = LIBERO_STATE_DIM
         self.num_frames = int(num_frames)
-        self.num_action_steps = self.num_frames - 1
+        self.num_action_steps = int(
+            self.num_frames - 1 if action_horizon is None else action_horizon
+        )
+        if self.num_action_steps <= 0:
+            raise ValueError("LIBERO action_horizon must be positive")
+        self.require_full_action_horizon = bool(require_full_action_horizon)
+        self.include_terminal_full_horizon = bool(include_terminal_full_horizon)
+        if self.include_terminal_full_horizon and not self.require_full_action_horizon:
+            raise ValueError(
+                "include_terminal_full_horizon requires require_full_action_horizon"
+            )
+        self.video_context_mode = str(video_context_mode).strip().lower()
+        if self.video_context_mode not in {"future_window", "causal_past"}:
+            raise ValueError(
+                "LIBERO video_context_mode must be 'future_window' or 'causal_past'"
+            )
         self.video_stride = int(video_stride)
         self.window_stride = int(window_stride)
         self.temporal_compression = int(temporal_compression)
@@ -526,11 +559,23 @@ class LiberoLeRobotDataset(BaseActionDataset):
                         f"file: {video_path}"
                     )
         self._episodes = selection.selected
-        self._windows = tuple(
-            (episode_index, start)
-            for episode_index, episode in enumerate(self._episodes)
-            for start in range(0, episode.length - 1, self.window_stride)
-        )
+        windows: list[tuple[int, int]] = []
+        for episode_index, episode in enumerate(self._episodes):
+            if self.require_full_action_horizon:
+                terminal_start = episode.length - (self.num_action_steps + 1)
+                if terminal_start < 0:
+                    continue
+                starts = list(range(0, terminal_start + 1, self.window_stride))
+                if (
+                    self.include_terminal_full_horizon
+                    and starts
+                    and starts[-1] != terminal_start
+                ):
+                    starts.append(terminal_start)
+            else:
+                starts = list(range(0, episode.length - 1, self.window_stride))
+            windows.extend((episode_index, start) for start in starts)
+        self._windows = tuple(windows)
         if not self._windows:
             raise ValueError(
                 "LIBERO dataset contains no valid obs(t)->action(t) windows"
@@ -622,9 +667,11 @@ class LiberoLeRobotDataset(BaseActionDataset):
     def __getitem__(self, index: int) -> dict[str, Any]:
         episode, start = self._resolve_index(index)
         states, actions, _task_indices = self._read_episode_arrays(episode)
-        actual_len = min(self.num_frames, episode.length - start)
+        actual_len = min(self.num_action_steps + 1, episode.length - start)
         if actual_len < 2:
             raise IndexError("LIBERO window has no obs(t)->action(t) label")
+        if self.require_full_action_horizon and actual_len != self.num_action_steps + 1:
+            raise RuntimeError("full-horizon LIBERO window enumeration drifted")
 
         state_window = states[start : start + actual_len]
         # LIBERO's relative command is aligned with the observation at the same
@@ -633,7 +680,11 @@ class LiberoLeRobotDataset(BaseActionDataset):
         state_padded = np.concatenate(
             [
                 state_window,
-                np.repeat(state_window[-1:], self.num_frames - actual_len, axis=0),
+                np.repeat(
+                    state_window[-1:],
+                    self.num_action_steps + 1 - actual_len,
+                    axis=0,
+                ),
             ],
             axis=0,
         ).astype(np.float32, copy=False)
@@ -644,10 +695,21 @@ class LiberoLeRobotDataset(BaseActionDataset):
         state_normalized = self._state_normalizer.normalize(state_padded)
         action_normalized = self._action_normalizer.normalize(action_padded)
 
-        raw_video_indices = [
-            min(start + relative, start + actual_len - 1)
-            for relative in self._video_sample_indices
-        ]
+        if self.video_context_mode == "causal_past":
+            # A causal action anchor at row ``start`` sees only observations up
+            # to and including that row.  Episode-start underflow is the same
+            # repeat-left padding used by deployment's rolling history.
+            history_start = start - (self.num_frames - 1)
+            raw_video_indices = [
+                max(0, history_start + relative)
+                for relative in self._video_sample_indices
+            ]
+        else:
+            video_actual_len = min(self.num_frames, episode.length - start)
+            raw_video_indices = [
+                min(start + relative, start + video_actual_len - 1)
+                for relative in self._video_sample_indices
+            ]
         decoded = {
             video_key: self._read_video_indices(
                 episode.video_path(video_key), sorted(set(raw_video_indices))
@@ -676,10 +738,16 @@ class LiberoLeRobotDataset(BaseActionDataset):
             [step < actual_len - 1 for step in range(self.num_action_steps)],
             dtype=torch.bool,
         )
-        video_mask = torch.tensor(
-            [relative < actual_len for relative in self._video_sample_indices],
-            dtype=torch.bool,
-        )
+        if self.video_context_mode == "causal_past":
+            # Repeat-left bootstrap frames are intentional policy inputs, not
+            # padding to be hidden from attention.
+            video_mask = torch.ones(len(self._video_sample_indices), dtype=torch.bool)
+        else:
+            video_actual_len = min(self.num_frames, episode.length - start)
+            video_mask = torch.tensor(
+                [relative < video_actual_len for relative in self._video_sample_indices],
+                dtype=torch.bool,
+            )
         return {
             "video": video,
             "first_frame_image": [video[0]],
@@ -702,6 +770,17 @@ class LiberoLeRobotDataset(BaseActionDataset):
             "task_name": episode.task,
             "task_index": episode.task_index,
             "action_alignment": "observation_t_to_action_t",
+            "video_context_mode": self.video_context_mode,
+            "video_context_start_frame": (
+                max(0, start - (self.num_frames - 1))
+                if self.video_context_mode == "causal_past"
+                else start
+            ),
+            "video_context_end_frame": (
+                start + 1
+                if self.video_context_mode == "causal_past"
+                else start + actual_len
+            ),
         }
 
 

@@ -26,6 +26,7 @@ import stat
 import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import torch
@@ -109,7 +110,6 @@ class Trainer:
 
         self.base_seed = int(self.t.get("seed", 0))
         self.process_seed = self._seed_process(self.base_seed, _rank())
-        self._data_generator = torch.Generator().manual_seed(self.process_seed)
         self._phase6_plan = None
         self._phase6_plan_sampler = None
         self._phase6_dataset_contract = None
@@ -149,6 +149,10 @@ class Trainer:
             logging.getLogger(__name__).warning("num_frames write-back skipped: %s", _e)
 
         # --- architecture (dispatched by architecture.variant) ---
+        # Every distributed rank must start from byte-identical parameters.
+        # Dataset sampling/noise is rank-specific, but model construction is not.
+        if _world_size() > 1:
+            self._seed_process(int(self.t.get("initialization_seed", self.base_seed)), 0)
         self.architecture = build_architecture(flatten_model_cfg(cfg.model))
         self.architecture.set_dtype_device(torch.bfloat16, self.device)
         self._load_initial_checkpoint()
@@ -177,6 +181,10 @@ class Trainer:
 
         # --- action stats into buffers (deploy normalization parity) ---
         self._load_action_stats()
+        if _world_size() > 1:
+            self._broadcast_initial_model_state()
+            self.process_seed = self._seed_process(self.base_seed, _rank())
+        self._data_generator = torch.Generator().manual_seed(self.process_seed)
 
     @staticmethod
     def _coerce_phase6_launch_context(value):
@@ -400,13 +408,7 @@ class Trainer:
     def _validate_exact_output_dir(
         self, exact_output_dir: str | os.PathLike[str] | None
     ) -> str | None:
-        """Bind an explicitly pre-created, non-symlink output root.
-
-        This narrow seam is used by the fail-closed LIBERO formal launcher.  It
-        deliberately does not create the directory and cannot be enabled by a
-        generic launcher argument alone: both the frozen config and the caller
-        must opt in to exactly the same absolute path.
-        """
+        """Bind an explicitly pre-created, non-symlink LIBERO output root."""
 
         enabled = self.t.get("exact_output_dir", False)
         if type(enabled) is not bool:
@@ -450,8 +452,19 @@ class Trainer:
             raise RuntimeError("formal LIBERO output root must be a real directory")
         if os.path.realpath(supplied) != supplied:
             raise RuntimeError("formal LIBERO output root ancestry must not use symlinks")
-        if int(self.t.get("expected_world_size", 0)) != 1:
-            raise RuntimeError("formal LIBERO exact-root training requires world size 1")
+        expected_world_size = self.t.get("expected_world_size", None)
+        if (
+            isinstance(expected_world_size, bool)
+            or not isinstance(expected_world_size, int)
+            or expected_world_size < 1
+        ):
+            raise RuntimeError(
+                "formal LIBERO exact-root training requires expected_world_size >= 1"
+            )
+        if _world_size() != expected_world_size:
+            raise RuntimeError(
+                "formal LIBERO exact-root world size differs from expected_world_size"
+            )
         return supplied
 
     # ------------------------------------------------------------------ setup
@@ -465,6 +478,151 @@ class Trainer:
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(process_seed)
         return process_seed
+
+    def _broadcast_initial_model_state(self) -> None:
+        """Make the complete CUDA model state identical before rank RNG diverges."""
+
+        if not _is_dist() or _world_size() == 1:
+            self.distributed_initialization_summary = {
+                "broadcast": False,
+                "world_size": 1,
+            }
+            return
+        entries, manifest = self._ordered_model_state_manifest()
+        manifest_bytes = self._canonical_json_bytes(manifest)
+        local_structure = {
+            "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+            "parameter_tensor_count": sum(
+                item["kind"] == "parameter" for item in manifest
+            ),
+            "buffer_tensor_count": sum(item["kind"] == "buffer" for item in manifest),
+            "tensor_count": len(manifest),
+            "numel": sum(item["numel"] for item in manifest),
+            "device_types": sorted({item["device_type"] for item in manifest}),
+        }
+        gathered_structures: list[Any] = [None] * _world_size()
+        dist.all_gather_object(gathered_structures, local_structure)
+        if any(item != local_structure for item in gathered_structures):
+            raise RuntimeError(
+                "distributed formal initialization model structure differs across ranks"
+            )
+        if local_structure["device_types"] != ["cuda"]:
+            raise RuntimeError(
+                "distributed formal initialization found non-CUDA model state"
+            )
+
+        broadcast_tensors = 0
+        broadcast_numel = 0
+        for _kind, _name, tensor in entries:
+            if tensor.numel() == 0:
+                continue
+            dist.broadcast(tensor.detach(), src=0)
+            broadcast_tensors += 1
+            broadcast_numel += tensor.numel()
+        self.distributed_initialization_summary = {
+            "broadcast": True,
+            "source_rank": 0,
+            "tensor_count": broadcast_tensors,
+            "numel": broadcast_numel,
+            "world_size": _world_size(),
+            "structure_consensus": True,
+            "structure_manifest_sha256": local_structure["manifest_sha256"],
+            "parameter_tensor_count": local_structure["parameter_tensor_count"],
+            "buffer_tensor_count": local_structure["buffer_tensor_count"],
+        }
+        dist.barrier()
+
+    @staticmethod
+    def _canonical_json_bytes(value: Any) -> bytes:
+        return (
+            json.dumps(
+                value,
+                ensure_ascii=False,
+                allow_nan=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            + "\n"
+        ).encode("utf-8")
+
+    def _ordered_model_state_manifest(
+        self,
+    ) -> tuple[list[tuple[str, str, torch.Tensor]], list[dict[str, Any]]]:
+        """Describe every unique parameter and buffer in collective order."""
+
+        entries: list[tuple[str, str, torch.Tensor]] = []
+        manifest: list[dict[str, Any]] = []
+        named_groups = (
+            ("parameter", self.architecture.named_parameters()),
+            ("buffer", self.architecture.named_buffers()),
+        )
+        for kind, named_tensors in named_groups:
+            for name, tensor in named_tensors:
+                item = {
+                    "kind": kind,
+                    "name": name,
+                    "shape": list(tensor.shape),
+                    "stride": (
+                        list(tensor.stride())
+                        if tensor.layout == torch.strided
+                        else None
+                    ),
+                    "dtype": str(tensor.dtype),
+                    "layout": str(tensor.layout),
+                    "device_type": tensor.device.type,
+                    "numel": tensor.numel(),
+                    "requires_grad": bool(tensor.requires_grad),
+                }
+                entries.append((kind, name, tensor))
+                manifest.append(item)
+        return entries, manifest
+
+    def _complete_model_state_digest_consensus(self) -> dict[str, Any]:
+        """Hash every parameter/buffer byte and require one digest on all ranks."""
+
+        entries, manifest = self._ordered_model_state_manifest()
+        manifest_bytes = self._canonical_json_bytes(manifest)
+        digest = hashlib.sha256()
+        digest.update(len(manifest_bytes).to_bytes(8, "big"))
+        digest.update(manifest_bytes)
+        chunk_bytes = 64 * 1024 * 1024
+        if self.device.type == "cuda":
+            torch.cuda.synchronize(self.device)
+        with torch.no_grad():
+            for kind, name, tensor in entries:
+                if tensor.layout != torch.strided:
+                    raise RuntimeError(
+                        "formal LIBERO state digest requires strided tensors, got "
+                        f"{kind} {name}: {tensor.layout}"
+                    )
+                raw = tensor.detach().contiguous().view(torch.uint8).reshape(-1)
+                for offset in range(0, raw.numel(), chunk_bytes):
+                    block = raw.narrow(
+                        0, offset, min(chunk_bytes, raw.numel() - offset)
+                    ).cpu()
+                    digest.update(block.numpy().tobytes(order="C"))
+        local_digest = digest.hexdigest()
+        gathered_digests = [local_digest]
+        if _is_dist():
+            gathered_digests = [None] * _world_size()
+            dist.all_gather_object(gathered_digests, local_digest)
+        if any(item != local_digest for item in gathered_digests):
+            raise RuntimeError(
+                "formal LIBERO final parameter/buffer state differs across ranks"
+            )
+        return {
+            "algorithm": "sha256",
+            "sha256": local_digest,
+            "consensus": True,
+            "consensus_world_size": _world_size(),
+            "tensor_count": len(entries),
+            "parameter_tensor_count": sum(
+                item["kind"] == "parameter" for item in manifest
+            ),
+            "buffer_tensor_count": sum(item["kind"] == "buffer" for item in manifest),
+            "numel": sum(item["numel"] for item in manifest),
+            "includes": "all_named_parameters_and_buffers",
+        }
 
     @staticmethod
     def _normalize_expected_sha256(value, field_name: str) -> str:
@@ -1710,6 +1868,17 @@ class Trainer:
         if _world_size() == 1:
             return
         ws = _world_size()
+        presence = torch.tensor(
+            [parameter.grad is not None for parameter in params],
+            dtype=torch.int32,
+            device=self.device,
+        )
+        minimum = presence.clone()
+        maximum = presence.clone()
+        dist.all_reduce(minimum, op=dist.ReduceOp.MIN)
+        dist.all_reduce(maximum, op=dist.ReduceOp.MAX)
+        if not torch.equal(minimum, maximum):
+            raise RuntimeError("gradient presence differs across distributed ranks")
         for p in params:
             if p.grad is not None:
                 dist.all_reduce(p.grad, op=dist.ReduceOp.SUM)
@@ -2209,6 +2378,31 @@ class Trainer:
         batch_size = int(t.get("batch_size", 1))
         grad_clip = float(t.get("grad_clip", 0.0) or 0.0)
         debug = bool(t.get("debug", False))
+        formal_final_step = None
+        if formal_libero:
+            raw_final_step = t.get("formal_final_step", max_steps)
+            if (
+                isinstance(raw_final_step, bool)
+                or not isinstance(raw_final_step, int)
+                or raw_final_step < 1
+                or raw_final_step != max_steps
+            ):
+                raise RuntimeError(
+                    "formal LIBERO requires formal_final_step=max_steps as a "
+                    "positive integer"
+                )
+            formal_final_step = raw_final_step
+            global_batch = batch_size * grad_accum * _world_size()
+            expected_global_batch = t.get("expected_global_batch_size", global_batch)
+            if (
+                isinstance(expected_global_batch, bool)
+                or not isinstance(expected_global_batch, int)
+                or expected_global_batch != global_batch
+            ):
+                raise RuntimeError(
+                    "formal LIBERO global batch differs from "
+                    "training.expected_global_batch_size"
+                )
 
         if governed_training:
             expected_save_contract = {
@@ -2229,7 +2423,7 @@ class Trainer:
         if formal_libero:
             expected_save_contract = {
                 "keep_last_k": 1,
-                "max_steps": 2000,
+                "max_steps": formal_final_step,
                 "save_initial_checkpoint": False,
                 "save_steps": 0,
             }
@@ -2240,7 +2434,7 @@ class Trainer:
                     )
             if save_at_steps:
                 raise RuntimeError(
-                    "formal LIBERO training permits only the final step-2000 checkpoint"
+                    "formal LIBERO training permits only its final checkpoint"
                 )
         if formal_phase6:
             output_path = self._phase6_launch_context.run_directory
@@ -2412,9 +2606,8 @@ class Trainer:
                         )
                 (loss / grad_accum).backward()
                 if formal_libero:
-                    # The T16 update core releases each completed autograd graph
-                    # before AdamW.  Preserve only detached scalar diagnostics so
-                    # the final micro graph cannot overlap the optimizer peak.
+                    # Preserve scalar diagnostics only; release the completed
+                    # autograd graph before the FP32-master AdamW update.
                     formal_libero_metrics = {
                         key: (
                             value.detach() if isinstance(value, torch.Tensor) else value
@@ -2621,7 +2814,9 @@ class Trainer:
                         float(diagnostic_result.get("loss_video_on_path", 0.0)),
                         float(endpoint),
                         float(
-                            diagnostic_result.get("loss_video_trajectory_velocity", 0.0)
+                            diagnostic_result.get(
+                                "loss_video_trajectory_velocity", 0.0
+                            )
                         ),
                         float(
                             diagnostic_result.get(
@@ -2655,28 +2850,53 @@ class Trainer:
             os.fsync(afcc_metrics_stream.fileno())
             afcc_metrics_stream.close()
         elif formal_libero:
-            if step != 2000 or saved_steps:
+            if step != formal_final_step or saved_steps:
+                if formal_final_step == 2000:
+                    raise RuntimeError(
+                        "formal LIBERO training did not complete exactly 2000 steps "
+                        "without an intermediate save"
+                    )
                 raise RuntimeError(
-                    "formal LIBERO training did not complete exactly 2000 steps "
-                    "without an intermediate save"
+                    f"formal LIBERO training did not complete exactly "
+                    f"{formal_final_step} steps without an intermediate save"
                 )
             if formal_libero_metrics is None:
                 raise RuntimeError("formal LIBERO final metrics are missing")
-            final_loss = float(formal_libero_metrics["loss"].float().item())
-            finite_state = {
-                "final_loss_finite": math.isfinite(final_loss),
-                "model_parameters_finite": self._phase6_tensors_finite(params),
-                "optimizer_master_parameters_finite": self._phase6_tensors_finite(
+            final_loss_tensor = formal_libero_metrics["loss"].detach().float().reshape(1)
+            finite_values = [
+                math.isfinite(float(final_loss_tensor.item())),
+                self._phase6_tensors_finite(params),
+                self._phase6_tensors_finite(
                     [master for _model, master in master_pairs]
                 ),
-                "optimizer_state_finite": self._phase6_optimizer_state_finite(
-                    optimizer
-                ),
+                self._phase6_optimizer_state_finite(optimizer),
+            ]
+            peak_tensor = torch.tensor(
+                [int(torch.cuda.max_memory_reserved(self.device))],
+                dtype=torch.int64,
+                device=self.device,
+            )
+            if _is_dist():
+                dist.all_reduce(final_loss_tensor, op=dist.ReduceOp.SUM)
+                final_loss_tensor /= _world_size()
+                finite_tensor = torch.tensor(
+                    finite_values, dtype=torch.int32, device=self.device
+                )
+                dist.all_reduce(finite_tensor, op=dist.ReduceOp.MIN)
+                finite_values = [bool(value) for value in finite_tensor.tolist()]
+                dist.all_reduce(peak_tensor, op=dist.ReduceOp.MAX)
+            final_loss = float(final_loss_tensor.item())
+            finite_state = {
+                "final_loss_finite": finite_values[0],
+                "model_parameters_finite": finite_values[1],
+                "optimizer_master_parameters_finite": finite_values[2],
+                "optimizer_state_finite": finite_values[3],
             }
             if not all(finite_state.values()):
                 raise RuntimeError(
                     "formal LIBERO final model/master/optimizer state is non-finite"
                 )
+            final_model_state = self._complete_model_state_digest_consensus()
             self.formal_libero_run_summary = {
                 **finite_state,
                 "final_loss": final_loss,
@@ -2686,15 +2906,28 @@ class Trainer:
                 "optimizer_steps": step,
                 "optimizer_foreach": optimizer_foreach,
                 "autograd_graph_released_before_optimizer": True,
-                "peak_memory_reserved_bytes": int(
-                    torch.cuda.max_memory_reserved(self.device)
-                ),
+                "peak_memory_reserved_bytes": int(peak_tensor.item()),
                 "trainable_parameter_count": sum(
                     parameter.numel() for parameter in params
                 ),
                 "trainable_parameter_tensor_count": len(params),
+                "world_size": _world_size(),
+                "per_device_batch_size": batch_size,
+                "gradient_accumulation_steps": grad_accum,
+                "global_batch_size": batch_size * grad_accum * _world_size(),
+                "dataset_windows": len(self.dataset),
+                "window_draws": step * batch_size * grad_accum * _world_size(),
+                "rank_process_seeds": [
+                    self.base_seed + rank for rank in range(_world_size())
+                ],
+                "distributed_initialization": getattr(
+                    self,
+                    "distributed_initialization_summary",
+                    {"broadcast": False, "world_size": 1},
+                ),
+                "final_model_state": final_model_state,
             }
-            self._save(output_path, 2000)
+            self._save(output_path, formal_final_step)
         # Legacy final state is always present without a duplicate large file.
         elif step not in saved_steps:
             self._save(output_path, step)
