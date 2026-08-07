@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "third_party" / "Sana"))
 
 CONFIG_RELATIVE_PATH = "configs/experiments/libero_formal_r5_8gpu_epoch1.yaml"
-RUN_NONCE = "df0adf888731b5509987046a65328678"
+RUN_NONCE = "9b5098afc038e06eb1f47f20bf82ab32"
 RUN_ROOT = Path(
     "/DATA/share/sana_wam_libero_training/formal_epoch1_r5/"
     "libero-ar-r5-causal1-warmstart-uniform-8gpu-1315-"
@@ -59,6 +59,15 @@ FAILED_R5_R0 = Path(
 FAILED_R5_R0_SHA256 = (
     "1910cfab528427f464367c3a29911035b0e7b2d18aacf055a079d4a26f4997f6"
 )
+FAILED_R5_R1 = Path(
+    "/DATA/share/sana_wam_libero_training/formal_epoch1_r5/"
+    "libero-ar-r5-causal1-warmstart-uniform-8gpu-1315-"
+    "df0adf888731b5509987046a65328678/FAILED.json"
+)
+FAILED_R5_R1_SHA256 = (
+    "089502d72314277eaa3c94065b75d4c31fb152d454ca25c1d1f5ad2e142f20d3"
+)
+
 SANA_GITLINK = "16b9cec673e3335724ba2d8db25de7f9ed229292"
 STATS_SHA256 = "e5d985903539c1767a246e63c629b214c47c395d2000dee44122b8a0672253c7"
 GPU_UUIDS = (
@@ -203,6 +212,7 @@ def _verify_config():
         "training.init_checkpoint": str(R4_ROOT / "checkpoint_step_2000.safetensors"),
         "training.init_checkpoint_sha256": R4_CHECKPOINT_SHA256,
         "training.formal_failed_predecessor_r5_sha256": FAILED_R5_R0_SHA256,
+        "training.formal_failed_predecessor_r5_r1_sha256": FAILED_R5_R1_SHA256,
         "model.architecture.action_loss_weighting": "none",
         "model.architecture.ar_attn_window": 1,
         "model.architecture.ar_action_horizon_rope": True,
@@ -241,6 +251,7 @@ def _verify_predecessors() -> dict[str, Any]:
         raise RuntimeError("R4 predecessor RESULT semantics differ")
     diagnostic = _verify_file(DIAGNOSTIC_RESULT, DIAGNOSTIC_RESULT_SHA256)
     failed_r5_r0 = _verify_file(FAILED_R5_R0, FAILED_R5_R0_SHA256)
+    failed_r5_r1 = _verify_file(FAILED_R5_R1, FAILED_R5_R1_SHA256)
     diagnostic_payload = json.loads(DIAGNOSTIC_RESULT.read_text(encoding="utf-8"))
     if (
         diagnostic_payload.get("execution_result") != "PASS"
@@ -259,6 +270,7 @@ def _verify_predecessors() -> dict[str, Any]:
         "r4_checkpoint": checkpoint,
         "diagnostic": diagnostic,
         "failed_r5_r0": failed_r5_r0,
+        "failed_r5_r1": failed_r5_r1,
     }
 
 

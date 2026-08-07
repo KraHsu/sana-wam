@@ -595,7 +595,7 @@ class Trainer:
                         "formal LIBERO state digest requires strided tensors, got "
                         f"{kind} {name}: {tensor.layout}"
                     )
-                raw = tensor.detach().contiguous().view(torch.uint8).reshape(-1)
+                raw = tensor.detach().contiguous().reshape(-1).view(torch.uint8)
                 for offset in range(0, raw.numel(), chunk_bytes):
                     block = raw.narrow(
                         0, offset, min(chunk_bytes, raw.numel() - offset)
