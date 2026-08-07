@@ -222,6 +222,11 @@ def test_t16_worker_pins_identity_and_a_two_arm_32_step_protocol() -> None:
 def test_t16_runner_pins_worker_config_and_direct_t15_predecessor() -> None:
     source, tree = _source_and_tree(RUNNER)
     literals = _top_level_literals(tree)
+    project_root_path_insert = "sys.path.insert(0, str(ROOT))"
+    assert project_root_path_insert in source
+    assert source.index(project_root_path_insert) < source.index(
+        "from smoke_libero_ar_real_gpu import"
+    )
     assert literals["T15_PREDECESSOR_SOURCE_COMMIT"] == T15_SOURCE_COMMIT
     assert literals["T15_PREDECESSOR_RUNNER_SHA256"] == T15_RUNNER_SHA256
     assert literals["T15_PREDECESSOR_RESULT_SHA256"] == T15_RESULT_SHA256

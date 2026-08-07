@@ -1,7 +1,7 @@
 # LIBERO T16：Paired One-Task Chunk-Closed-Loop Smoke
 
-状态：**source/static closure 已完成；T15 停止条件已满足，T16 尚未创建运行 root，
-尚未导入或构造 simulator、尚未构造模型，也未执行 GPU。**
+状态：**source 根因修复与 static closure 已完成；首次 T16 root 在 PRE rollout 前
+fail-closed 冻结，尚未构造 simulator、未执行 rollout 或参数更新；fresh-root 复核尚未运行。**
 
 T16 是 T15 后的第一个行为证据门槛：在同一 fresh-init 模型进程内，先从
 一个固定 LIBERO simulator state 做 pre-update rollout，再原样执行 T15 的
@@ -159,11 +159,11 @@ SHA 必须逐字节相同，否则 fail-closed。
 - `scripts/libero_t16_sim_worker.py`：
   `653ccc274e6dcc4f08799564c06822b28c6080c9826bfaee7af3fa5744718584`
 - `scripts/smoke_libero_ar_t16_paired_one_task_closed_loop_gpu.py`：
-  `39c4f26811baca2ed4501286865eda2204982b5dab82a87d5c08a6e030a91a44`
+  `b53213477f04cff37798eb7cdff9e1fbed621d57e03df30e566404a66857a178`
 - `configs/benchmarks/libero/t16_simulator/config.yaml`：
   `29b385e0ec34a664c42635c3b94e817aaa711e948a83b980410fefd3be6f2ec3`
 - `tests/test_smoke_libero_ar_t16_paired_one_task_closed_loop_gpu.py`：
-  `0a6d96a87c3c558417278efaa8d5c0b26e863e06318dae0764cfc47b4c838353`
+  `643ab78cc420bf99675c890623a1d9bea08992b34f6da9cfb268c5ffa47d2aaf`
 
 runner 内复用的 T15 update core 与 T15 runner 做 AST normalized projection，固定
 SHA256 为
@@ -171,6 +171,29 @@ SHA256 为
 H200 上 `ruff format --check`、`ruff check`、`py_compile` 均通过，T16 专项静态测试
 `9 passed`。这些检查不导入 LIBERO、不构造 simulator/model、不创建 root、不访问
 CUDA，也不执行 update 或 rollout；因此本节不是运行证据。
+
+### 7.1 首次 execution attempt 的 fail-closed 边界
+
+首次 attempt 固定为 source commit
+`2661f655891df6e29721cb4d796bae7e427fb466`、runner SHA256
+`39c4f26811baca2ed4501286865eda2204982b5dab82a87d5c08a6e030a91a44`，
+nonce `13e276b36ef98103696d87de38949885`。其 terminal root 为：
+
+```text
+/DATA/share/sana_wam_libero_nonformal_screens/t16/2661f655891d/libero-t16-paired-one-task-chunk-closed-loop-fixed32-13e276b36ef98103696d87de38949885
+```
+
+root 已冻结为 `0500`，唯一 `FAILED.json` 为 `0400`，SHA256
+`f9a2ae9b0a2017b93e1dff445c579463537834de9f8d8115ba185fa356a99294`。
+错误为 `ModuleNotFoundError: No module named 'benchmarks'`：runner 以
+`scripts/...py` 入口执行时加入了 `scripts/src/third_party`，但没有把 repo root
+加入 `sys.path`。失败发生在创建 simulator client、PRE rollout 和 T15 update 之前；
+因此它不是 interface 或行为效果证据。运行中只完成了架构构造、允许的 base SANA
+初始化权重加载和训练输入预处理；未加载或保存 SANA-WAM checkpoint。
+
+根因修复只在 import 前增加 repo-root path，并加入静态回归断言；旧 root 永不复用、
+不修改。修复后的 GPU 复核必须使用新 source commit、new runner SHA、fresh nonce/root，
+且不得自动重跑。
 
 ## 8. 预算、root 和终态
 
