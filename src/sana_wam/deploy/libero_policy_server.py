@@ -248,6 +248,20 @@ def validate_libero_train_deploy_parity(training_cfg: Any, runtime_cfg: Any) -> 
         )
 
 
+def _validate_runtime_action_horizon(engine: Any, training_cfg: Any) -> None:
+    """Bind the runtime chunk width to the frozen checkpoint horizon."""
+
+    expected = OmegaConf.select(
+        training_cfg, "dataloader.action_horizon", default=None
+    )
+    observed = getattr(engine, "_action_tokens_per_chunk", None)
+    if observed != expected:
+        raise ValueError(
+            "causal LIBERO runtime action tokens must match checkpoint "
+            f"action_horizon={expected}, got {observed}"
+        )
+
+
 class LiberoPolicyServer(PolicyServer):
     """PolicyServer with LIBERO identity and per-step episode echoes."""
 
@@ -452,10 +466,7 @@ def build_libero_server_from_config(
         raise ValueError(
             "causal LIBERO requires DualSystemARArchitecture + ARInferenceEngine"
         )
-    if getattr(engine, "_action_tokens_per_chunk", None) != 28:
-        raise ValueError(
-            "causal LIBERO runtime must resolve exactly 28 action tokens per chunk"
-        )
+    _validate_runtime_action_horizon(engine, training_cfg)
 
     server = LiberoPolicyServer(
         engine=engine,

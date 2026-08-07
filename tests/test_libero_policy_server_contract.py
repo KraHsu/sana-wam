@@ -12,6 +12,7 @@ from sana_wam.dataloader.transforms.normalize import ActionNormalizer, Normalize
 from sana_wam.deploy.libero_model_loader import LiberoActionStateNormalizer
 from sana_wam.deploy.libero_policy_server import (
     LiberoPolicyServer,
+    _validate_runtime_action_horizon,
     validate_libero_train_deploy_parity,
 )
 from sana_wam.deploy.policy_server import PolicyServer
@@ -164,6 +165,25 @@ def _parity_configs():
 def test_train_deploy_parity_accepts_matching_temporal_contract() -> None:
     training, runtime = _parity_configs()
     validate_libero_train_deploy_parity(training, runtime)
+
+
+@pytest.mark.parametrize("action_horizon", [8, 28])
+def test_runtime_action_horizon_is_derived_from_checkpoint(action_horizon: int) -> None:
+    training = OmegaConf.create(
+        {"dataloader": {"action_horizon": action_horizon}}
+    )
+    engine = SimpleNamespace(_action_tokens_per_chunk=action_horizon)
+    _validate_runtime_action_horizon(engine, training)
+
+
+def test_runtime_action_horizon_rejects_engine_drift() -> None:
+    training = OmegaConf.create({"dataloader": {"action_horizon": 8}})
+    engine = SimpleNamespace(_action_tokens_per_chunk=28)
+    with pytest.raises(
+        ValueError,
+        match="action tokens must match checkpoint action_horizon=8, got 28",
+    ):
+        _validate_runtime_action_horizon(engine, training)
 
 
 def test_train_deploy_parity_accepts_bounded_receding_horizon() -> None:
