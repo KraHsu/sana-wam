@@ -1,0 +1,5 @@
+assets: /home/zch/workspace/Isaac-GR00T/external_dependencies/LIBERO/libero/libero/assets
+bddl_files: /home/zch/workspace/Isaac-GR00T/external_dependencies/LIBERO/libero/libero/bddl_files
+benchmark_root: /home/zch/workspace/Isaac-GR00T/external_dependencies/LIBERO/libero/libero
+datasets: /DATA/share/LIBERO/libero
+init_states: /home/zch/workspace/Isaac-GR00T/external_dependencies/LIBERO/libero/libero/init_files

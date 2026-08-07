@@ -1,7 +1,7 @@
 # LIBERO T16：Paired One-Task Chunk-Closed-Loop Smoke
 
-状态：**development plan；T15 停止条件已满足，T16 尚未创建运行 root，
-尚未构造 simulator 或执行 GPU。**
+状态：**source/static closure 已完成；T15 停止条件已满足，T16 尚未创建运行 root，
+尚未导入或构造 simulator、尚未构造模型，也未执行 GPU。**
 
 T16 是 T15 后的第一个行为证据门槛：在同一 fresh-init 模型进程内，先从
 一个固定 LIBERO simulator state 做 pre-update rollout，再原样执行 T15 的
@@ -63,8 +63,11 @@ sorted compact JSON + LF：
 取 SHA256 字典序最小者，禁止按效果挑 task。冻结结果为：
 
 - suite：`libero_spatial`
-- dataset task index：`5`
-- task：`pick up the black bowl on the cookie box and place it on the plate`
+- LeRobot dataset task index：`5`
+- LIBERO suite ordinal：`3`（不得与 dataset task index `5` 互换）
+- model prompt：`pick up the black bowl on the cookie box and place it on the plate`
+- BDDL/environment language：
+  `pick the akita black bowl on the cookies box and place it on the plate`
 - task-selection SHA256：
   `30bc48677e10f0674a5837833d4b77a3ffe48751767b28a93042e08af8e3a0d8`
 - BDDL SHA256：
@@ -120,6 +123,16 @@ worker 只读 clean checkout 的 assets/BDDL/init state，不修改外部仓、`
 或 simulator venv。`LIBERO_CONFIG_PATH` 必须显式指向新增且已固定 SHA 的
 config，不允许 LIBERO import-time prompt 创建文件。
 
+物理 GPU 编号契约不得做 logical-0 重映射：对选定物理 GPU `N`，simulator child
+必须同时设置 `CUDA_VISIBLE_DEVICES=N`、`MUJOCO_EGL_DEVICE_ID=N` 和 renderer
+device `N`。固定的 robosuite `1.4.0` 会直接按物理 EGL device list 索引，若写成
+logical `0`，在非 GPU 0 上会失败或渲染到错误设备。child 的 `PYTHONPATH` 只允许
+clean LIBERO checkout 与 SANA-WAM repo，不继承 caller 的额外路径。
+
+worker 在导入 LIBERO 或构造 env 前完成 interpreter、checkout、config、BDDL、init、
+Python/runtime package 版本核对，并在 `OffScreenRenderEnv` 构造前固定 NumPy seed。
+关闭前复核已加载 `libero.*` module 均来自 clean checkout，且关键源文件字节未变。
+
 worker 协议只允许 `ready/reset/step/close`；每条 request/response 有单调 seq。
 `reset(pre)` 与 `reset(post)` 均执行相同 env seed `0`、相同 init index `17`
 和 5 个零动作 settle step；两臂 settle 后的 MuJoCo state 与两视图 observation
@@ -139,7 +152,27 @@ SHA 必须逐字节相同，否则 fail-closed。
 - 每个 environment step 仍把新观测送入 policy；但只有 action buffer 耗尽时
   才调用 model generation，必须分别记录 policy request 和 generation 计数。
 
-## 7. 预算、root 和终态
+## 7. Source/static closure 证据（2026-08-07）
+
+本轮只新增以下四个 implementation 文件；其 materialized SHA256 为：
+
+- `scripts/libero_t16_sim_worker.py`：
+  `653ccc274e6dcc4f08799564c06822b28c6080c9826bfaee7af3fa5744718584`
+- `scripts/smoke_libero_ar_t16_paired_one_task_closed_loop_gpu.py`：
+  `39c4f26811baca2ed4501286865eda2204982b5dab82a87d5c08a6e030a91a44`
+- `configs/benchmarks/libero/t16_simulator/config.yaml`：
+  `29b385e0ec34a664c42635c3b94e817aaa711e948a83b980410fefd3be6f2ec3`
+- `tests/test_smoke_libero_ar_t16_paired_one_task_closed_loop_gpu.py`：
+  `0a6d96a87c3c558417278efaa8d5c0b26e863e06318dae0764cfc47b4c838353`
+
+runner 内复用的 T15 update core 与 T15 runner 做 AST normalized projection，固定
+SHA256 为
+`357c111513e0b96e30297189f9d47bdef6a0b2486bd92b32d7e244b2f4799429`。
+H200 上 `ruff format --check`、`ruff check`、`py_compile` 均通过，T16 专项静态测试
+`9 passed`。这些检查不导入 LIBERO、不构造 simulator/model、不创建 root、不访问
+CUDA，也不执行 update 或 rollout；因此本节不是运行证据。
+
+## 8. 预算、root 和终态
 
 - single GPU，同时最多一个 SANA-WAM model；不完整 2B training。
 - real-data update 预算与 T15 完全相同：16 prepare、192 architecture forward、
@@ -152,7 +185,7 @@ SHA 必须逐字节相同，否则 fail-closed。
 - root fresh/exclusive/one-shot；terminal root `0500`，唯一 RESULT/FAILED `0400`；
   禁止复用、覆盖、自动重跑或 post-freeze mutation。
 
-## 8. Verdict 与解释边界
+## 9. Verdict 与解释边界
 
 执行 PASS 要求：
 
@@ -175,7 +208,7 @@ pre/post action trace L2、MuJoCo state/eef/object displacement、reward、succe
 `PRE_ONLY_SUCCESS`、`BOTH_SUCCESS`、`NEITHER_SUCCESS`或 `TRAJECTORY_IDENTICAL/DIFFERENT`，
 但它们不是 success-rate classifier，不得据单初态宣称模型改善。
 
-## 9. 停止与后续规则
+## 10. 停止与后续规则
 
 - 若 interface 无法通过，冻结 FAILED root，只修根因后申请 fresh-root 复核；
   不把行为效果差自动归因为 plumbing bug。
