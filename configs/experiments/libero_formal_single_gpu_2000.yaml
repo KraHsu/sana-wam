@@ -159,7 +159,7 @@ dataloader:
       - libero_goal_no_noops_1.0.0_lerobot:82
 
 training:
-  output_dir: /DATA/share/sana_wam_libero_training/formal2000/libero-ar-formal2000-r2-single-gpu-2000-41151d523f774bf3f0dc281df56ca8b7
+  output_dir: /DATA/share/sana_wam_libero_training/formal2000/libero-ar-formal2000-r3-single-gpu-2000-e21c6e5ad5910c00156499472f46bee6
   max_steps: 2000
   save_steps: 0
   save_at_steps: []
@@ -170,9 +170,10 @@ training:
   formal_libero_training: true
   formal_non_resumable: true
   formal_predecessor_t16_result_sha256: 5e2f5d61f7715f952f1762c04f5ad99891f9eda1ae5256310498c23146bcc471
-  formal_failed_predecessor_sha256: e778230115fa595895ba16e5d8bc5aac545b426277e69b02f4681c34cfe6603a
+  formal_failed_predecessor_sha256: 1f7ea352023a7b4af1d6aa52feb280c059bb2731b441c1c5a506b3d21038c523
+  formal_failed_predecessor_r1_sha256: e778230115fa595895ba16e5d8bc5aac545b426277e69b02f4681c34cfe6603a
   formal_failed_predecessor_r0_sha256: 0a62b6a66ba152285d751795330d90a93558c2ca851706be0549dbd6966831c2
-  formal_revision_reason: disable_adamw_foreach_after_r1_optimizer_peak_oom
+  formal_revision_reason: break_nonreentrant_checkpoint_output_state_cycle_after_r2_backward_oom
   batch_size: 1
   gradient_accumulation_steps: 8
   num_workers: 4

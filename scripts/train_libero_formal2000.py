@@ -31,10 +31,10 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "third_party" / "Sana"))
 
 CONFIG_RELATIVE_PATH = "configs/experiments/libero_formal_single_gpu_2000.yaml"
-RUN_NONCE = "41151d523f774bf3f0dc281df56ca8b7"
+RUN_NONCE = "e21c6e5ad5910c00156499472f46bee6"
 RUN_ROOT = Path(
     "/DATA/share/sana_wam_libero_training/formal2000/"
-    "libero-ar-formal2000-r2-single-gpu-2000-41151d523f774bf3f0dc281df56ca8b7"
+    "libero-ar-formal2000-r3-single-gpu-2000-e21c6e5ad5910c00156499472f46bee6"
 )
 EXPECTED_SANA_COMMIT = "16b9cec673e3335724ba2d8db25de7f9ed229292"
 EXPECTED_GPU_INDEX = 7
@@ -71,6 +71,11 @@ FAILED_R1_ROOT = Path(
     "libero-ar-formal2000-r1-single-gpu-2000-ced0769ce3a32b441cda12a04929d6f9"
 )
 FAILED_R1_SHA256 = "e778230115fa595895ba16e5d8bc5aac545b426277e69b02f4681c34cfe6603a"
+FAILED_R2_ROOT = Path(
+    "/DATA/share/sana_wam_libero_training/formal2000/"
+    "libero-ar-formal2000-r2-single-gpu-2000-41151d523f774bf3f0dc281df56ca8b7"
+)
+FAILED_R2_SHA256 = "1f7ea352023a7b4af1d6aa52feb280c059bb2731b441c1c5a506b3d21038c523"
 STATS_SHA256 = "e5d985903539c1767a246e63c629b214c47c395d2000dee44122b8a0672253c7"
 STATS_POPULATION_SHA256 = (
     "7ed9772facf261299022e55169bcdaaa49fe3a7a20e0057e08cf419b5e584146"
@@ -359,6 +364,38 @@ def _verify_failed_r1() -> dict[str, Any]:
     return {**manifest, "root": str(FAILED_R1_ROOT)}
 
 
+def _verify_failed_r2() -> dict[str, Any]:
+    if os.path.realpath(FAILED_R2_ROOT) != str(FAILED_R2_ROOT):
+        raise RuntimeError("failed formal R2 ancestry contains a symlink")
+    metadata = os.lstat(FAILED_R2_ROOT)
+    if not stat.S_ISDIR(metadata.st_mode) or stat.S_IMODE(metadata.st_mode) != 0o500:
+        raise RuntimeError("failed formal R2 root is not frozen mode 0500")
+    expected_files = {"ATTEMPT.json", "FAILED.json", "TRAIN.log"}
+    if set(os.listdir(FAILED_R2_ROOT)) != expected_files:
+        raise RuntimeError("failed formal R2 root contents changed")
+    for name in expected_files:
+        child = os.lstat(FAILED_R2_ROOT / name)
+        if not stat.S_ISREG(child.st_mode) or stat.S_IMODE(child.st_mode) != 0o400:
+            raise RuntimeError(f"failed formal R2 file is not frozen: {name}")
+    failed_path = FAILED_R2_ROOT / "FAILED.json"
+    manifest = _verify_file(failed_path, FAILED_R2_SHA256)
+    payload = json.loads(failed_path.read_bytes())
+    traceback_text = payload.get("traceback", "")
+    if (
+        payload.get("valid_run") is not False
+        or payload.get("verdict") != "FAILED_CLOSED_NON_RESUMABLE"
+        or payload.get("error_type") != "OutOfMemoryError"
+        or "CUDA out of memory" not in payload.get("error", "")
+        or "torch/utils/checkpoint.py" not in traceback_text
+        or "basic_modules.py" not in traceback_text
+        or "_foreach_sqrt" in traceback_text
+        or payload.get("training_started") is not True
+        or payload.get("automatic_rerun_permitted") is not False
+    ):
+        raise RuntimeError("failed formal R2 receipt semantics changed")
+    return {**manifest, "root": str(FAILED_R2_ROOT)}
+
+
 def _config_value(cfg, path: str):
     return OmegaConf.select(cfg, path, default=None)
 
@@ -383,10 +420,11 @@ def _verify_config(expected_config_sha256: str):
         "training.formal_libero_training": True,
         "training.formal_non_resumable": True,
         "training.formal_predecessor_t16_result_sha256": T16_RESULT_SHA256,
-        "training.formal_failed_predecessor_sha256": FAILED_R1_SHA256,
+        "training.formal_failed_predecessor_sha256": FAILED_R2_SHA256,
+        "training.formal_failed_predecessor_r1_sha256": FAILED_R1_SHA256,
         "training.formal_failed_predecessor_r0_sha256": FAILED_R0_SHA256,
         "training.formal_revision_reason": (
-            "disable_adamw_foreach_after_r1_optimizer_peak_oom"
+            "break_nonreentrant_checkpoint_output_state_cycle_after_r2_backward_oom"
         ),
         "model.architecture.video_on_path_loss_weight": 0.0,
         "model.architecture.video_trajectory_endpoint_weight": 0.0,
@@ -729,6 +767,7 @@ def main() -> None:
     t16 = _verify_t16()
     failed_r0 = _verify_failed_r0()
     failed_r1 = _verify_failed_r1()
+    failed_r2 = _verify_failed_r2()
     cfg = _verify_config(args.expected_config_sha256)
     assets = _verify_assets()
 
@@ -752,6 +791,7 @@ def main() -> None:
                 "predecessor_t16": t16,
                 "failed_predecessor_r0": failed_r0,
                 "failed_predecessor_r1": failed_r1,
+                "failed_predecessor_r2": failed_r2,
                 "assets": assets,
                 "gpu": {**gpu_before, "lock_path": lock_path},
                 "training": {
@@ -859,6 +899,7 @@ def main() -> None:
                 "predecessor_t16": t16,
                 "failed_predecessor_r0": failed_r0,
                 "failed_predecessor_r1": failed_r1,
+                "failed_predecessor_r2": failed_r2,
                 "base_load": base_load,
                 "trainable_partition": partition,
                 "training": {

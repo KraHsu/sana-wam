@@ -8,6 +8,10 @@ descriptor, dense mask, missing phi) that would silently corrupt an AR forward.
 
 from __future__ import annotations
 
+import gc
+import types
+import weakref
+
 import pytest
 import torch
 import torch.nn as nn
@@ -122,3 +126,71 @@ def test_driver_refuses_missing_phi():
     tq, tk, v, _, _ = _rand_tracks(N)
     with pytest.raises(RuntimeError, match="requires phi_q and phi_k"):
         driver._mixed_attention(tq, tk, v, None, phi_q=None, phi_k=None)
+
+
+def test_checkpoint_closure_does_not_retain_mutated_output_states():
+    gc_was_enabled = gc.isenabled()
+    gc.disable()
+    try:
+        driver = _build_ar_driver(num_layers=1)
+        driver._ar_meta = build_ar_seq_meta(
+            num_chunks=1,
+            video_tokens_per_chunk=1,
+            action_tokens_per_chunk=1,
+            window=1,
+        )
+
+        class State:
+            pass
+
+        video_state = State()
+        action_state = State()
+        payload = State()
+        video_input = torch.randn(2, 3, requires_grad=True)
+        action_input = torch.randn(2, 3, requires_grad=True)
+        video_state.x = video_input
+        action_state.payload = payload
+        payload.x_action = action_input
+
+        def fake_step_impl(
+            self,
+            layer_id,
+            local_video,
+            local_action,
+            *,
+            attn_mask,
+            suppress_inner_attn_ckpt,
+        ):
+            del self, layer_id, attn_mask, suppress_inner_attn_ckpt
+            video = local_video.x
+            action = local_action.payload.x_action
+            local_video.x = video.tanh() + action.mean()
+            local_action.payload.x_action = action.sin() + video.mean()
+            return local_video, local_action
+
+        driver._step_impl = types.MethodType(fake_step_impl, driver)
+        output_video, output_action = driver._step_checkpointed(
+            0,
+            video_state,
+            action_state,
+            attn_mask=None,
+            offload=False,
+        )
+        driver._ar_meta = None
+        loss = output_video.x.sum() + output_action.payload.x_action.sum()
+        loss.backward()
+        assert video_input.grad is not None
+        assert action_input.grad is not None
+
+        video_state_ref = weakref.ref(video_state)
+        action_state_ref = weakref.ref(action_state)
+        payload_ref = weakref.ref(payload)
+        del loss, output_video, output_action
+        del video_input, action_input, video_state, action_state, payload
+        assert video_state_ref() is None
+        assert action_state_ref() is None
+        assert payload_ref() is None
+    finally:
+        if gc_was_enabled:
+            gc.enable()
+        gc.collect()

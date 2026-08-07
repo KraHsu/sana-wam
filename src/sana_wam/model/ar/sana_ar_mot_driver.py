@@ -161,11 +161,27 @@ class SanaARMoTJointDriver(SanaMoTJointDriver):
             raise RuntimeError("checkpointed AR step requires an AR descriptor")
         return_action_video_numerators = self._return_action_video_numerators
         outer_payload = astate.payload
+        vx0 = vstate.x
+        ax0 = outer_payload.x_action
+
+        # A non-reentrant checkpoint frame retains its recompute closure until
+        # backward finishes.  Capturing the live mutable states here would form
+        # a cycle after the checkpoint outputs are written back below:
+        # output graph -> checkpoint frame -> closure -> state -> output graph.
+        # Keep tensor-free templates for the two fields mutated by every layer;
+        # the closure receives their current values only through checkpoint's
+        # explicit tensor arguments.
+        vstate_template = copy.copy(vstate)
+        astate_template = copy.copy(astate)
+        payload_template = copy.copy(outer_payload)
+        vstate_template.x = None
+        astate_template.payload = None
+        payload_template.x_action = None
 
         def _run(vx: Tensor, ax: Tensor):
-            local_vstate = copy.copy(vstate)
-            local_astate = copy.copy(astate)
-            local_payload = copy.copy(outer_payload)
+            local_vstate = copy.copy(vstate_template)
+            local_astate = copy.copy(astate_template)
+            local_payload = copy.copy(payload_template)
             local_astate.payload = local_payload
             local_vstate.x = vx
             local_payload.x_action = ax
@@ -199,8 +215,6 @@ class SanaARMoTJointDriver(SanaMoTJointDriver):
                 raise RuntimeError("checkpointed AR step returned an unexpected auxiliary")
             return local_vstate.x, local_payload.x_action
 
-        vx0 = vstate.x
-        ax0 = outer_payload.x_action
         if offload:
             with torch.autograd.graph.save_on_cpu():
                 checkpoint_result = torch.utils.checkpoint.checkpoint(
