@@ -769,7 +769,7 @@ class ARInferenceEngine(BaseInferenceEngine):
             raise RuntimeError(
                 "fresh single-chunk deployment expected one completed local chunk"
             )
-        cadence = self._feedback_cadence(conditions)
+        cadence = self._feedback_cadence(conditions, allow_partial=True)
         if cadence != "ok":
             raise RuntimeError(
                 f"invalid fresh single-chunk generation cadence: {cadence}"
@@ -859,20 +859,28 @@ class ARInferenceEngine(BaseInferenceEngine):
             self._feedback_fallbacks = fallbacks_before
             raise
 
-    def _feedback_cadence(self, conditions: dict) -> str:
+    def _feedback_cadence(
+        self, conditions: dict, *, allow_partial: bool = False
+    ) -> str:
         pending = self._pending_action_feedback
         if pending is None:
             return "episode_start"
         required = int(pending["action_tokens"])
         executed = int(conditions.get("executed_steps_since_generate", 0) or 0)
-        if executed != required:
-            return f"cadence_mismatch:{executed}!={required}"
+        if allow_partial:
+            if executed < 1 or executed > required:
+                return f"cadence_mismatch:{executed}!={required}"
+            expected_elapsed = executed
+        else:
+            if executed != required:
+                return f"cadence_mismatch:{executed}!={required}"
+            expected_elapsed = required
         generated_at = pending.get("generated_at_policy_step")
         current_step = conditions.get("policy_step")
         if generated_at is not None and current_step is not None:
             elapsed = int(current_step) - int(generated_at)
-            if elapsed != required:
-                return f"policy_step_mismatch:{elapsed}!={required}"
+            if elapsed != expected_elapsed:
+                return f"policy_step_mismatch:{elapsed}!={expected_elapsed}"
         return "ok"
 
     def _measured_feedback_states(

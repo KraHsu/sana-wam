@@ -259,6 +259,34 @@ def test_fresh_single_chunk_boundary_rebases_cache_but_not_episode_index() -> No
     }
 
 
+def test_fresh_single_chunk_boundary_accepts_receding_prefix() -> None:
+    from sana_wam.deploy.ar_engine import ARInferenceEngine
+
+    class Cache:
+        resets = 0
+
+        def reset(self):
+            self.resets += 1
+
+    engine = object.__new__(ARInferenceEngine)
+    engine._reset_cache_each_generation = True
+    engine._episode_generation_index = 1
+    engine._step_c = 1
+    engine._cache = Cache()
+    engine._pending_action_feedback = {
+        "action_tokens": 28,
+        "generated_at_policy_step": 0,
+    }
+    engine._last_feedback = {"status": "predicted"}
+    engine._begin_fresh_single_chunk_generation(
+        {"executed_steps_since_generate": 8, "policy_step": 8}
+    )
+    assert engine._cache.resets == 1
+    assert engine._step_c == 0
+    assert engine._episode_generation_index == 1
+    assert engine._pending_action_feedback is None
+
+
 @requires_sana
 def test_action_horizon_rope_has_unique_slots_and_shared_noisy_clean_phases() -> None:
     arch, _vb, _ab = _build_arch()
