@@ -15,7 +15,7 @@ RUNNER = ROOT / "scripts/train_libero_formal2000.py"
 TRAINER = ROOT / "src/sana_wam/train/trainer.py"
 RUN_ROOT = (
     "/DATA/share/sana_wam_libero_training/formal2000/"
-    "libero-ar-formal2000-r3-single-gpu-2000-e21c6e5ad5910c00156499472f46bee6"
+    "libero-ar-formal2000-r4-single-gpu-2000-9c7e8f1a64b24dc38ef0a9d6c27b5314"
 )
 
 
@@ -66,11 +66,12 @@ def test_formal2000_config_is_single_gpu_fresh_init_final_only() -> None:
 def test_runner_binds_one_root_t16_and_no_resume() -> None:
     source = RUNNER.read_text()
     ast.parse(source)
-    assert source.count("e21c6e5ad5910c00156499472f46bee6") >= 2
+    assert source.count("9c7e8f1a64b24dc38ef0a9d6c27b5314") >= 2
     assert "5e2f5d61f7715f952f1762c04f5ad99891f9eda1ae5256310498c23146bcc471" in source
     assert "0a62b6a66ba152285d751795330d90a93558c2ca851706be0549dbd6966831c2" in source
     assert "e778230115fa595895ba16e5d8bc5aac545b426277e69b02f4681c34cfe6603a" in source
     assert "1f7ea352023a7b4af1d6aa52feb280c059bb2731b441c1c5a506b3d21038c523" in source
+    assert "666ddf05a20d6a745bf3a4c84c4bb143004278640623b8fc40eb0b3762ce193f" in source
     assert '"training.optimizer_foreach": False' in source
     assert "T16_PAIRED_ONE_TASK_CHUNK_CLOSED_LOOP_INTERFACE_VALID" in source
     assert "Trainer(cfg, exact_output_dir=str(RUN_ROOT))" in source
@@ -78,6 +79,13 @@ def test_runner_binds_one_root_t16_and_no_resume() -> None:
     assert "os.O_EXCL" in source
     assert "FAILED_CLOSED_NON_RESUMABLE" in source
     assert "torch.load(" not in source
+
+
+def test_runner_requires_detached_regular_file_stdio() -> None:
+    source = RUNNER.read_text()
+    assert "def _verify_detached_stdio()" in source
+    assert "stat.S_ISREG(metadata.st_mode)" in source
+    assert "detached_stdio = _verify_detached_stdio()" in source
 
 
 def test_runner_canonical_json_is_sorted_compact_and_lf() -> None:

@@ -31,10 +31,10 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "third_party" / "Sana"))
 
 CONFIG_RELATIVE_PATH = "configs/experiments/libero_formal_single_gpu_2000.yaml"
-RUN_NONCE = "e21c6e5ad5910c00156499472f46bee6"
+RUN_NONCE = "9c7e8f1a64b24dc38ef0a9d6c27b5314"
 RUN_ROOT = Path(
     "/DATA/share/sana_wam_libero_training/formal2000/"
-    "libero-ar-formal2000-r3-single-gpu-2000-e21c6e5ad5910c00156499472f46bee6"
+    "libero-ar-formal2000-r4-single-gpu-2000-9c7e8f1a64b24dc38ef0a9d6c27b5314"
 )
 EXPECTED_SANA_COMMIT = "16b9cec673e3335724ba2d8db25de7f9ed229292"
 EXPECTED_GPU_INDEX = 7
@@ -76,6 +76,11 @@ FAILED_R2_ROOT = Path(
     "libero-ar-formal2000-r2-single-gpu-2000-41151d523f774bf3f0dc281df56ca8b7"
 )
 FAILED_R2_SHA256 = "1f7ea352023a7b4af1d6aa52feb280c059bb2731b441c1c5a506b3d21038c523"
+FAILED_R3_ROOT = Path(
+    "/DATA/share/sana_wam_libero_training/formal2000/"
+    "libero-ar-formal2000-r3-single-gpu-2000-e21c6e5ad5910c00156499472f46bee6"
+)
+FAILED_R3_SHA256 = "666ddf05a20d6a745bf3a4c84c4bb143004278640623b8fc40eb0b3762ce193f"
 STATS_SHA256 = "e5d985903539c1767a246e63c629b214c47c395d2000dee44122b8a0672253c7"
 STATS_POPULATION_SHA256 = (
     "7ed9772facf261299022e55169bcdaaa49fe3a7a20e0057e08cf419b5e584146"
@@ -396,6 +401,37 @@ def _verify_failed_r2() -> dict[str, Any]:
     return {**manifest, "root": str(FAILED_R2_ROOT)}
 
 
+def _verify_failed_r3() -> dict[str, Any]:
+    if os.path.realpath(FAILED_R3_ROOT) != str(FAILED_R3_ROOT):
+        raise RuntimeError("failed formal R3 ancestry contains a symlink")
+    metadata = os.lstat(FAILED_R3_ROOT)
+    if not stat.S_ISDIR(metadata.st_mode) or stat.S_IMODE(metadata.st_mode) != 0o500:
+        raise RuntimeError("failed formal R3 root is not frozen mode 0500")
+    expected_files = {"ATTEMPT.json", "FAILED.json", "TRAIN.log"}
+    if set(os.listdir(FAILED_R3_ROOT)) != expected_files:
+        raise RuntimeError("failed formal R3 root contents changed")
+    for name in expected_files:
+        child = os.lstat(FAILED_R3_ROOT / name)
+        if not stat.S_ISREG(child.st_mode) or stat.S_IMODE(child.st_mode) != 0o400:
+            raise RuntimeError(f"failed formal R3 file is not frozen: {name}")
+    failed_path = FAILED_R3_ROOT / "FAILED.json"
+    manifest = _verify_file(failed_path, FAILED_R3_SHA256)
+    payload = json.loads(failed_path.read_bytes())
+    traceback_text = payload.get("traceback", "")
+    if (
+        payload.get("valid_run") is not False
+        or payload.get("verdict") != "FAILED_CLOSED_NON_RESUMABLE"
+        or payload.get("error_type") != "BrokenPipeError"
+        or payload.get("error") != "[Errno 32] Broken pipe"
+        or "tqdm/std.py" not in traceback_text
+        or "vae.py" not in traceback_text
+        or payload.get("training_started") is not True
+        or payload.get("automatic_rerun_permitted") is not False
+    ):
+        raise RuntimeError("failed formal R3 receipt semantics changed")
+    return {**manifest, "root": str(FAILED_R3_ROOT)}
+
+
 def _config_value(cfg, path: str):
     return OmegaConf.select(cfg, path, default=None)
 
@@ -420,11 +456,12 @@ def _verify_config(expected_config_sha256: str):
         "training.formal_libero_training": True,
         "training.formal_non_resumable": True,
         "training.formal_predecessor_t16_result_sha256": T16_RESULT_SHA256,
-        "training.formal_failed_predecessor_sha256": FAILED_R2_SHA256,
+        "training.formal_failed_predecessor_sha256": FAILED_R3_SHA256,
+        "training.formal_failed_predecessor_r2_sha256": FAILED_R2_SHA256,
         "training.formal_failed_predecessor_r1_sha256": FAILED_R1_SHA256,
         "training.formal_failed_predecessor_r0_sha256": FAILED_R0_SHA256,
         "training.formal_revision_reason": (
-            "break_nonreentrant_checkpoint_output_state_cycle_after_r2_backward_oom"
+            "detached_regular_file_stdio_after_r3_broken_pipe_at_step170"
         ),
         "model.architecture.video_on_path_loss_weight": 0.0,
         "model.architecture.video_trajectory_endpoint_weight": 0.0,
@@ -576,6 +613,25 @@ def _verify_environment_arguments(args: argparse.Namespace) -> None:
         observed = os.environ.get(key)
         if observed not in (None, expected):
             raise RuntimeError(f"{key} differs from the single-process contract")
+
+
+def _verify_detached_stdio() -> dict[str, dict[str, int]]:
+    identity: dict[str, dict[str, int]] = {}
+    for name in ("stdout", "stderr"):
+        stream = getattr(sys, name)
+        descriptor = stream.fileno()
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise RuntimeError(
+                f"formal R4 requires detached {name} bound to a regular file"
+            )
+        identity[name] = {
+            "descriptor": descriptor,
+            "device": metadata.st_dev,
+            "inode": metadata.st_ino,
+            "mode": stat.S_IMODE(metadata.st_mode),
+        }
+    return identity
 
 
 def _create_run_root() -> None:
@@ -759,6 +815,7 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     args = _parse_args()
     _verify_environment_arguments(args)
+    detached_stdio = _verify_detached_stdio()
     source = _verify_source(
         args.expected_repo_commit,
         args.expected_runner_sha256,
@@ -768,6 +825,7 @@ def main() -> None:
     failed_r0 = _verify_failed_r0()
     failed_r1 = _verify_failed_r1()
     failed_r2 = _verify_failed_r2()
+    failed_r3 = _verify_failed_r3()
     cfg = _verify_config(args.expected_config_sha256)
     assets = _verify_assets()
 
@@ -792,6 +850,8 @@ def main() -> None:
                 "failed_predecessor_r0": failed_r0,
                 "failed_predecessor_r1": failed_r1,
                 "failed_predecessor_r2": failed_r2,
+                "failed_predecessor_r3": failed_r3,
+                "detached_stdio": detached_stdio,
                 "assets": assets,
                 "gpu": {**gpu_before, "lock_path": lock_path},
                 "training": {
@@ -900,6 +960,8 @@ def main() -> None:
                 "failed_predecessor_r0": failed_r0,
                 "failed_predecessor_r1": failed_r1,
                 "failed_predecessor_r2": failed_r2,
+                "failed_predecessor_r3": failed_r3,
+                "detached_stdio": detached_stdio,
                 "base_load": base_load,
                 "trainable_partition": partition,
                 "training": {
