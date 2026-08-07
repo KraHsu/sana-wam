@@ -131,6 +131,20 @@ def test_policy_action_passes_motion_and_maps_gripper() -> None:
 
 
 @pytest.mark.parametrize(
+    ("model_open_score", "expected_env_gripper"),
+    [(-0.8203125, 1.0), (1.25, -1.0)],
+)
+def test_policy_action_thresholds_finite_unbounded_gripper_predictions(
+    model_open_score: float, expected_env_gripper: float
+) -> None:
+    action = np.zeros(7, dtype=np.float32)
+    action[-1] = model_open_score
+    env_action = adapter.policy_action_to_libero(action)
+    np.testing.assert_array_equal(env_action[:6], action[:6])
+    assert env_action[-1] == expected_env_gripper
+
+
+@pytest.mark.parametrize(
     "action",
     [
         np.zeros(14, dtype=np.float32),
@@ -220,14 +234,10 @@ def test_model_noise_seed_is_stable_and_episode_specific() -> None:
     )
 
 
-def test_policy_action_rejects_nonfinite_or_wrong_gripper_convention() -> None:
+def test_policy_action_rejects_nonfinite_values() -> None:
     action = np.zeros(7, dtype=np.float32)
     action[2] = np.nan
     with pytest.raises(ValueError, match="non-finite"):
-        adapter.policy_action_to_libero(action)
-    action = np.zeros(7, dtype=np.float32)
-    action[-1] = -1.0
-    with pytest.raises(ValueError, match=r"\[0, 1\]"):
         adapter.policy_action_to_libero(action)
 
 

@@ -83,9 +83,11 @@ The server must return exactly seven finite values:
 ```
 
 The first six relative-motion values pass through unchanged. Only the gripper
-coordinate is converted. The model/data convention is `open=1`, `closed=0`;
-LIBERO's environment convention is `open=-1`, `closed=+1`. With the frozen 0.5
-threshold, the mapping is:
+coordinate is converted. Training targets use `open=1`, `closed=0`, but a
+continuous diffusion prediction is not range bounded and may extrapolate beyond
+those endpoints. Every finite prediction is thresholded directly without
+clamping. LIBERO's environment convention is `open=-1`, `closed=+1`; with the
+frozen 0.5 threshold, the mapping is:
 
 ```text
 env_gripper = -1  if model_open_gripper > 0.5

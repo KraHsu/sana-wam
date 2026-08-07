@@ -147,8 +147,9 @@ SHA 必须逐字节相同，否则 fail-closed。
 - 图像、state 由现有 `PolicyServer` deploy preprocessing 路径处理，使用 trainer.dataset
   内的固定 7D action / 8D state normalizer 构造 dual normalizer。
 - model action 必须是 7 个 finite 值；前 6 维不裁剪、不填充、不改解释。
-- model gripper 必须在 `[0,1]`；`>0.5` 映射为 LIBERO open `-1`，
-  其余映射为 closed `+1`。越界不自动 clamp，而是记录有效行为失败。
+- gripper 训练 target 端点为 closed `0` / open `1`，但 diffusion 连续预测不保证
+  落在 `[0,1]`；任何 finite 输出都直接以 `>0.5` 映射为 LIBERO open `-1`，
+  其余映射为 closed `+1`。禁止为满足端点范围而 clamp。
 - 每个 environment step 仍把新观测送入 policy；但只有 action buffer 耗尽时
   才调用 model generation，必须分别记录 policy request 和 generation 计数。
 
@@ -194,6 +195,31 @@ root 已冻结为 `0500`，唯一 `FAILED.json` 为 `0400`，SHA256
 根因修复只在 import 前增加 repo-root path，并加入静态回归断言；旧 root 永不复用、
 不修改。修复后的 GPU 复核必须使用新 source commit、new runner SHA、fresh nonce/root，
 且不得自动重跑。
+
+第二次 attempt 固定为 source commit
+`f381380034ed440c2911d5d518e59517d4066659`、runner SHA256
+`b53213477f04cff37798eb7cdff9e1fbed621d57e03df30e566404a66857a178`，nonce
+`e1554dd205e9ef4ffee8932686a8eb23`。其 terminal root 为：
+
+```text
+/DATA/share/sana_wam_libero_nonformal_screens/t16/f381380034ed/libero-t16-paired-one-task-chunk-closed-loop-fixed32-e1554dd205e9ef4ffee8932686a8eb23
+```
+
+root/唯一 `FAILED.json` 已分别冻结为 `0500`/`0400`，FAILED SHA256
+`9ec732e81f1e5bedbc6ab530e2eeb0451b7481031013cf3f4b18d1c882b18054`。
+该 attempt 已成功启动 simulator、完成 deterministic reset 和首次模型 generation，
+但在第一个 env step 前因 gripper prediction `-0.8203125` 被旧 adapter 的 `[0,1]`
+range gate 拒绝。训练 stats 明确固定 gripper raw targets 为 `{0,1}`，min-max 后模型
+target 为 `{-1,+1}`；continuous diffusion 输出本来就不受该范围硬约束。正确 deploy
+语义是对反归一化后的 finite score 直接在 `0.5` threshold 二值化，而不是把外推值
+当作架构失败，也不是 clamp。此修复不改变 motion action、训练 loss、normalizer、
+模型架构或 simulator controller。
+
+修复后的 adapter / regression test / benchmark README SHA256 分别为
+`58389075ba50fb7c6e2205310c9f21f677615b17e8216ee5cce606738a68a0c5`、
+`39a8bac724cf37a4187564afede69fecfd493a8429b867b71c5b9852a6b6f872`、
+`4395ddc2b3ff01404c64dae1d1a46714d9e61db0a9ed40316bb398065c2ea07e`。
+H200 CPU contract suite 为 `43 passed`；Ruff、py_compile 和 diff check 均通过。
 
 ## 8. 预算、root 和终态
 

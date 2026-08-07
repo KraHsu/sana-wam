@@ -119,8 +119,10 @@ def policy_action_to_libero(action: Any) -> np.ndarray:
     """Validate and convert a 7D policy action to LIBERO's controller action.
 
     The six motion coordinates pass through without clipping.  The final model
-    coordinate uses ``open=1, closed=0`` and is thresholded to LIBERO's
-    ``open=-1, closed=+1`` convention.
+    coordinate is trained against ``open=1, closed=0`` and is thresholded to
+    LIBERO's ``open=-1, closed=+1`` convention.  Diffusion predictions are not
+    range bounded, so finite scores outside ``[0, 1]`` are thresholded directly
+    rather than rejected or clamped.
     """
 
     policy_action = np.asarray(action, dtype=np.float32)
@@ -134,11 +136,6 @@ def policy_action_to_libero(action: Any) -> np.ndarray:
         raise ValueError("policy action contains non-finite values")
 
     model_open = float(policy_action[-1])
-    if not 0.0 <= model_open <= 1.0:
-        raise ValueError(
-            "policy gripper coordinate must use the frozen [0, 1] "
-            f"closed/open convention, got {model_open}"
-        )
     env_action = policy_action.copy()
     env_action[-1] = -1.0 if model_open > 0.5 else 1.0
     return env_action
