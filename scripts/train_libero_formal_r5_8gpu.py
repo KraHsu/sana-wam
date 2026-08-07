@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "third_party" / "Sana"))
 
 CONFIG_RELATIVE_PATH = "configs/experiments/libero_formal_r5_8gpu_epoch1.yaml"
-RUN_NONCE = "02ca43f7e6097c4a045792c3766f2409"
+RUN_NONCE = "df0adf888731b5509987046a65328678"
 RUN_ROOT = Path(
     "/DATA/share/sana_wam_libero_training/formal_epoch1_r5/"
     "libero-ar-r5-causal1-warmstart-uniform-8gpu-1315-"
@@ -50,6 +50,14 @@ DIAGNOSTIC_RESULT = Path(
 )
 DIAGNOSTIC_RESULT_SHA256 = (
     "09a7e6ec01977dd4b3b374b1e0add75d32a694a092016a9d620f841b3a71ed70"
+)
+FAILED_R5_R0 = Path(
+    "/DATA/share/sana_wam_libero_training/formal_epoch1_r5/"
+    "libero-ar-r5-causal1-warmstart-uniform-8gpu-1315-"
+    "02ca43f7e6097c4a045792c3766f2409/FAILED.json"
+)
+FAILED_R5_R0_SHA256 = (
+    "1910cfab528427f464367c3a29911035b0e7b2d18aacf055a079d4a26f4997f6"
 )
 SANA_GITLINK = "16b9cec673e3335724ba2d8db25de7f9ed229292"
 STATS_SHA256 = "e5d985903539c1767a246e63c629b214c47c395d2000dee44122b8a0672253c7"
@@ -194,6 +202,7 @@ def _verify_config():
         "training.formal_non_resumable": True,
         "training.init_checkpoint": str(R4_ROOT / "checkpoint_step_2000.safetensors"),
         "training.init_checkpoint_sha256": R4_CHECKPOINT_SHA256,
+        "training.formal_failed_predecessor_r5_sha256": FAILED_R5_R0_SHA256,
         "model.architecture.action_loss_weighting": "none",
         "model.architecture.ar_attn_window": 1,
         "model.architecture.ar_action_horizon_rope": True,
@@ -231,6 +240,7 @@ def _verify_predecessors() -> dict[str, Any]:
     ):
         raise RuntimeError("R4 predecessor RESULT semantics differ")
     diagnostic = _verify_file(DIAGNOSTIC_RESULT, DIAGNOSTIC_RESULT_SHA256)
+    failed_r5_r0 = _verify_file(FAILED_R5_R0, FAILED_R5_R0_SHA256)
     diagnostic_payload = json.loads(DIAGNOSTIC_RESULT.read_text(encoding="utf-8"))
     if (
         diagnostic_payload.get("execution_result") != "PASS"
@@ -238,7 +248,18 @@ def _verify_predecessors() -> dict[str, Any]:
         != "VALID_MECHANICAL_DIAGNOSTIC_ALIGNMENT_FIXED_BUT_POLICY_NOT_SUCCESSFUL"
     ):
         raise RuntimeError("aligned action20 diagnostic semantics differ")
-    return {"r4_result": result, "r4_checkpoint": checkpoint, "diagnostic": diagnostic}
+    failed_payload = json.loads(FAILED_R5_R0.read_text(encoding="utf-8"))
+    if (
+        failed_payload.get("verdict") != "FAILED_CLOSED_NON_RESUMABLE"
+        or "torchrun failed with exit code 1" not in failed_payload.get("error", "")
+    ):
+        raise RuntimeError("R5-R0 failed predecessor semantics differ")
+    return {
+        "r4_result": result,
+        "r4_checkpoint": checkpoint,
+        "diagnostic": diagnostic,
+        "failed_r5_r0": failed_r5_r0,
+    }
 
 
 def _query_gpus(require_idle: bool) -> list[dict[str, Any]]:

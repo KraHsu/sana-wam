@@ -156,7 +156,7 @@ dataloader:
       - libero_goal_no_noops_1.0.0_lerobot:82
 
 training:
-  output_dir: /DATA/share/sana_wam_libero_training/formal_epoch1_r5/libero-ar-r5-causal1-warmstart-uniform-8gpu-1315-02ca43f7e6097c4a045792c3766f2409
+  output_dir: /DATA/share/sana_wam_libero_training/formal_epoch1_r5/libero-ar-r5-causal1-warmstart-uniform-8gpu-1315-df0adf888731b5509987046a65328678
   max_steps: 1315
   formal_final_step: 1315
   lr_schedule_steps: 1315
@@ -173,6 +173,7 @@ training:
   formal_predecessor_r4_result_sha256: 87448a3310075aac461ae279540501a75eda594fe47a5ec17296215e37ce1740
   formal_predecessor_r4_checkpoint_sha256: 324070da04f9d2d8543b550c11b40f5d94e9c57195166c963d97c13832ec400f
   formal_aligned_action20_diagnostic_result_sha256: 09a7e6ec01977dd4b3b374b1e0add75d32a694a092016a9d620f841b3a71ed70
+  formal_failed_predecessor_r5_sha256: 1910cfab528427f464367c3a29911035b0e7b2d18aacf055a079d4a26f4997f6
   init_checkpoint: /DATA/share/sana_wam_libero_training/formal2000/libero-ar-formal2000-r4-single-gpu-2000-9c7e8f1a64b24dc38ef0a9d6c27b5314/checkpoint_step_2000.safetensors
   init_checkpoint_sha256: 324070da04f9d2d8543b550c11b40f5d94e9c57195166c963d97c13832ec400f
   batch_size: 1

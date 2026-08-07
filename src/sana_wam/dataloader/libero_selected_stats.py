@@ -177,13 +177,33 @@ def _excluded_episode_pin(episode: LiberoEpisode) -> dict[str, Any]:
 
 
 def _assert_window_union_complete(
-    episodes: Sequence[LiberoEpisode], *, num_frames: int, window_stride: int
+    episodes: Sequence[LiberoEpisode],
+    *,
+    action_horizon: int,
+    window_stride: int,
+    require_full_action_horizon: bool,
+    include_terminal_full_horizon: bool,
 ) -> None:
     for episode in episodes:
         covered = np.zeros(episode.length - 1, dtype=np.bool_)
-        for start in range(0, episode.length - 1, window_stride):
-            actual_length = min(num_frames, episode.length - start)
-            covered[start : start + actual_length - 1] = True
+        if require_full_action_horizon:
+            terminal_start = episode.length - (action_horizon + 1)
+            starts = (
+                []
+                if terminal_start < 0
+                else list(range(0, terminal_start + 1, window_stride))
+            )
+            if (
+                include_terminal_full_horizon
+                and starts
+                and starts[-1] != terminal_start
+            ):
+                starts.append(terminal_start)
+        else:
+            starts = list(range(0, episode.length - 1, window_stride))
+        for start in starts:
+            actual_actions = min(action_horizon, episode.length - 1 - start)
+            covered[start : start + actual_actions] = True
         if not bool(covered.all()):
             missing = np.flatnonzero(~covered).tolist()
             raise ValueError(
@@ -196,22 +216,39 @@ def validate_libero_window_coverage_for_config(config: Any) -> None:
     """Check training-window coverage without making it population identity."""
 
     num_frames = _config_value(config, "dataloader.num_frames", 33)
+    action_horizon = _config_value(
+        config, "dataloader.action_horizon", num_frames - 1
+    )
     window_stride = _config_value(config, "dataloader.window_stride", 1)
+    require_full = _config_value(
+        config, "dataloader.require_full_action_horizon", False
+    )
+    include_terminal = _config_value(
+        config, "dataloader.include_terminal_full_horizon", False
+    )
     if (
         isinstance(num_frames, bool)
         or not isinstance(num_frames, int)
         or isinstance(window_stride, bool)
         or not isinstance(window_stride, int)
+        or isinstance(action_horizon, bool)
+        or not isinstance(action_horizon, int)
         or num_frames < 2
+        or action_horizon <= 0
         or window_stride <= 0
+        or not isinstance(require_full, bool)
+        or not isinstance(include_terminal, bool)
+        or (include_terminal and not require_full)
     ):
         raise ValueError("LIBERO training window fields are invalid")
     contract = selection_contract_from_config(config)
     selection = select_libero_episodes(**_selection_arguments(contract))
     _assert_window_union_complete(
         selection.selected,
-        num_frames=num_frames,
+        action_horizon=action_horizon,
         window_stride=window_stride,
+        require_full_action_horizon=require_full,
+        include_terminal_full_horizon=include_terminal,
     )
 
 
