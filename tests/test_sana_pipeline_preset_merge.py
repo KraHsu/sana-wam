@@ -44,6 +44,8 @@ def test_incremental_model_kwargs_extend_discovered_2b_preset(tmp_path, with_che
     assert kwargs["attn_type"] == "LiteLAReLURope"
     assert kwargs["ffn_type"] == "GLUMBConvTemp"
     assert kwargs["linear_head_dim"] == 112
+    assert kwargs["y_norm"] is True
+    assert kwargs["y_norm_scale_factor"] == 0.01
     assert kwargs["pred_sigma"] is False
     for key, value in extras.items():
         assert kwargs[key] == value

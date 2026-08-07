@@ -1180,6 +1180,7 @@ class Trainer:
     def _load_initial_checkpoint(self) -> None:
         checkpoint = self.t.get("init_checkpoint", None)
         expected = self.t.get("init_checkpoint_sha256", None)
+        explicit_allow_missing = self._init_checkpoint_allow_missing_patterns()
         has_checkpoint = checkpoint not in (None, "")
         has_digest = expected not in (None, "")
         if has_checkpoint != has_digest:
@@ -1187,6 +1188,11 @@ class Trainer:
                 "training.init_checkpoint and training.init_checkpoint_sha256 must be set together"
             )
         if not has_checkpoint:
+            if explicit_allow_missing:
+                raise ValueError(
+                    "training.init_checkpoint_allow_missing_patterns requires "
+                    "training.init_checkpoint"
+                )
             return
 
         checkpoint_path = self._verify_file_sha256(
@@ -1194,7 +1200,12 @@ class Trainer:
             expected,
             field_name="init_checkpoint",
         )
-        allow_missing = self._action_adapter_warm_start_contract(checkpoint_path)
+        adapter_allow_missing = self._action_adapter_warm_start_contract(
+            checkpoint_path
+        )
+        allow_missing = tuple(
+            dict.fromkeys((*explicit_allow_missing, *adapter_allow_missing))
+        )
         if allow_missing:
             self.architecture.load_checkpoint(
                 checkpoint_path,
@@ -1204,12 +1215,47 @@ class Trainer:
         else:
             self.architecture.load_checkpoint(checkpoint_path, strict=True)
         if _rank() == 0:
+            load_notes = []
+            if explicit_allow_missing:
+                load_notes.append(
+                    "explicit allowed-missing patterns="
+                    f"{explicit_allow_missing!r}"
+                )
+            if adapter_allow_missing:
+                load_notes.append("identity-init action video-memory adapter")
             logger.info(
                 "Initialized weights from %s (strict load%s; optimizer and LR "
                 "schedule start fresh)",
                 checkpoint_path,
-                ", identity-init action video-memory adapter" if allow_missing else "",
+                f", {', '.join(load_notes)}" if load_notes else "",
             )
+
+    def _init_checkpoint_allow_missing_patterns(self) -> tuple[str, ...]:
+        """Validate the explicit, narrowly-scoped checkpoint migration hatch."""
+        raw = self.t.get("init_checkpoint_allow_missing_patterns", None)
+        if raw is None:
+            return ()
+        patterns = self._as_config_list(
+            raw, "init_checkpoint_allow_missing_patterns"
+        )
+        normalized = []
+        for pattern in patterns:
+            if (
+                not isinstance(pattern, str)
+                or not pattern
+                or pattern.strip() != pattern
+            ):
+                raise ValueError(
+                    "training.init_checkpoint_allow_missing_patterns entries "
+                    "must be non-empty strings without surrounding whitespace"
+                )
+            if pattern in normalized:
+                raise ValueError(
+                    "duplicate training.init_checkpoint_allow_missing_patterns "
+                    f"entry: {pattern}"
+                )
+            normalized.append(pattern)
+        return tuple(normalized)
 
     def _action_adapter_warm_start_contract(
         self, checkpoint_path: str

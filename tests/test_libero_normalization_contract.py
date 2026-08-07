@@ -148,6 +148,29 @@ def test_deploy_config_cannot_override_saved_libero_identity() -> None:
     reject_libero_checkpoint_contract_overrides(saved, same)
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("y_norm", False), ("y_norm_scale_factor", 1.0)],
+)
+def test_deploy_config_cannot_override_saved_sana_text_norm(field, value) -> None:
+    saved = _libero_config()
+    OmegaConf.update(
+        saved, "model.video_backbone.model_kwargs.y_norm", True, merge=False
+    )
+    OmegaConf.update(
+        saved,
+        "model.video_backbone.model_kwargs.y_norm_scale_factor",
+        0.01,
+        merge=False,
+    )
+    deployed = OmegaConf.create(
+        {"model": {"video_backbone": {"model_kwargs": {field: value}}}}
+    )
+
+    with pytest.raises(ValueError, match=field):
+        reject_libero_checkpoint_contract_overrides(saved, deployed)
+
+
 def test_training_contract_rejects_model_or_temporal_semantic_drift() -> None:
     cfg = _libero_config()
     validate_libero_training_config(cfg)

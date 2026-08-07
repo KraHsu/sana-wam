@@ -76,6 +76,20 @@ class _WarmStartModel(_CheckpointModel):
         )
 
 
+class _WeightOnlyNorm(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.weight = nn.Parameter(torch.full((4,), 0.01))
+
+
+class _YNormWarmStartModel(_WarmStartModel):
+    def __init__(self):
+        super().__init__()
+        self.video_backbone = nn.Module()
+        self.video_backbone.dit = nn.Module()
+        self.video_backbone.dit.attention_y_norm = _WeightOnlyNorm()
+
+
 def _trainer_for(architecture, **training):
     trainer = object.__new__(Trainer)
     trainer.architecture = architecture
@@ -148,6 +162,100 @@ def test_trainer_loads_a_off_student_with_only_adapter_missing(tmp_path):
     assert torch.count_nonzero(adapter.k_right).item() == 0
     assert torch.count_nonzero(adapter.v_right).item() == 0
     assert torch.count_nonzero(adapter.z_logits).item() == 0
+
+
+def test_explicit_missing_pattern_merges_with_adapter_and_preserves_base_norm(
+    tmp_path,
+):
+    old = _CheckpointModel(adapter=False)
+    checkpoint = tmp_path / "pre_y_norm.safetensors"
+    BaseWAMArchitecture.save_checkpoint(old, str(checkpoint))
+    digest = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
+
+    student = _YNormWarmStartModel()
+    pretrained_norm = student.video_backbone.dit.attention_y_norm.weight.detach().clone()
+    trainer = _trainer_for(
+        student,
+        init_checkpoint=str(checkpoint),
+        init_checkpoint_sha256=digest,
+        init_checkpoint_allow_missing_patterns=[
+            "video_backbone.dit.attention_y_norm.weight"
+        ],
+    )
+    trainer._load_initial_checkpoint()
+
+    assert student.load_calls == [
+        (
+            str(checkpoint.resolve()),
+            True,
+            (
+                "video_backbone.dit.attention_y_norm.weight",
+                _ACTION_VIDEO_MEMORY_ADAPTER_PREFIX,
+            ),
+        )
+    ]
+    torch.testing.assert_close(
+        student.video_backbone.dit.attention_y_norm.weight,
+        pretrained_norm,
+        atol=0,
+        rtol=0,
+    )
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "video_backbone.dit.attention_y_norm.weight",
+        [1],
+        [""],
+        [" video_backbone.dit.attention_y_norm.weight"],
+    ],
+)
+def test_explicit_missing_patterns_require_strict_list_of_strings(value):
+    trainer = _trainer_for(
+        _CheckpointModel(adapter=False),
+        init_checkpoint_allow_missing_patterns=value,
+    )
+    with pytest.raises(ValueError, match="init_checkpoint_allow_missing_patterns"):
+        trainer._load_initial_checkpoint()
+
+
+def test_explicit_missing_pattern_does_not_tolerate_other_missing_keys(tmp_path):
+    checkpoint = tmp_path / "pre_y_norm.safetensors"
+    BaseWAMArchitecture.save_checkpoint(
+        _CheckpointModel(adapter=False), str(checkpoint)
+    )
+    digest = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
+    student = _YNormWarmStartModel()
+    trainer = _trainer_for(
+        student,
+        init_checkpoint=str(checkpoint),
+        init_checkpoint_sha256=digest,
+        init_checkpoint_allow_missing_patterns=["some_other_parameter"],
+    )
+
+    with pytest.raises(RuntimeError, match="attention_y_norm.weight"):
+        trainer._load_initial_checkpoint()
+
+
+def test_explicit_missing_pattern_never_tolerates_unexpected_keys(tmp_path):
+    state = _CheckpointModel(adapter=False).state_dict()
+    state["unexpected.weight"] = torch.ones(1)
+    checkpoint = tmp_path / "unexpected.safetensors"
+    _save_state(checkpoint, state)
+    digest = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
+    student = _YNormWarmStartModel()
+    trainer = _trainer_for(
+        student,
+        init_checkpoint=str(checkpoint),
+        init_checkpoint_sha256=digest,
+        init_checkpoint_allow_missing_patterns=[
+            "video_backbone.dit.attention_y_norm.weight"
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="unexpected.weight"):
+        trainer._load_initial_checkpoint()
 
 
 @pytest.mark.parametrize("mode", ["partial", "complete"])

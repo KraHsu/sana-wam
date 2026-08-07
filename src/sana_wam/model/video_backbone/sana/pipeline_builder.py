@@ -481,6 +481,8 @@ _SANA_VIDEO_2B_480P_PRESET: dict = {
     "linear_head_dim": 112,
     "ffn_type": "GLUMBConvTemp",
     "qk_norm": True,
+    "y_norm": True,
+    "y_norm_scale_factor": 0.01,
     "pred_sigma": False,
     "learn_sigma": False,
     "caption_channels": 2304,

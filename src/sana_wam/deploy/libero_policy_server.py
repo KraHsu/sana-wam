@@ -54,6 +54,8 @@ _CRITICAL_CHECKPOINT_PATHS = (
     "model.architecture.action_loss_weighting",
     "model.video_backbone.attn_kernel",
     "model.video_backbone.continuous_timestep_conditioning",
+    "model.video_backbone.model_kwargs.y_norm",
+    "model.video_backbone.model_kwargs.y_norm_scale_factor",
     "model.action_backbone.attn_kernel",
 )
 
