@@ -142,6 +142,6 @@ def test_ar_rollout_window_isolates_distant_past():
               video_steps=2, action_steps=2, action_tokens_per_chunk=2, seed=5)
     a = arch.ar_rollout(obs, **kw)
     a_b = arch.ar_rollout(obs_b, **kw)
-    # window=1: at step 2 (action frame 7) only frames >= 6 are visible; frame 0
+    # window=1: at step 2 (action frame 5) only frames >= 4 are visible; frame 0
     # (obs[0]) is long evicted -> step-2 action identical.
     torch.testing.assert_close(a[2], a_b[2], atol=1e-6, rtol=1e-5)

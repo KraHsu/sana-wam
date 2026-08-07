@@ -2080,36 +2080,23 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
         engine). Per step ``c`` with realized observation ``obs_latents[c]``:
 
         1. ``cache.clear_pred()`` then ingest the realized obs as a **confirmed**
-           clean video chunk at frame ``2c`` (LingBot stage 3: real obs replaces
-           the previous step's prediction).
-        2. Denoise the next video chunk (frame ``2c+2``) for ``video_steps``
-           flow-matching steps, each attending the windowed cached clean history;
-           store the prediction back into the cache as ``is_pred=True``.
-        3. Denoise the action chunk (frame ``2c+3``) — it sees the just-predicted
-           video chunk through the cache (``2c+2 <= 2c+2``) — then ingests itself
-           as **confirmed** clean history so future chunks condition on the
-           executed action (see :meth:`_denoise_action_chunk`). Returns its actions.
+           clean video chunk at frame ``2c``.
+        2. Denoise the aligned action chunk at frame ``2c+1``.  This exactly
+           matches training, where action chunk ``c`` attends clean video chunk
+           ``c``, and preserves the dataset's ``obs(t) -> action(t)`` contract.
+           The action is ingested as confirmed history for future chunks (see
+           :meth:`_denoise_action_chunk`).
 
         Returns a list of ``(B, action_tokens_per_chunk, action_dim)`` action
         chunks, one per step. The numerical *core* (cache + cache-aware attention)
         is proven equivalent to the training kernel (``test_sana_ar_inference``).
-        The frame *alignment* was checked against the LingBot-VA reference server
-        (``/mnt/cpfs/zch/lingbot-va/wan_va/wan_va_server.py`` ``_infer`` /
-        ``_compute_kv_cache``):
-
-        - Steady state MATCHES. Step ``c`` emits action chunk ``c+1`` conditioned
-          on confirmed real-obs history through chunk ``c`` plus the just-predicted
-          video chunk ``c+1`` — exactly LingBot's action chunk ``i`` (``i = c+1``)
-          at ``frame_st_id = i·fcs``, which sees confirmed obs through chunk
-          ``i-1`` plus its own ``update_cache=1`` predicted video. The
-          ``clear_pred`` + confirmed re-ingest of the next obs at the same even
-          frame id mirrors ``_compute_kv_cache`` (``clear_pred_cache`` +
-          ``update_cache=2``). Window units line up too: both axes advance by
-          ``fcs`` per chunk (video on even ids), so ``attn_window`` is comparable.
-
-        - F3 bootstrap is a chunk-0-only boundary special case: clamp the real
-          initial observation and emit chunk 0's action without a look-ahead video.
-          Chunks c>=1 always use the steady-state predicted-video path.
+        The previous LingBot-style look-ahead emitted frames ``1,5,7,...`` after
+        bootstrap, permanently skipping action frame 3 and pairing the observation
+        at chunk ``c`` with action chunk ``c+1``.  That temporal contract does not
+        match the LIBERO labels or this model's training mask.  Closed-loop rollout
+        therefore always emits action frames ``1,3,5,...`` from the corresponding
+        realized observations; ``video_steps`` is retained only for API/config
+        compatibility and no predicted video is generated in this path.
 
         RoPE uses absolute frame offsets (video ``rope_frame_index =
         arange(c*fcs, ...)``, action ``frame_ids = 2c+1``) so cached clean-K phases
@@ -2145,9 +2132,7 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
         cache = ARLinearStateCache(num_layers=vb.num_layers, window=window)
 
         # Flow-matching schedules (descending sigmas, 0 appended as final target).
-        vb.scheduler.set_timesteps(video_steps)
-        v_sigmas = [float(s) for s in vb.scheduler.sigmas.tolist()] + [0.0]
-        v_ts = vb.scheduler.timesteps
+        _ = video_steps  # closed-loop observed-action path predicts no video chunk
         ab.scheduler.set_timesteps(action_steps)
         a_sigmas = [float(s) for s in ab.scheduler.sigmas.tolist()] + [0.0]
         a_ts = ab.scheduler.timesteps
@@ -2183,51 +2168,19 @@ class DualSystemARArchitecture(DualSystemSelfAttnArchitecture):
                 v_proprio=v_pe,
             )
 
-            if self._ar_bootstrap_clean_prefix and c == 0:
-                # F3 bootstrap is an episode-boundary special case. Later chunks
-                # must exercise the steady-state imagination-conditioned path.
-                pred_action = self._denoise_action_chunk(
-                    driver,
-                    cache,
-                    frame_id=2 * c + 1,
-                    batch=B,
-                    action_tokens=action_tokens_per_chunk,
-                    a_sigmas=a_sigmas,
-                    a_ts=a_ts,
-                    context=step_ctx,
-                    context_mask=step_mask,
-                    gen=gen,
-                    a_proprio=a_pe,
-                )
-            else:
-                # Steady-state (default): predict next video chunk (frame 2c+2)...
-                pred_video = self._denoise_video_chunk(
-                    driver,
-                    cache,
-                    frame_id=2 * (c + 1),
-                    like=obs,
-                    v_sigmas=v_sigmas,
-                    v_ts=v_ts,
-                    context=step_ctx,
-                    context_mask=step_mask,
-                    gen=gen,
-                    v_proprio=v_pe,
-                )
-                # ...then the action chunk (frame 2c+3) conditioned on it.
-                pred_action = self._denoise_action_chunk(
-                    driver,
-                    cache,
-                    frame_id=2 * (c + 1) + 1,
-                    batch=B,
-                    action_tokens=action_tokens_per_chunk,
-                    a_sigmas=a_sigmas,
-                    a_ts=a_ts,
-                    context=step_ctx,
-                    context_mask=step_mask,
-                    gen=gen,
-                    a_proprio=a_pe,
-                )
-                del pred_video  # kept in the cache; free local
+            pred_action = self._denoise_action_chunk(
+                driver,
+                cache,
+                frame_id=2 * c + 1,
+                batch=B,
+                action_tokens=action_tokens_per_chunk,
+                a_sigmas=a_sigmas,
+                a_ts=a_ts,
+                context=step_ctx,
+                context_mask=step_mask,
+                gen=gen,
+                a_proprio=a_pe,
+            )
             actions_out.append(pred_action)
         return actions_out
 

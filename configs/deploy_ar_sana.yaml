@@ -21,8 +21,8 @@ server:
 # scripts/deploy.py); the engine also recomputes them defensively.
 # ---------------------------------------------------------------------------
 inference:
-  video_steps: 4              # flow-matching steps for each predicted video chunk
-  action_steps: 4             # flow-matching steps for each predicted action chunk
+  video_steps: 4              # retained for compatibility; closed-loop uses observed video
+  action_steps: 20            # full-noise action denoising validation
   # null matches training's ambient noise; set an int only for deterministic debugging.
   seed: null
   # Canonical-compatible default. ``paired`` derives a distinct stable RNG seed

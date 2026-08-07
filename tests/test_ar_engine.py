@@ -244,7 +244,7 @@ def test_engine_step_matches_ar_rollout_with_proprio():
 
 @requires_sana
 def test_engine_matches_ar_rollout_bootstrap_mode():
-    """F3 bootstrap applies at chunk 0; later chunks use steady-state imagination."""
+    """The closed-loop observed-action alignment is independent of video bootstrap."""
     torch.manual_seed(0)
     arch, vb, ab = _build_arch()
     arch._ar_bootstrap_clean_prefix = True
@@ -271,7 +271,8 @@ def test_engine_matches_ar_rollout_bootstrap_mode():
         a = engine._step_with_obs_latent(obs, context, seq_lens, proprio=None)
         torch.testing.assert_close(a, ref[c], atol=1e-6, rtol=1e-5)
 
-    # Bootstrap mode (act on current real obs) differs from steady-state (act on predicted video).
+    # Video bootstrap is a training/video-loss choice; closed-loop actions always
+    # use the aligned realized observation.
     arch._ar_bootstrap_clean_prefix = False
     ref_steady = arch.ar_rollout(
         obs_seq,
@@ -284,11 +285,12 @@ def test_engine_matches_ar_rollout_bootstrap_mode():
         action_tokens_per_chunk=2,
         seed=7,
     )
-    assert not torch.allclose(ref[0], ref_steady[0], atol=1e-5)
+    for aligned, steady in zip(ref, ref_steady):
+        torch.testing.assert_close(aligned, steady, atol=0, rtol=0)
 
 
 @requires_sana
-def test_bootstrap_only_fires_at_step_zero():
+def test_closed_loop_uses_observed_video_and_contiguous_action_frames():
     torch.manual_seed(0)
     arch, vb, ab = _build_arch()
     arch._ar_bootstrap_clean_prefix = True
@@ -299,14 +301,21 @@ def test_bootstrap_only_fires_at_step_zero():
         torch.randn(1, vb._dit.in_channels, 2, 8, 8, generator=g) for _ in range(3)
     ]
 
-    calls = []
-    original = arch._denoise_video_chunk
+    video_calls = []
+    action_calls = []
+    original_video = arch._denoise_video_chunk
+    original_action = arch._denoise_action_chunk
 
-    def spy(*args, **kwargs):
-        calls.append(kwargs.get("frame_id"))
-        return original(*args, **kwargs)
+    def video_spy(*args, **kwargs):
+        video_calls.append(kwargs.get("frame_id"))
+        return original_video(*args, **kwargs)
 
-    arch._denoise_video_chunk = spy
+    def action_spy(*args, **kwargs):
+        action_calls.append(kwargs.get("frame_id"))
+        return original_action(*args, **kwargs)
+
+    arch._denoise_video_chunk = video_spy
+    arch._denoise_action_chunk = action_spy
     try:
         arch.ar_rollout(
             obs_seq,
@@ -320,9 +329,11 @@ def test_bootstrap_only_fires_at_step_zero():
             seed=7,
         )
     finally:
-        arch._denoise_video_chunk = original
+        arch._denoise_video_chunk = original_video
+        arch._denoise_action_chunk = original_action
 
-    assert calls == [4, 6]
+    assert video_calls == []
+    assert action_calls == [1, 3, 5]
 
 
 @requires_sana
@@ -378,7 +389,10 @@ def test_engine_matches_ar_rollout_with_per_chunk_proprio():
 
 @pytest.mark.parametrize(
     "bootstrap,expected_order",
-    [(True, [("action", 1), ("obs", 2)]), (False, [("obs", 2), ("action", 3)])],
+    [
+        (True, [("action", 1), ("obs", 2)]),
+        (False, [("action", 1), ("obs", 2)]),
+    ],
 )
 @requires_sana
 def test_measured_feedback_replaces_previous_action_frame_in_causal_order(
@@ -462,7 +476,10 @@ def test_measured_feedback_replaces_previous_action_frame_in_causal_order(
 
 @pytest.mark.parametrize(
     "bootstrap,expected_order",
-    [(True, [("action", 1), ("obs", 2)]), (False, [("obs", 2), ("action", 3)])],
+    [
+        (True, [("action", 1), ("obs", 2)]),
+        (False, [("action", 1), ("obs", 2)]),
+    ],
 )
 @requires_sana
 def test_reencode_predicted_rebuilds_previous_chunk_in_causal_order(
@@ -553,13 +570,8 @@ def test_reencode_predicted_rebuilds_previous_chunk_in_causal_order(
         next(entry["S"] for entry in entries if entry["frame_id"] == action_frame)
         for entries in engine._cache._entries
     ]
-    if bootstrap:
-        for old, new in zip(old_states, new_states):
-            torch.testing.assert_close(new, old, atol=0, rtol=0)
-    else:
-        assert any(
-            not torch.equal(old, new) for old, new in zip(old_states, new_states)
-        )
+    for old, new in zip(old_states, new_states):
+        torch.testing.assert_close(new, old, atol=0, rtol=0)
 
 
 @requires_sana
@@ -1029,20 +1041,20 @@ def test_steady_feedback_commit_failure_restores_pre_step_cache(seed, feedback_m
         else torch.get_rng_state().clone()
     )
     pending_before = engine._pending_action_feedback
-    original_video = arch._denoise_video_chunk
+    original_action = arch._denoise_action_chunk
 
-    def fail_video(*args, **kwargs):
+    def fail_action(*args, **kwargs):
         torch.randn(1, generator=kwargs["gen"])
         raise RuntimeError("injected denoise failure")
 
-    arch._denoise_video_chunk = fail_video
+    arch._denoise_action_chunk = fail_action
     try:
         with pytest.raises(RuntimeError, match="denoise"):
             engine._step_with_obs_latent(
                 obs, context, seq_lens, proprio=None, feedback_plan=plan
             )
     finally:
-        arch._denoise_video_chunk = original_video
+        arch._denoise_action_chunk = original_action
 
     assert engine._step_c == 1
     assert engine._pending_action_feedback is pending_before

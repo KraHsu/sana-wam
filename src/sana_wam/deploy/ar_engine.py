@@ -11,7 +11,7 @@ re-runs from scratch each call.
 flow-matching schedules, monotonic RNG, step counter, prompt-context cache and a
 rolling pixel-frame buffer, and executes **exactly one AR step per ``generate``
 call** by reusing the architecture's own per-step helpers verbatim
-(``_rollout_step_context`` / ``_ingest_clean_video`` / ``_denoise_video_chunk`` /
+(``_rollout_step_context`` / ``_ingest_clean_video`` /
 ``_denoise_action_chunk``). Driving ``generate`` N times over the realized obs
 stream is therefore numerically identical to a single ``ar_rollout`` over those
 same observations (see ``tests/test_ar_rollout_engine.py`` equivalence gate).
@@ -45,8 +45,10 @@ Deploy-semantics knobs (eval-verification targets, handoff §2c F3/F4):
 - ``inference.ar_proprio_mode``: ``per_step`` (default) conditions each chunk on
   the current robot state; ``single`` latches the episode's first state (exact
   training-clip parity). This is the F4 train/inference choice to A/B at eval.
-- F3 bootstrap emits chunk 0 directly from the real initial observation. All
-  later chunks use the steady-state predicted-video path.
+- Every realized observation chunk ``c`` emits the aligned action chunk ``c``.
+  In interleaved frame ids this is video ``2c`` followed by action ``2c+1``;
+  closed-loop deployment must not skip action frame 3 or replace the observed
+  video condition with an untrained predicted-video look-ahead.
 """
 
 from __future__ import annotations
@@ -577,10 +579,10 @@ class ARInferenceEngine(BaseInferenceEngine):
         obs = obs_latent.to(device=self._device, dtype=self._dtype)
         c = self._step_c
         obs_frame_id = 2 * c
-        if feedback_plan is not None and feedback_plan["frame_id"] not in {
-            obs_frame_id - 1,
-            obs_frame_id + 1,
-        }:
+        if (
+            feedback_plan is not None
+            and feedback_plan["frame_id"] != obs_frame_id - 1
+        ):
             raise RuntimeError(
                 "action cache-feedback frame is not adjacent to the current observation: "
                 f"action={feedback_plan['frame_id']} obs={obs_frame_id}"
@@ -636,8 +638,6 @@ class ARInferenceEngine(BaseInferenceEngine):
                 context_mask=step_mask,
                 v_proprio=v_pe,
             )
-            if feedback_plan is not None and feedback_plan["frame_id"] > obs_frame_id:
-                self._last_feedback = self._commit_action_cache_feedback(feedback_plan)
         except Exception:
             if cache_snapshot is not None:
                 self._cache.restore_snapshot(cache_snapshot)
@@ -649,53 +649,25 @@ class ARInferenceEngine(BaseInferenceEngine):
                 ) = feedback_state
             raise
         try:
-            if getattr(arch, "_ar_bootstrap_clean_prefix", False) and c == 0:
-                # F3 bootstrap applies only at the episode boundary. Later chunks use
-                # the steady-state imagination-conditioned path.
-                pred_action = arch._denoise_action_chunk(
-                    self._driver,
-                    self._cache,
-                    frame_id=2 * c + 1,
-                    batch=obs.shape[0],
-                    action_tokens=self._action_tokens_per_chunk,
-                    a_sigmas=self._a_sigmas,
-                    a_ts=self._a_ts,
-                    context=step_ctx,
-                    context_mask=step_mask,
-                    gen=self._gen,
-                    a_proprio=a_pe,
-                )
-                action_frame_id = 2 * c + 1
-            else:
-                # Steady-state (default): predict next video chunk (frame 2c+2)...
-                pred_video = arch._denoise_video_chunk(
-                    self._driver,
-                    self._cache,
-                    frame_id=2 * (c + 1),
-                    like=obs,
-                    v_sigmas=self._v_sigmas,
-                    v_ts=self._v_ts,
-                    context=step_ctx,
-                    context_mask=step_mask,
-                    gen=self._gen,
-                    v_proprio=v_pe,
-                )
-                # ...then the action chunk (frame 2c+3) conditioned on it.
-                pred_action = arch._denoise_action_chunk(
-                    self._driver,
-                    self._cache,
-                    frame_id=2 * (c + 1) + 1,
-                    batch=obs.shape[0],
-                    action_tokens=self._action_tokens_per_chunk,
-                    a_sigmas=self._a_sigmas,
-                    a_ts=self._a_ts,
-                    context=step_ctx,
-                    context_mask=step_mask,
-                    gen=self._gen,
-                    a_proprio=a_pe,
-                )
-                action_frame_id = 2 * (c + 1) + 1
-                del pred_video  # kept alive in the cache; free local
+            # Training pairs clean video chunk c (frame 2c) with noisy action
+            # chunk c (frame 2c+1).  Emit that exact successor here.  The former
+            # look-ahead path generated video 2c+2 and action 2c+3, which skipped
+            # action frame 3 after bootstrap and conditioned actions on a video
+            # branch that R4 did not train.
+            action_frame_id = 2 * c + 1
+            pred_action = arch._denoise_action_chunk(
+                self._driver,
+                self._cache,
+                frame_id=action_frame_id,
+                batch=obs.shape[0],
+                action_tokens=self._action_tokens_per_chunk,
+                a_sigmas=self._a_sigmas,
+                a_ts=self._a_ts,
+                context=step_ctx,
+                context_mask=step_mask,
+                gen=self._gen,
+                a_proprio=a_pe,
+            )
             actions_normalized = pred_action.squeeze(0).float().cpu().numpy()
             actions = actions_normalized.copy()
             normalizer = getattr(self.architecture, "action_normalizer", None)
