@@ -22,6 +22,7 @@ import math
 import os
 import random
 import re
+import stat
 import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -70,6 +71,7 @@ class Trainer:
         *,
         launch_context=None,
         post_primary_afcc_authorized: bool = False,
+        exact_output_dir: str | os.PathLike[str] | None = None,
     ):
         # This is the direct-construction guard.  It must remain before CUDA,
         # datasets, model construction, checkpoint selection, and root writes.
@@ -82,6 +84,7 @@ class Trainer:
             raise TypeError("post_primary_afcc_authorized must be boolean")
         self._post_primary_afcc_authorized = post_primary_afcc_authorized
         self._phase6_launch_context = self._coerce_phase6_launch_context(launch_context)
+        self._exact_output_dir = self._validate_exact_output_dir(exact_output_dir)
         self._phase6_preflight_report = None
         self._phase6_preflight_report_bytes = None
         self._phase6_preflight_report_sha256 = None
@@ -98,6 +101,7 @@ class Trainer:
         if (
             self._phase6_launch_context is not None
             or self._post_primary_afcc_authorized
+            or self._exact_output_dir is not None
         ) and self.device.type != "cuda":
             raise RuntimeError("governed training requires one CUDA device")
         if torch.cuda.is_available():
@@ -392,6 +396,63 @@ class Trainer:
             self.t["actual_world_size"] = actual
         if _rank() == 0:
             logger.info("Verified distributed world size: %d", actual)
+
+    def _validate_exact_output_dir(
+        self, exact_output_dir: str | os.PathLike[str] | None
+    ) -> str | None:
+        """Bind an explicitly pre-created, non-symlink output root.
+
+        This narrow seam is used by the fail-closed LIBERO formal launcher.  It
+        deliberately does not create the directory and cannot be enabled by a
+        generic launcher argument alone: both the frozen config and the caller
+        must opt in to exactly the same absolute path.
+        """
+
+        enabled = self.t.get("exact_output_dir", False)
+        if type(enabled) is not bool:
+            raise ValueError("training.exact_output_dir must be boolean")
+        if not enabled:
+            if exact_output_dir is not None:
+                raise RuntimeError(
+                    "exact_output_dir argument requires training.exact_output_dir=true"
+                )
+            return None
+        if exact_output_dir is None:
+            raise RuntimeError(
+                "training.exact_output_dir=true requires the governed launcher argument"
+            )
+        if (
+            self._phase6_launch_context is not None
+            or self._post_primary_afcc_authorized
+        ):
+            raise RuntimeError(
+                "formal LIBERO exact output cannot be combined with another authority"
+            )
+        if self.cfg.dataloader.get("type", None) != "libero":
+            raise RuntimeError("exact output directory is restricted to LIBERO training")
+        if self.t.get("formal_libero_training", None) is not True:
+            raise RuntimeError("exact output directory requires formal LIBERO authority")
+        if self.t.get("formal_non_resumable", None) is not True:
+            raise RuntimeError("formal LIBERO training must be explicitly non-resumable")
+
+        configured = os.fspath(self.t.get("output_dir", ""))
+        supplied = os.fspath(exact_output_dir)
+        if not configured or not supplied:
+            raise RuntimeError("formal LIBERO output directory cannot be empty")
+        if not os.path.isabs(configured) or not os.path.isabs(supplied):
+            raise RuntimeError("formal LIBERO output directory must be absolute")
+        if os.path.normpath(configured) != configured or supplied != configured:
+            raise RuntimeError(
+                "formal LIBERO output argument differs from training.output_dir"
+            )
+        metadata = os.lstat(supplied)
+        if not stat.S_ISDIR(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
+            raise RuntimeError("formal LIBERO output root must be a real directory")
+        if os.path.realpath(supplied) != supplied:
+            raise RuntimeError("formal LIBERO output root ancestry must not use symlinks")
+        if int(self.t.get("expected_world_size", 0)) != 1:
+            raise RuntimeError("formal LIBERO exact-root training requires world size 1")
+        return supplied
 
     # ------------------------------------------------------------------ setup
     @staticmethod
@@ -2131,6 +2192,7 @@ class Trainer:
         t = self.t
         formal_phase6 = self._phase6_launch_context is not None
         formal_afcc = self._post_primary_afcc_authorized
+        formal_libero = self._exact_output_dir is not None
         governed_training = formal_phase6 or formal_afcc
         max_steps = int(t.max_steps)
         lr_schedule_steps = self._resolve_lr_schedule_steps(max_steps)
@@ -2156,6 +2218,22 @@ class Trainer:
             if save_at_steps != {504}:
                 raise RuntimeError(
                     "governed training permits only the step-504 checkpoint"
+                )
+        if formal_libero:
+            expected_save_contract = {
+                "keep_last_k": 1,
+                "max_steps": 2000,
+                "save_initial_checkpoint": False,
+                "save_steps": 0,
+            }
+            for key, expected in expected_save_contract.items():
+                if t.get(key, None) != expected:
+                    raise RuntimeError(
+                        f"formal LIBERO training requires training.{key}={expected!r}"
+                    )
+            if save_at_steps:
+                raise RuntimeError(
+                    "formal LIBERO training permits only the final step-2000 checkpoint"
                 )
         if formal_phase6:
             output_path = self._phase6_launch_context.run_directory
@@ -2183,6 +2261,10 @@ class Trainer:
             else:
                 afcc_metrics_stream = None
             metrics_writer = None
+        elif formal_libero:
+            output_path = self._validate_exact_output_dir(self._exact_output_dir)
+            metrics_writer = None
+            afcc_metrics_stream = None
         else:
             ts = time.strftime("%Y%m%d_%H%M%S") if not debug else "debug"
             output_path = os.path.join(str(t.get("output_dir", "outputs/ar_sana")), ts)
@@ -2229,7 +2311,7 @@ class Trainer:
         elif formal_afcc:
             self._validate_afcc_trainable_partition(named_trainables)
         optimizer_groups, master_pairs = self._optimizer_param_groups(model_groups)
-        if governed_training and (
+        if (governed_training or formal_libero) and (
             len(master_pairs) != len(params)
             or any(master.dtype != torch.float32 for _model, master in master_pairs)
         ):
@@ -2254,6 +2336,8 @@ class Trainer:
             )
 
         self._set_training_mode()
+        if formal_libero:
+            torch.cuda.reset_peak_memory_stats(self.device)
         step, epoch = 0, 0
         data_iter = iter(loader)
         optimizer.zero_grad(set_to_none=True)
@@ -2494,7 +2578,7 @@ class Trainer:
                         int(result.get("video_trajectory_supervised_state_index", -1)),
                     )
 
-            if not formal_phase6 and self._checkpoint_due(
+            if not formal_phase6 and not formal_libero and self._checkpoint_due(
                 step, save_steps, save_at_steps
             ):
                 self._save(output_path, step)
@@ -2513,6 +2597,43 @@ class Trainer:
             afcc_metrics_stream.flush()
             os.fsync(afcc_metrics_stream.fileno())
             afcc_metrics_stream.close()
+        elif formal_libero:
+            if step != 2000 or saved_steps:
+                raise RuntimeError(
+                    "formal LIBERO training did not complete exactly 2000 steps "
+                    "without an intermediate save"
+                )
+            final_loss = float(result["loss"].detach().float().item())
+            finite_state = {
+                "final_loss_finite": math.isfinite(final_loss),
+                "model_parameters_finite": self._phase6_tensors_finite(params),
+                "optimizer_master_parameters_finite": self._phase6_tensors_finite(
+                    [master for _model, master in master_pairs]
+                ),
+                "optimizer_state_finite": self._phase6_optimizer_state_finite(
+                    optimizer
+                ),
+            }
+            if not all(finite_state.values()):
+                raise RuntimeError(
+                    "formal LIBERO final model/master/optimizer state is non-finite"
+                )
+            self.formal_libero_run_summary = {
+                **finite_state,
+                "final_loss": final_loss,
+                "final_learning_rates": [
+                    float(group["lr"]) for group in optimizer.param_groups
+                ],
+                "optimizer_steps": step,
+                "peak_memory_reserved_bytes": int(
+                    torch.cuda.max_memory_reserved(self.device)
+                ),
+                "trainable_parameter_count": sum(
+                    parameter.numel() for parameter in params
+                ),
+                "trainable_parameter_tensor_count": len(params),
+            }
+            self._save(output_path, 2000)
         # Legacy final state is always present without a duplicate large file.
         elif step not in saved_steps:
             self._save(output_path, step)
@@ -2533,6 +2654,10 @@ class Trainer:
             self._save_post_primary_afcc(output_path, step)
             return
         ckpt = os.path.join(output_path, f"checkpoint_step_{step}.safetensors")
+        if self._exact_output_dir is not None and os.path.lexists(ckpt):
+            raise FileExistsError(
+                f"formal LIBERO checkpoint already exists: {ckpt}"
+            )
         save_config(output_path, self.cfg)
         self.architecture.save_checkpoint(ckpt)
         if self._phase6_launch_context is None:

@@ -1,0 +1,197 @@
+# Formal LIBERO-native AR training config following the successful T16 seam.
+#
+# The dedicated launcher supplies the execution authority.  This run is a
+# fresh initialization, single GPU, deliberately non-resumable 2000-step run
+# with one final checkpoint.  Any interruption requires a fresh root and seed
+# replay from step zero.
+
+model:
+  architecture:
+    framework: dual_system
+    variant: autoregressive
+    action_dim: 7
+    use_proprioception: true
+    state_dim: 8
+    delta_action: false
+    bridge_layers: null
+    bridge_interval: 1
+    mot_checkpoint_mixed_attn: true
+    attention_mask_mode: joint
+    video_attention_mask_mode: first_frame_causal
+    ar_frame_chunk_size: 2
+    # LIBERO episodes end at different lengths, so the final fixed-size window
+    # carries an explicit padded suffix.  The SANA AR padding contract requires
+    # every non-cached temporal operator to stay inside the physical AR chunk.
+    ar_chunkwise_temporal_ops: true
+    ar_attn_window: 72
+    ar_noisy_cond_prob: 0.5
+    ar_cond_max_ratio: 0.3
+    proprio_per_chunk: true
+    ar_bootstrap_clean_prefix: true
+    proprio_action_dropout_prob: 0.0
+    action_loss_weighting: low_noise
+    joint_graft: false
+    joint_graft_idx: null
+    joint_graft_every_n: 0
+  video_backbone:
+    name: sana_video_2b
+    model_path: /DATA/share/SANA-Video_2B_480p
+    freeze: false
+    attn_kernel: linear_relu
+    text_encoder_name: /DATA/share/gemma-2-2b-it
+    # Architecture-validation choice: preserve fractional video diffusion time
+    # in FP32 from the first update through deployment.  This is not an
+    # inference-only toggle and must not drift inside a checkpoint lineage.
+    continuous_timestep_conditioning: true
+    model_kwargs:
+      additional_flash_attn: window_flash
+      flash_attn_window_count: [1, 1, 4]
+      linear_feature_map: learnable
+  action_backbone:
+    dim: 1152
+    ffn_dim: 4608
+    attn_kernel: linear_relu
+
+dataloader:
+  type: libero
+  dataset_roots:
+    - /DATA/share/LIBERO/libero/libero_spatial_no_noops_1.0.0_lerobot
+    - /DATA/share/LIBERO/libero/libero_object_no_noops_1.0.0_lerobot
+    - /DATA/share/LIBERO/libero/libero_goal_no_noops_1.0.0_lerobot
+    - /DATA/share/LIBERO/libero/libero_10_no_noops_1.0.0_lerobot
+  # Reserved fresh path for exact selected-training-row statistics.  The
+  # existing sana_wam_libero_all_minmax_stats.npy is metadata-only smoke data
+  # and must not be pinned for training.
+  action_stats_path: /DATA/share/LIBERO/sana_wam_libero_train_all4_excl_goal82_stats_v2.npy
+  action_mode: libero_relative_eef
+  state_mode: libero_eef_axis_angle_gripper
+  normalize_mode: min-max
+  state_normalize_mode: min-max
+  num_frames: 113
+  video_stride: 4
+  temporal_compression: 4
+  causal_temporal: true
+  window_stride: 4
+  height: 384
+  width: 320
+  split: train
+  val_ratio: 0.0
+  repeat: 1
+  seed: 20260806
+  multiview: true
+  camera_layout: [head_camera, left_wrist_camera, right_wrist_camera]
+  target_camera: head_camera
+  training_video_rotation_degrees: 0
+  delta_action: false
+  filter_static_segments: false
+  verify_stats_source: true
+  verify_known_repairs: true
+  excluded_episodes:
+    - libero_goal_no_noops_1.0.0_lerobot:82
+  benchmark_contract:
+    schema_version: sana-wam-libero-policy-v1
+    benchmark: libero
+    dataloader_type: libero
+    action_mode: libero_relative_eef
+    state_mode: libero_eef_axis_angle_gripper
+    normalize_required: true
+    state_dim: 8
+    state_layout:
+      - eef_x
+      - eef_y
+      - eef_z
+      - eef_axis_angle_x
+      - eef_axis_angle_y
+      - eef_axis_angle_z
+      - gripper_qpos_0
+      - gripper_qpos_1
+    action_dim: 7
+    action_layout:
+      - delta_x
+      - delta_y
+      - delta_z
+      - delta_axis_angle_x
+      - delta_axis_angle_y
+      - delta_axis_angle_z
+      - open_gripper
+    action_representation: relative_delta_pose
+    action_output_space: denormalized_checkpoint_units
+    normalization:
+      action:
+        active: true
+        mode: min-max
+        stats_key: libero_relative_eef
+        dim: 7
+      state:
+        active: true
+        mode: min-max
+        stats_key: libero_eef_axis_angle_gripper
+        dim: 8
+    gripper:
+      model_open: 1.0
+      model_closed: 0.0
+      threshold: 0.5
+      env_open: -1.0
+      env_closed: 1.0
+    multiview: true
+    camera_layout: [head_camera, left_wrist_camera, right_wrist_camera]
+    camera_mapping:
+      agentview_image: head_camera
+      robot0_eye_in_hand_image: left_wrist_camera
+      missing: right_wrist_camera
+    missing_right_camera_fill: black
+    training_video_rotation_degrees: 0
+    simulator_video_rotation_degrees: 180
+    training_dataset_names:
+      - libero_spatial_no_noops_1.0.0_lerobot
+      - libero_object_no_noops_1.0.0_lerobot
+      - libero_goal_no_noops_1.0.0_lerobot
+      - libero_10_no_noops_1.0.0_lerobot
+    excluded_training_episodes:
+      - libero_goal_no_noops_1.0.0_lerobot:82
+
+training:
+  output_dir: /DATA/share/sana_wam_libero_training/formal2000/libero-ar-formal2000-single-gpu-2000-dba67fee2b53ecce092898c0a70144c4
+  max_steps: 2000
+  save_steps: 0
+  save_at_steps: []
+  save_initial_checkpoint: false
+  keep_last_k: 1
+  expected_world_size: 1
+  exact_output_dir: true
+  formal_libero_training: true
+  formal_non_resumable: true
+  formal_predecessor_t16_result_sha256: 5e2f5d61f7715f952f1762c04f5ad99891f9eda1ae5256310498c23146bcc471
+  batch_size: 1
+  gradient_accumulation_steps: 8
+  num_workers: 4
+  trainable_modules:
+    - action_backbone
+    - proprio_encoder
+    - proprio_video_embed
+    - proprio_action_embed
+  # Keep all video-backbone parameters frozen/eval while retaining autograd
+  # with respect to the trainable proprio_video_embed input seam.
+  preserve_frozen_input_grad_modules:
+    - video_backbone
+  # Trainer groups non-action top-level conditioning modules under video_lr;
+  # the video backbone itself is outside the allowlist and remains frozen.
+  video_lr: 1.0e-4
+  action_lr: 1.0e-4
+  # Keep optimizer arithmetic and sub-BF16 updates in persistent FP32 masters;
+  # BF16 model tensors remain the forward/backward storage.
+  optimizer_master_weights: true
+  weight_decay: 0.0
+  grad_clip: 1.0
+  warmup_steps: 100
+  lambda_video: 0.0
+  lambda_action: 1.0
+  use_gradient_checkpointing: true
+  deepspeed: null
+  seed: 20260807
+  debug: false
+  # Immutable selected-row v2 artifact materialized CPU-only on 2026-08-06.
+  action_stats_sha256: e5d985903539c1767a246e63c629b214c47c395d2000dee44122b8a0672253c7
+  # Must independently pin the selected-row v2 population manifest embedded
+  # in the stats artifact; metadata-only v1 stats have no admissible value.
+  action_stats_population_sha256: 7ed9772facf261299022e55169bcdaaa49fe3a7a20e0057e08cf419b5e584146
