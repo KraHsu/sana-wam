@@ -29,6 +29,7 @@ CONTROL_CHECKPOINT_SHA256 = (
 CONTROL_CONFIG_SHA256 = "b72152c5bd4e1ff16338e87bd7c2d1ea8e34f71484dec1d8d1dc60de389a2eef"
 CONTROL_RUNNER_SHA256 = "3dcdf563df4c384828b22837b8c0fce5911a40b55c2a12472d082172355d60de"
 CONTROL_AB_SHA256 = "1608f1c3b3f8151808fb85af7852c88a406c593e661ef5034b84f09948b73008"
+RUN_NONCE = "698541efd5c0b1c9f6b94cd5cbebf284"
 PATTERNS = [
     "action_backbone.*",
     "proprio_encoder.*",
@@ -71,6 +72,7 @@ def test_r11_config_is_exact_matched_taskbalanced_successor() -> None:
     assert cfg.model.architecture.action_loss_weighting == "none"
     assert cfg.training.initialization_seed == cfg.training.seed == 20260810
     assert cfg.training.init_checkpoint_sha256 == R8_CHECKPOINT_SHA256
+    assert str(cfg.training.output_dir).endswith(RUN_NONCE)
 
 
 def test_r11_config_binds_r8_and_all_matched_control_evidence() -> None:
@@ -116,6 +118,7 @@ def test_r11_runner_binds_evidence_before_root_creation() -> None:
 
 def test_r11_runner_declares_exact_partition_and_terminal_proofs() -> None:
     source = RUNNER.read_text(encoding="utf-8")
+    assert f'RUN_NONCE = "{RUN_NONCE}"' in source
     assert '"--nproc-per-node=8"' in source
     assert '"--max-restarts=0"' in source
     assert "SANA_WAM_R11_DIT_TRUNK_SUPERVISED_WORKER" in source
@@ -265,6 +268,19 @@ def test_composite_digest_is_name_and_value_sensitive() -> None:
     after = digest([("video_backbone.dit.blocks.0.weight", parameter)])
     assert before != after
     assert len(before) == len(after) == hashlib.sha256().digest_size * 2
+
+
+def test_scalar_bf16_digest_helpers_hash_storage_bytes_without_view_error() -> None:
+    namespace = _namespace()
+    scalar = torch.tensor(1.25, dtype=torch.bfloat16)
+    expected = hashlib.sha256(
+        scalar.contiguous().reshape(-1).view(torch.uint8).numpy().tobytes()
+    ).hexdigest()
+    assert namespace["_tensor_sha256"](scalar) == expected
+    composite = namespace["_composite_parameter_digest"]([("scalar", scalar)])
+    assert len(composite) == hashlib.sha256().digest_size * 2
+    source = RUNNER.read_text(encoding="utf-8")
+    assert source.count(".reshape(-1)") == 3
 
 
 def test_r11_runner_keeps_two_stage_terminal_commit() -> None:

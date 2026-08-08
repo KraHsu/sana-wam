@@ -38,7 +38,7 @@ MATCHED_CONTROL_CONFIG_RELATIVE_PATH = (
 MATCHED_CONTROL_RUNNER_RELATIVE_PATH = (
     "scripts/train_libero_formal_r8_taskbalanced_8gpu_successor1.py"
 )
-RUN_NONCE = "09f3eb85dbd8f8c6ea7116d096be3340"
+RUN_NONCE = "698541efd5c0b1c9f6b94cd5cbebf284"
 RUN_ROOT = Path(
     "/DATA/share/sana_wam_libero_training/formal_taskbalanced_r11_dit_trunk_adapt/"
     "libero-ar-r11-dit-trunk-taskbalanced-causal1-warmstart-8gpu-4340-"
@@ -190,6 +190,7 @@ def _tensor_sha256(tensor: Any) -> str:
         tensor.detach()
         .to(device="cpu")
         .contiguous()
+        .reshape(-1)
         .view(torch.uint8)
         .numpy()
         .tobytes()
@@ -622,7 +623,14 @@ def _composite_parameter_digest(
             "dtype": str(detached.dtype),
         }
         digest.update(_canonical_json_bytes(metadata))
-        raw = detached.to(device="cpu").contiguous().view(torch.uint8).numpy().tobytes()
+        raw = (
+            detached.to(device="cpu")
+            .contiguous()
+            .reshape(-1)
+            .view(torch.uint8)
+            .numpy()
+            .tobytes()
+        )
         digest.update(raw)
     return digest.hexdigest()
 
@@ -824,7 +832,9 @@ def _verify_saved_checkpoint_partitions(
                     {"name": name, "shape": list(tensor.shape), "dtype": str(tensor.dtype)}
                 )
             )
-            digest.update(tensor.contiguous().view(torch.uint8).numpy().tobytes())
+            digest.update(
+                tensor.contiguous().reshape(-1).view(torch.uint8).numpy().tobytes()
+            )
             parameter_count += tensor.numel()
         return {
             "tensor_count": len(keys),
