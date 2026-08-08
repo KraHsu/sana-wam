@@ -21,6 +21,11 @@ from sana_wam.dataloader.libero_selected_stats import (
     validate_libero_selected_stats_for_config,
     validate_libero_window_coverage_for_config,
 )
+from sana_wam.dataloader.libero_task_balanced_sampler import (
+    LIBERO_TASK_BALANCED_EXPECTED_TASKS,
+    LIBERO_TASK_BALANCED_SAMPLER_CONTRACT,
+    LiberoTaskBalancedDistributedSampler,
+)
 
 
 LIBERO_PRODUCTION_DATASET_ROOTS = tuple(
@@ -54,6 +59,9 @@ LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS = (
     "video_backbone.dit.blocks.*.attn.qkv.weight",
 )
 LIBERO_R10_QKV_ADAPT_EVAL_MODULES = ("video_backbone",)
+LIBERO_TASK_BALANCED_GLOBAL_DRAWS = 34_720
+LIBERO_TASK_BALANCED_DRAWS_PER_TASK = 868
+LIBERO_TASK_BALANCED_DRAWS_PER_RANK = 4_340
 
 
 def _config_value(config: Any, path: str, default: Any = None) -> Any:
@@ -194,6 +202,66 @@ def _validate_libero_trainable_config(config: Any) -> None:
             raise ValueError(f"R10-QKV-ADAPT requires {path} to be absent")
 
 
+def _validate_libero_sampler_config(config: Any, dataset: Any | None) -> None:
+    config = config if OmegaConf.is_config(config) else OmegaConf.create(config)
+    contract = _config_value(
+        config,
+        "training.libero_sampler_contract",
+        default=None,
+    )
+    if contract is None:
+        return
+    if contract != LIBERO_TASK_BALANCED_SAMPLER_CONTRACT:
+        raise ValueError(
+            f"unknown training.libero_sampler_contract: {contract!r}"
+        )
+    exact = {
+        "dataloader.repeat": 1,
+        "training.batch_size": 1,
+        "training.expected_global_batch_size": 8,
+        "training.expected_world_size": 8,
+        "training.formal_final_step": LIBERO_TASK_BALANCED_DRAWS_PER_RANK,
+        "training.gradient_accumulation_steps": 1,
+        "training.lr_schedule_steps": LIBERO_TASK_BALANCED_DRAWS_PER_RANK,
+        "training.max_steps": LIBERO_TASK_BALANCED_DRAWS_PER_RANK,
+    }
+    for path, expected in exact.items():
+        observed = OmegaConf.select(config, path, default=None)
+        if type(observed) is not type(expected) or observed != expected:
+            raise ValueError(
+                f"{LIBERO_TASK_BALANCED_SAMPLER_CONTRACT} requires "
+                f"{path}={expected!r}, got {observed!r}"
+            )
+    if dataset is None:
+        return
+    sampler = LiberoTaskBalancedDistributedSampler(
+        dataset,
+        num_replicas=8,
+        rank=0,
+        seed=int(OmegaConf.select(config, "training.seed", default=0)),
+    )
+    summary = sampler.audit_summary()
+    expected_summary = {
+        "task_count": LIBERO_TASK_BALANCED_EXPECTED_TASKS,
+        "input_window_count": 34_693,
+        "draws_per_task": LIBERO_TASK_BALANCED_DRAWS_PER_TASK,
+        "global_draw_count": LIBERO_TASK_BALANCED_GLOBAL_DRAWS,
+        "draws_per_rank": LIBERO_TASK_BALANCED_DRAWS_PER_RANK,
+        "max_draws_per_window": 2,
+        "window_draw_multiplicity_counts": {
+            "0": 4_353,
+            "1": 25_960,
+            "2": 4_380,
+        },
+    }
+    for key, expected in expected_summary.items():
+        if summary.get(key) != expected:
+            raise ValueError(
+                f"task-balanced materialized dataset {key} differs: "
+                f"expected {expected!r}, got {summary.get(key)!r}"
+            )
+
+
 def validate_libero_training_config(
     cfg: Any,
     *,
@@ -234,6 +302,7 @@ def validate_libero_training_config(
             )
 
     _validate_libero_trainable_config(config)
+    _validate_libero_sampler_config(config, dataset)
 
     contract = OmegaConf.select(config, "dataloader.benchmark_contract", default=None)
     if OmegaConf.is_config(contract):
@@ -301,6 +370,10 @@ __all__ = [
     "LIBERO_R10_QKV_ADAPT_TRAINABLE_CONTRACT",
     "LIBERO_R10_QKV_ADAPT_EVAL_MODULES",
     "LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS",
+    "LIBERO_TASK_BALANCED_DRAWS_PER_RANK",
+    "LIBERO_TASK_BALANCED_DRAWS_PER_TASK",
+    "LIBERO_TASK_BALANCED_GLOBAL_DRAWS",
+    "LIBERO_TASK_BALANCED_SAMPLER_CONTRACT",
     "validate_libero_production_stats_source_config",
     "validate_libero_training_config",
 ]

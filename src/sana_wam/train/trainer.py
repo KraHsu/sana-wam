@@ -35,6 +35,10 @@ from torch.utils.data import DataLoader, DistributedSampler
 
 from sana_wam.config import flatten_model_cfg
 from sana_wam.dataloader.mixture import build_training_dataset
+from sana_wam.dataloader.libero_task_balanced_sampler import (
+    LIBERO_TASK_BALANCED_SAMPLER_CONTRACT,
+    LiberoTaskBalancedDistributedSampler,
+)
 from sana_wam.model import build_architecture
 from sana_wam.train.checkpointing import (
     manage_checkpoints,
@@ -2526,8 +2530,28 @@ class Trainer:
         if not governed_training and self._save_initial_checkpoint(output_path):
             saved_steps.add(0)
 
+        libero_sampler_contract = self.t.get("libero_sampler_contract", None)
+        if libero_sampler_contract is not None and (
+            not isinstance(libero_sampler_contract, str)
+            or libero_sampler_contract != LIBERO_TASK_BALANCED_SAMPLER_CONTRACT
+        ):
+            raise RuntimeError(
+                "unknown training.libero_sampler_contract: "
+                f"{libero_sampler_contract!r}"
+            )
         if self._phase6_plan_sampler is not None:
+            if libero_sampler_contract is not None:
+                raise RuntimeError(
+                    "LIBERO task-balanced sampling cannot replace a Phase-6 plan"
+                )
             sampler = self._phase6_plan_sampler
+        elif libero_sampler_contract is not None:
+            sampler = LiberoTaskBalancedDistributedSampler(
+                self.dataset,
+                num_replicas=_world_size(),
+                rank=_rank(),
+                seed=self.base_seed,
+            )
         else:
             sampler = (
                 DistributedSampler(self.dataset, shuffle=True, seed=self.base_seed)
@@ -2973,6 +2997,10 @@ class Trainer:
                 ),
                 "final_model_state": final_model_state,
             }
+            if libero_sampler_contract is not None:
+                self.formal_libero_run_summary["task_balanced_sampler"] = (
+                    sampler.audit_summary()
+                )
             self._save(output_path, formal_final_step)
         # Legacy final state is always present without a duplicate large file.
         elif step not in saved_steps:
