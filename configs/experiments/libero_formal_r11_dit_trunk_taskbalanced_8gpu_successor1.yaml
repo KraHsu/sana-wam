@@ -168,7 +168,7 @@ dataloader:
       - libero_goal_no_noops_1.0.0_lerobot:82
 
 training:
-  output_dir: /DATA/share/sana_wam_libero_training/formal_taskbalanced_r11_dit_trunk_adapt/libero-ar-r11-dit-trunk-taskbalanced-causal1-warmstart-8gpu-4340-698541efd5c0b1c9f6b94cd5cbebf284
+  output_dir: /DATA/share/sana_wam_libero_training/formal_taskbalanced_r11_dit_trunk_adapt/libero-ar-r11-dit-trunk-taskbalanced-causal1-warmstart-8gpu-4340-f101d204c2c0242aae20e5fdf950e347
   max_steps: 4340
   formal_final_step: 4340
   lr_schedule_steps: 4340

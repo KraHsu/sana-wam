@@ -29,7 +29,7 @@ CONTROL_CHECKPOINT_SHA256 = (
 CONTROL_CONFIG_SHA256 = "b72152c5bd4e1ff16338e87bd7c2d1ea8e34f71484dec1d8d1dc60de389a2eef"
 CONTROL_RUNNER_SHA256 = "3dcdf563df4c384828b22837b8c0fce5911a40b55c2a12472d082172355d60de"
 CONTROL_AB_SHA256 = "1608f1c3b3f8151808fb85af7852c88a406c593e661ef5034b84f09948b73008"
-RUN_NONCE = "698541efd5c0b1c9f6b94cd5cbebf284"
+RUN_NONCE = "f101d204c2c0242aae20e5fdf950e347"
 PATTERNS = [
     "action_backbone.*",
     "proprio_encoder.*",
@@ -131,6 +131,8 @@ def test_r11_runner_declares_exact_partition_and_terminal_proofs() -> None:
     assert "all_20_block_composites_changed" in source
     assert "frozen_partitions_unchanged" in source
     assert "buffers_unchanged" in source
+    assert "runtime_all_named_buffers_unchanged" in source
+    assert "architecture_state_dict_persistent_only_v1" in source
     assert "rank_consensus" in source
     assert "FAILED_CLOSED_NON_RESUMABLE" in source
 
@@ -164,6 +166,9 @@ class _TinyArchitecture(nn.Module):
         self.proprio_action_embed = nn.Linear(2, 2)
         self.video_backbone = _TinyVideo()
         self.register_buffer("audit_buffer", torch.tensor([1.0]))
+        self.register_buffer(
+            "runtime_only_buffer", torch.tensor([2.0]), persistent=False
+        )
 
 
 class _TinyTrainer:
@@ -229,7 +234,9 @@ def test_materialized_partition_proves_exact_trunk_freeze_eval_and_optimizer_ids
     ] is True
     assert len(manifest["dit_trunk"]["block_composite_sha256"]) == 20
     assert set(manifest["frozen_partitions"]) == {"final_layer", "vae", "text_encoder"}
-    assert manifest["buffers"]["tensor_count"] == 1
+    assert manifest["buffers"]["tensor_count"] == 2
+    assert manifest["persistent_buffers"]["names"] == ["audit_buffer"]
+    assert manifest["nonpersistent_buffers"]["names"] == ["runtime_only_buffer"]
 
 
 def test_materialized_partition_rejects_training_video_or_optimizer_omission() -> None:
@@ -257,6 +264,55 @@ def test_each_block_and_trunk_digest_changes_independently_of_frozen_roots() -> 
         ]["block_composite_sha256"][index]
     assert before["frozen_partitions"] == after["frozen_partitions"]
     assert before["buffers"] == after["buffers"]
+
+
+def test_nonpersistent_buffer_is_runtime_hashed_but_not_required_in_safetensors(
+    tmp_path: Path,
+) -> None:
+    from safetensors.torch import save_file
+
+    ns, trainer = _tiny_manifest()
+    before = ns["_verify_materialized_trainable_partition"](trainer)
+    assert "runtime_only_buffer" not in trainer.architecture.state_dict()
+
+    with torch.no_grad():
+        trainer.architecture.runtime_only_buffer.add_(1.0)
+    after = ns["_verify_materialized_trainable_partition"](trainer)
+    assert before["buffers"]["composite_sha256"] != after["buffers"][
+        "composite_sha256"
+    ]
+    assert before["persistent_buffers"] == after["persistent_buffers"]
+    assert before["nonpersistent_buffers"]["composite_sha256"] != after[
+        "nonpersistent_buffers"
+    ]["composite_sha256"]
+
+    checkpoint = tmp_path / "tiny.safetensors"
+    save_file(
+        {
+            name: tensor.detach().cpu().contiguous()
+            for name, tensor in trainer.architecture.state_dict().items()
+        },
+        str(checkpoint),
+    )
+    saved = ns["_verify_saved_checkpoint_partitions"](
+        checkpoint,
+        dit_trunk_names=after["dit_trunk"]["names"],
+        frozen_names={
+            label: partition["names"]
+            for label, partition in after["frozen_partitions"].items()
+        },
+        persistent_buffer_names=after["persistent_buffers"]["names"],
+        expected_dit_trunk_sha256=after["dit_trunk"]["composite_sha256"],
+        expected_frozen_sha256={
+            label: partition["composite_sha256"]
+            for label, partition in after["frozen_partitions"].items()
+        },
+        expected_persistent_buffers_sha256=after["persistent_buffers"][
+            "composite_sha256"
+        ],
+    )
+    assert saved["buffer_contract"] == "architecture_state_dict_persistent_only_v1"
+    assert saved["persistent_buffers"]["tensor_count"] == 1
 
 
 def test_composite_digest_is_name_and_value_sensitive() -> None:

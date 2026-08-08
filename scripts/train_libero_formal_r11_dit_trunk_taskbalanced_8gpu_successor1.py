@@ -38,7 +38,7 @@ MATCHED_CONTROL_CONFIG_RELATIVE_PATH = (
 MATCHED_CONTROL_RUNNER_RELATIVE_PATH = (
     "scripts/train_libero_formal_r8_taskbalanced_8gpu_successor1.py"
 )
-RUN_NONCE = "698541efd5c0b1c9f6b94cd5cbebf284"
+RUN_NONCE = "f101d204c2c0242aae20e5fdf950e347"
 RUN_ROOT = Path(
     "/DATA/share/sana_wam_libero_training/formal_taskbalanced_r11_dit_trunk_adapt/"
     "libero-ar-r11-dit-trunk-taskbalanced-causal1-warmstart-8gpu-4340-"
@@ -635,6 +635,19 @@ def _composite_parameter_digest(
     return digest.hexdigest()
 
 
+def _named_tensor_manifest(
+    named_tensors: list[tuple[str, Any]], *, scope: str
+) -> dict[str, Any]:
+    """Describe one exact runtime tensor partition without changing hash semantics."""
+    return {
+        "scope": scope,
+        "names": [name for name, _ in named_tensors],
+        "tensor_count": len(named_tensors),
+        "element_count": sum(tensor.numel() for _, tensor in named_tensors),
+        "composite_sha256": _composite_parameter_digest(named_tensors),
+    }
+
+
 def _verify_materialized_trainable_partition(trainer: Any) -> dict[str, Any]:
     """Prove R11 opens only action/proprio plus the six DiT-trunk subtrees."""
     trainer._set_training_mode()
@@ -763,12 +776,28 @@ def _verify_materialized_trainable_partition(trainer: Any) -> dict[str, Any]:
     named_buffers = list(trainer.architecture.named_buffers())
     if not named_buffers:
         raise RuntimeError("R11 architecture buffer partition is empty")
-    buffer_manifest = {
-        "names": [name for name, _ in named_buffers],
-        "tensor_count": len(named_buffers),
-        "element_count": sum(buffer.numel() for _, buffer in named_buffers),
-        "composite_sha256": _composite_parameter_digest(named_buffers),
-    }
+    architecture_state_names = set(trainer.architecture.state_dict())
+    persistent_buffers = [
+        (name, buffer)
+        for name, buffer in named_buffers
+        if name in architecture_state_names
+    ]
+    nonpersistent_buffers = [
+        (name, buffer)
+        for name, buffer in named_buffers
+        if name not in architecture_state_names
+    ]
+    if len(persistent_buffers) + len(nonpersistent_buffers) != len(named_buffers):
+        raise RuntimeError("R11 architecture buffer persistence partition differs")
+    buffer_manifest = _named_tensor_manifest(
+        named_buffers, scope="runtime_all_named_buffers"
+    )
+    persistent_buffer_manifest = _named_tensor_manifest(
+        persistent_buffers, scope="architecture_state_dict_persistent_buffers"
+    )
+    nonpersistent_buffer_manifest = _named_tensor_manifest(
+        nonpersistent_buffers, scope="runtime_nonpersistent_buffers"
+    )
 
     return {
         "contract": TRAINABLE_CONTRACT,
@@ -802,6 +831,8 @@ def _verify_materialized_trainable_partition(trainer: Any) -> dict[str, Any]:
         },
         "frozen_partitions": frozen_partitions,
         "buffers": buffer_manifest,
+        "persistent_buffers": persistent_buffer_manifest,
+        "nonpersistent_buffers": nonpersistent_buffer_manifest,
         "pattern_tensor_counts": match_counts,
     }
 
@@ -811,12 +842,12 @@ def _verify_saved_checkpoint_partitions(
     *,
     dit_trunk_names: list[str],
     frozen_names: dict[str, list[str]],
-    buffer_names: list[str],
+    persistent_buffer_names: list[str],
     expected_dit_trunk_sha256: str,
     expected_frozen_sha256: dict[str, str],
-    expected_buffers_sha256: str,
+    expected_persistent_buffers_sha256: str,
 ) -> dict[str, Any]:
-    """Bind the saved checkpoint to changed trunk and unchanged frozen roots."""
+    """Bind saved state_dict tensors without requiring runtime-only buffers."""
     import torch
     from safetensors import safe_open
 
@@ -848,7 +879,7 @@ def _verify_saved_checkpoint_partitions(
         required = set(dit_trunk_names)
         for names in frozen_names.values():
             required.update(names)
-        required.update(buffer_names)
+        required.update(persistent_buffer_names)
         missing = sorted(required - keys)
         if missing:
             raise RuntimeError(f"R11 checkpoint omitted partition tensors: {missing[:20]}")
@@ -856,7 +887,7 @@ def _verify_saved_checkpoint_partitions(
         frozen = {}
         for label, names in frozen_names.items():
             frozen[label] = _digest_keys(checkpoint, names)
-        buffers = _digest_keys(checkpoint, buffer_names)
+        persistent_buffers = _digest_keys(checkpoint, persistent_buffer_names)
 
     if (
         trunk["tensor_count"] != EXPECTED_DIT_TRUNK_TENSORS
@@ -867,9 +898,17 @@ def _verify_saved_checkpoint_partitions(
     for label, expected in expected_frozen_sha256.items():
         if frozen.get(label, {}).get("composite_sha256") != expected:
             raise RuntimeError(f"R11 saved frozen {label} digest changed")
-    if buffers["composite_sha256"] != expected_buffers_sha256:
-        raise RuntimeError("R11 saved architecture buffer digest changed")
-    return {"dit_trunk": trunk, "frozen_partitions": frozen, "buffers": buffers}
+    if (
+        persistent_buffers["composite_sha256"]
+        != expected_persistent_buffers_sha256
+    ):
+        raise RuntimeError("R11 saved persistent architecture buffer digest changed")
+    return {
+        "dit_trunk": trunk,
+        "frozen_partitions": frozen,
+        "persistent_buffers": persistent_buffers,
+        "buffer_contract": "architecture_state_dict_persistent_only_v1",
+    }
 
 
 def _query_gpus(require_idle: bool) -> list[dict[str, Any]]:
@@ -1336,6 +1375,7 @@ def _worker(args: argparse.Namespace) -> None:
                 "all_20_block_composites_changed": True,
                 "frozen_partitions_unchanged": True,
                 "buffers_unchanged": True,
+                "runtime_all_named_buffers_unchanged": True,
             }
         except Exception as exc:
             local_error = f"{type(exc).__name__}: {exc}"
@@ -1617,6 +1657,8 @@ def _supervise(args: argparse.Namespace) -> None:
                 or trainable_partition.get("all_20_block_composites_changed") is not True
                 or trainable_partition.get("frozen_partitions_unchanged") is not True
                 or trainable_partition.get("buffers_unchanged") is not True
+                or trainable_partition.get("runtime_all_named_buffers_unchanged")
+                is not True
                 or trainable_partition.get("initial_dit_trunk_composite_sha256")
                 == dit_trunk_partition.get("composite_sha256")
                 or len(dit_trunk_partition.get("block_composite_sha256", {})) != 20
@@ -1632,7 +1674,9 @@ def _supervise(args: argparse.Namespace) -> None:
                     label: partition.get("names", [])
                     for label, partition in frozen_partitions.items()
                 },
-                buffer_names=trainable_partition.get("buffers", {}).get("names", []),
+                persistent_buffer_names=trainable_partition.get(
+                    "persistent_buffers", {}
+                ).get("names", []),
                 expected_dit_trunk_sha256=dit_trunk_partition.get(
                     "composite_sha256", ""
                 ),
@@ -1640,9 +1684,9 @@ def _supervise(args: argparse.Namespace) -> None:
                     label: partition.get("composite_sha256", "")
                     for label, partition in frozen_partitions.items()
                 },
-                expected_buffers_sha256=trainable_partition.get("buffers", {}).get(
-                    "composite_sha256", ""
-                ),
+                expected_persistent_buffers_sha256=trainable_partition.get(
+                    "persistent_buffers", {}
+                ).get("composite_sha256", ""),
             )
             result = {
                 "schema_version": "sana-wam-libero-r11-dit-trunk-result-v1",
