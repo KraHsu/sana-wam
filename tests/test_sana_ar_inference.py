@@ -143,3 +143,97 @@ def test_cache_rejects_duplicate_layer_frame():
     state = cache.windowed_state(0, 2, hi_inclusive=1)
     assert state is not None
     torch.testing.assert_close(state[0], S)
+
+
+def test_bfloat16_cache_state_and_query_share_fp32_operator_definition():
+    generator = torch.Generator().manual_seed(20260808)
+    shape = (1, 2, 3, 4)
+    tilde_q = torch.randn(shape, generator=generator).to(torch.bfloat16)
+    tilde_k = torch.randn(shape, generator=generator).to(torch.bfloat16)
+    value = torch.randn(shape, generator=generator).to(torch.bfloat16)
+    phi_q = (torch.rand(shape, generator=generator) + 0.25).to(torch.bfloat16)
+    phi_k = (torch.rand(shape, generator=generator) + 0.25).to(torch.bfloat16)
+
+    S, z = clean_state_from_tokens(tilde_k, value, phi_k)
+    expected_S, expected_z = clean_state_from_tokens(
+        tilde_k.float(), value.float(), phi_k.float()
+    )
+    assert S.dtype == z.dtype == torch.float32
+    assert torch.equal(S, expected_S)
+    assert torch.equal(z, expected_z)
+
+    # Direct low-precision writes are normalized too, so every cache reduction
+    # is fp32 even if a caller bypasses clean_state_from_tokens.
+    cache = ARLinearStateCache(num_layers=1, window=4)
+    cache.update(0, 0, S.to(torch.bfloat16), z.to(torch.bfloat16), is_pred=False)
+    win = cache.windowed_state(0, 1, hi_inclusive=0)
+    assert win is not None
+    assert win[0].dtype == win[1].dtype == torch.float32
+
+    output = ar_inference_attn(
+        tilde_q,
+        phi_q,
+        win,
+        tilde_k,
+        phi_k,
+        value,
+    )
+    fp32_output = ar_inference_attn(
+        tilde_q.float(),
+        phi_q.float(),
+        win,
+        tilde_k.float(),
+        phi_k.float(),
+        value.float(),
+    )
+    assert output.dtype == torch.bfloat16
+    assert torch.equal(output, fp32_output.to(torch.bfloat16))
+
+
+def test_bfloat16_cache_inference_matches_training_kernel():
+    meta = build_ar_seq_meta(
+        num_chunks=3,
+        video_tokens_per_chunk=2,
+        action_tokens_per_chunk=1,
+        window=3,
+    )
+    values = list(_rand(meta.frame_ids.numel(), B=1, H=2, d=4, seed=73))
+    values[3] = values[3] + 0.25
+    values[4] = values[4] + 0.25
+    tq, tk, value, pq, pk = (
+        tensor.to(torch.bfloat16) for tensor in values
+    )
+    training = _ar_chunked_linear_attn(tq, tk, value, pq, pk, meta)
+
+    cache = ARLinearStateCache(num_layers=1, window=10_000)
+    for frame_id in range(meta.num_frames):
+        selector = (meta.noise_ids == 1) & (meta.frame_ids == frame_id)
+        if not bool(selector.any()):
+            continue
+        index = selector.nonzero(as_tuple=False).squeeze(-1)
+        S, z = clean_state_from_tokens(
+            tk[:, :, index], value[:, :, index], pk[:, :, index]
+        )
+        assert S.dtype == z.dtype == torch.float32
+        cache.update(0, frame_id, S, z, is_pred=False)
+
+    for frame_id in range(meta.num_frames):
+        selector = (meta.noise_ids == 0) & (meta.frame_ids == frame_id)
+        if not bool(selector.any()):
+            continue
+        index = selector.nonzero(as_tuple=False).squeeze(-1)
+        win = cache.windowed_state(
+            0,
+            frame_id,
+            hi_inclusive=frame_id - 1,
+            window=meta.window,
+        )
+        inferred = ar_inference_attn(
+            tq[:, :, index],
+            pq[:, :, index],
+            win,
+            tk[:, :, index],
+            pk[:, :, index],
+            value[:, :, index],
+        )
+        assert torch.equal(inferred, training[:, :, index])

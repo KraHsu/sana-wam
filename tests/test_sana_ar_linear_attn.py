@@ -148,3 +148,59 @@ def test_window_truncates_history():
     # And the tight kernel must still match its own dense oracle.
     tight_ref = _ar_expanded_reference(tq, tk, v, pq, pk, meta_tight, eps=1e-12)
     torch.testing.assert_close(tight, tight_ref, atol=1e-9, rtol=1e-7)
+
+
+def test_bfloat16_kernel_uses_fp32_prefix_math_and_restores_output_dtype():
+    """Low-precision feature tracks enter one fp32 operator/state definition."""
+
+    class RecordingIdentityAdapter:
+        def __init__(self):
+            self.state_dtypes = []
+
+        def forward_delta(self, layer_id, S, z):  # noqa: N803
+            assert layer_id == 0
+            self.state_dtypes.append((S.dtype, z.dtype))
+            return torch.zeros_like(S), torch.zeros_like(z)
+
+    meta = build_ar_seq_meta(
+        num_chunks=2,
+        video_tokens_per_chunk=2,
+        action_tokens_per_chunk=2,
+        window=4,
+    )
+    values = list(_make_qkv(meta.frame_ids.numel(), B=1, H=2, d=4, seed=91))
+    values[3] = values[3] + 0.25
+    values[4] = values[4] + 0.25
+    low = tuple(
+        value.to(torch.bfloat16).detach().requires_grad_(True) for value in values
+    )
+
+    adapter = RecordingIdentityAdapter()
+    output, captured = _ar_chunked_linear_attn(
+        *low,
+        meta,
+        action_video_memory_adapter=adapter,
+        layer_id=0,
+        return_action_video_numerators=True,
+    )
+    fp32_output, fp32_captured = _ar_chunked_linear_attn(
+        *(value.detach().float() for value in low),
+        meta,
+        action_video_memory_adapter=RecordingIdentityAdapter(),
+        layer_id=0,
+        return_action_video_numerators=True,
+    )
+
+    assert output.dtype == captured.dtype == torch.bfloat16
+    assert adapter.state_dtypes
+    assert all(
+        state_dtype == normalizer_dtype == torch.float32
+        for state_dtype, normalizer_dtype in adapter.state_dtypes
+    )
+    assert torch.equal(output, fp32_output.to(torch.bfloat16))
+    assert torch.equal(captured, fp32_captured.to(torch.bfloat16))
+
+    (output.float().square().mean() + captured.float().square().mean()).backward()
+    assert all(value.grad is not None for value in low)
+    assert all(value.grad.dtype == torch.bfloat16 for value in low)
+    assert all(torch.isfinite(value.grad).all() for value in low)

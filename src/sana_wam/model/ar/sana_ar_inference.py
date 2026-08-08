@@ -30,6 +30,11 @@ from typing import Dict, List, Optional, Tuple
 import torch
 from torch import Tensor
 
+from .sana_ar_linear_attn import (
+    AR_LINEAR_ATTN_EPS,
+    _ar_attention_compute_dtype,
+)
+
 __all__ = ["ARLinearStateCache", "ar_inference_attn"]
 
 
@@ -122,6 +127,11 @@ class ARLinearStateCache:
         Evicts entries older than the sliding window relative to ``frame_id`` to
         keep the cache bounded (LingBot's ring buffer).
         """
+        # Cache entries are long-lived sufficient statistics.  Never retain
+        # low-precision S/z produced by a legacy or direct caller: doing so would
+        # make rollout numerics diverge from the fp32 training prefixes.
+        S = S.to(_ar_attention_compute_dtype(S.dtype))
+        z = z.to(_ar_attention_compute_dtype(z.dtype))
         entries = self._entries[layer_id]
         if any(entry["frame_id"] == int(frame_id) for entry in entries):
             raise ValueError(
@@ -199,6 +209,10 @@ def clean_state_from_tokens(
     ``S = Σ_j v_j ⊗ tilde_k_j`` ``(B, H, d, d)``; ``z = Σ_j phi_k_j`` ``(B, H, 1, d)``.
     All inputs ``(B, H, Nk, d)``.
     """
+    compute_dtype = _ar_attention_compute_dtype(v.dtype)
+    tilde_k = tilde_k.to(compute_dtype)
+    v = v.to(compute_dtype)
+    phi_k = phi_k.to(compute_dtype)
     S = v.transpose(-1, -2) @ tilde_k  # (B, H, d, d)
     z = phi_k.sum(dim=-2, keepdim=True)  # (B, H, 1, d)
     return S, z
@@ -211,7 +225,7 @@ def ar_inference_attn(
     tilde_k_self: Tensor,
     phi_k_self: Tensor,
     v_self: Tensor,
-    eps: float = 1e-15,
+    eps: float = AR_LINEAR_ATTN_EPS,
 ) -> Tensor:
     """One noisy chunk's dual-track linear attention against cache + own block.
 
@@ -225,8 +239,18 @@ def ar_inference_attn(
         The chunk's own noisy keys/values ``(B, H, Nk, d)`` — the within-frame
         ``noise2noise`` block.
     """
+    orig_dtype = v_self.dtype
+    compute_dtype = _ar_attention_compute_dtype(orig_dtype)
+    tilde_q = tilde_q.to(compute_dtype)
+    phi_q = phi_q.to(compute_dtype)
+    tilde_k_self = tilde_k_self.to(compute_dtype)
+    phi_k_self = phi_k_self.to(compute_dtype)
+    v_self = v_self.to(compute_dtype)
+
     if win_state is not None:
         S_win, z_win = win_state
+        S_win = S_win.to(compute_dtype)
+        z_win = z_win.to(compute_dtype)
         num = tilde_q @ S_win.transpose(-1, -2)  # (B, H, Nq, d)
         denom = phi_q @ z_win.transpose(-1, -2)  # (B, H, Nq, 1)
     else:
@@ -239,4 +263,5 @@ def ar_inference_attn(
     bb = phi_q @ phi_k_self.transpose(-1, -2)  # (B, H, Nq, Nk)
     num = num + a @ v_self
     denom = denom + bb.sum(dim=-1, keepdim=True)
-    return num / (denom + eps)
+    out = num / (denom + eps)
+    return out.to(orig_dtype) if compute_dtype != orig_dtype else out

@@ -83,12 +83,28 @@ from torch import Tensor
 from .sana_linear_attn import _expanded_linear_attn
 
 __all__ = [
+    "AR_LINEAR_ATTN_EPS",
     "ARSeqMeta",
     "build_ar_seq_meta",
     "ar_build_dense_mask",
     "_ar_expanded_reference",
     "_ar_chunked_linear_attn",
 ]
+
+
+AR_LINEAR_ATTN_EPS: float = 1e-8
+
+
+def _ar_attention_compute_dtype(dtype: torch.dtype) -> torch.dtype:
+    """Return the AR attention operator/state dtype for an input dtype.
+
+    Production fp16/bf16 feature tracks are always accumulated in fp32.  Keeping
+    fp32/fp64 callers unchanged preserves the high-precision oracle surface while
+    making the mixed-precision training and cache paths share one definition.
+    """
+    if dtype in (torch.float16, torch.bfloat16):
+        return torch.float32
+    return dtype
 
 
 @dataclass(frozen=True)
@@ -354,7 +370,7 @@ def _ar_expanded_reference(
     phi_q: Tensor,
     phi_k: Tensor,
     meta: ARSeqMeta,
-    eps: float = 1e-15,
+    eps: float = AR_LINEAR_ATTN_EPS,
 ) -> Tensor:
     """Ground-truth oracle: dense LingBot mask through the audited expanded path.
 
@@ -424,7 +440,7 @@ def _ar_chunked_linear_attn(
     phi_q: Tensor,
     phi_k: Tensor,
     meta: ARSeqMeta,
-    eps: float = 1e-15,
+    eps: float = AR_LINEAR_ATTN_EPS,
     *,
     action_video_memory_adapter=None,
     layer_id: Optional[int] = None,
@@ -448,6 +464,18 @@ def _ar_chunked_linear_attn(
         raise TypeError("return_action_video_numerators must be boolean")
 
     B, H, N, d = tilde_q.shape
+    orig_dtype = v.dtype
+    compute_dtype = _ar_attention_compute_dtype(orig_dtype)
+    if compute_dtype != orig_dtype:
+        # Feature mapping (ReLU/RoPE) happens in the caller.  From this boundary
+        # onward every operator and sufficient state is fp32 for fp16/bf16 runs:
+        # per-frame S/z, their prefixes, query-side num/denom, and the noisy
+        # within-frame block.  Cast only the public result back at the end.
+        tilde_q = tilde_q.to(compute_dtype)
+        tilde_k = tilde_k.to(compute_dtype)
+        v = v.to(compute_dtype)
+        phi_q = phi_q.to(compute_dtype)
+        phi_k = phi_k.to(compute_dtype)
     frame_ids = meta.frame_ids
     noise_ids = meta.noise_ids
     W = int(meta.window)
@@ -586,8 +614,9 @@ def _ar_chunked_linear_attn(
 
             out[:, :, qidx, :] = num / (denom + eps)
 
+    result = out.to(orig_dtype) if compute_dtype != orig_dtype else out
     if not return_action_video_numerators:
-        return out
+        return result
     expected_chunks = (G + 1) // 2
     if len(action_video_numerators) != expected_chunks:
         raise RuntimeError(
@@ -599,4 +628,7 @@ def _ar_chunked_linear_attn(
         raise RuntimeError(
             "action-facing numerator chunks have inconsistent query widths"
         )
-    return out, torch.stack(action_video_numerators, dim=1)
+    numerators = torch.stack(action_video_numerators, dim=1)
+    if compute_dtype != orig_dtype:
+        numerators = numerators.to(orig_dtype)
+    return result, numerators

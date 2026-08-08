@@ -17,6 +17,7 @@ import torch
 import torch.nn as nn
 
 from sana_wam.model.ar.sana_ar_linear_attn import (
+    AR_LINEAR_ATTN_EPS,
     _ar_expanded_reference,
     build_ar_seq_meta,
 )
@@ -68,6 +69,12 @@ def _rand_tracks(N, num_heads=2, head_dim=8, B=2, seed=0):
     pq = torch.randn(B, N, HD, generator=g, dtype=torch.float64).relu()
     pk = torch.randn(B, N, HD, generator=g, dtype=torch.float64).relu()
     return tq, tk, v, pq, pk
+
+
+def test_ar_driver_defaults_production_train_and_cache_to_r8_epsilon():
+    driver = _build_ar_driver()
+    assert AR_LINEAR_ATTN_EPS == 1e-8
+    assert driver.eps == AR_LINEAR_ATTN_EPS
 
 
 @pytest.mark.parametrize("num_chunks,vtok,atok,window", [(1, 2, 1, 99), (3, 2, 1, 99), (3, 3, 2, 2), (4, 2, 2, 1)])

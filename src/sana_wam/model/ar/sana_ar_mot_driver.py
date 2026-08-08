@@ -44,6 +44,7 @@ from sana_wam.model.ar.sana_ar_inference import (
     clean_state_from_tokens,
 )
 from sana_wam.model.ar.sana_ar_linear_attn import (
+    AR_LINEAR_ATTN_EPS,
     ARSeqMeta,
     _ar_chunked_linear_attn,
 )
@@ -61,6 +62,9 @@ class SanaARMoTJointDriver(SanaMoTJointDriver):
         self.action_video_memory_adapter = kwargs.pop(
             "action_video_memory_adapter", None
         )
+        # AR training and cache inference both pass ``self.eps`` to their shared
+        # fp32 attention definition.  Keep the non-AR driver default untouched.
+        kwargs.setdefault("eps", AR_LINEAR_ATTN_EPS)
         super().__init__(*args, **kwargs)
         self._ar_meta: Optional[ARSeqMeta] = None
         self._active_ar_layer_id: Optional[int] = None
