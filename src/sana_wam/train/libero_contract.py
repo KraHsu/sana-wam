@@ -212,18 +212,27 @@ def _validate_libero_sampler_config(config: Any, dataset: Any | None) -> None:
     if contract is None:
         return
     if contract != LIBERO_TASK_BALANCED_SAMPLER_CONTRACT:
+        raise ValueError(f"unknown training.libero_sampler_contract: {contract!r}")
+    balanced_rounds = _config_value(
+        config,
+        "training.balanced_rounds_in_this_run",
+        default=None,
+    )
+    if type(balanced_rounds) is not int or balanced_rounds <= 0:
         raise ValueError(
-            f"unknown training.libero_sampler_contract: {contract!r}"
+            f"{LIBERO_TASK_BALANCED_SAMPLER_CONTRACT} requires a positive integer "
+            "training.balanced_rounds_in_this_run"
         )
+    total_steps = LIBERO_TASK_BALANCED_DRAWS_PER_RANK * balanced_rounds
     exact = {
         "dataloader.repeat": 1,
         "training.batch_size": 1,
         "training.expected_global_batch_size": 8,
         "training.expected_world_size": 8,
-        "training.formal_final_step": LIBERO_TASK_BALANCED_DRAWS_PER_RANK,
+        "training.formal_final_step": total_steps,
         "training.gradient_accumulation_steps": 1,
-        "training.lr_schedule_steps": LIBERO_TASK_BALANCED_DRAWS_PER_RANK,
-        "training.max_steps": LIBERO_TASK_BALANCED_DRAWS_PER_RANK,
+        "training.lr_schedule_steps": total_steps,
+        "training.max_steps": total_steps,
     }
     for path, expected in exact.items():
         observed = OmegaConf.select(config, path, default=None)
