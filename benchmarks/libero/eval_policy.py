@@ -45,7 +45,7 @@ SUITE_STEP_BUDGETS = {
     "libero_goal": 300,
     "libero_10": 520,
 }
-DEFAULT_SETTLE_STEPS = 5
+DEFAULT_SETTLE_STEPS = 10
 DEFAULT_SETTLE_ACTION = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0)
 
 

@@ -104,7 +104,7 @@ def test_eval_module_only_imports_libero_lazily() -> None:
 
 
 def test_run_episode_settles_then_requests_one_action_per_policy_step() -> None:
-    env = FakeEnv(success_after_steps=8)
+    env = FakeEnv(success_after_steps=eval_policy.DEFAULT_SETTLE_STEPS + 3)
     policy = FakePolicy()
     result = eval_policy.run_episode(
         env=env,
@@ -118,7 +118,7 @@ def test_run_episode_settles_then_requests_one_action_per_policy_step() -> None:
         init_state="state-four",
         step_budget=20,
         dummy_action=eval_policy.DEFAULT_SETTLE_ACTION,
-        settle_steps=5,
+        settle_steps=eval_policy.DEFAULT_SETTLE_STEPS,
     )
 
     assert result.success is True
@@ -128,12 +128,12 @@ def test_run_episode_settles_then_requests_one_action_per_policy_step() -> None:
     )
     assert env.reset_count == 1
     assert env.init_states == ["state-four"]
-    assert len(env.actions) == 8
-    for action in env.actions[:5]:
+    assert len(env.actions) == eval_policy.DEFAULT_SETTLE_STEPS + 3
+    for action in env.actions[: eval_policy.DEFAULT_SETTLE_STEPS]:
         np.testing.assert_array_equal(
             action, np.asarray(eval_policy.DEFAULT_SETTLE_ACTION, dtype=np.float32)
         )
-    for action in env.actions[5:]:
+    for action in env.actions[eval_policy.DEFAULT_SETTLE_STEPS :]:
         assert action[0] == pytest.approx(0.1)
     assert len(policy.reset_calls) == 1
     assert len(policy.predict_observations) == result.policy_steps
@@ -159,7 +159,7 @@ def test_run_episode_stops_at_budget_without_hidden_retry() -> None:
     assert result.success is False
     assert result.policy_steps == 4
     assert policy.request_count == 4
-    assert len(env.actions) == 5 + 4
+    assert len(env.actions) == eval_policy.DEFAULT_SETTLE_STEPS + 4
 
 
 def test_evaluate_benchmark_uses_fixed_init_states_and_closes_each_env() -> None:
@@ -180,7 +180,7 @@ def test_evaluate_benchmark_uses_fixed_init_states_and_closes_each_env() -> None
         num_trials_per_task=2,
         suite="libero_spatial",
         seed=0,
-        settle_steps=5,
+        settle_steps=eval_policy.DEFAULT_SETTLE_STEPS,
         dummy_action=eval_policy.DEFAULT_SETTLE_ACTION,
         step_budgets=eval_policy.SUITE_STEP_BUDGETS,
         env_factory=env_factory,
@@ -212,7 +212,7 @@ def test_evaluate_benchmark_closes_environment_on_policy_failure() -> None:
             num_trials_per_task=1,
             suite="libero_spatial",
             seed=0,
-            settle_steps=5,
+            settle_steps=eval_policy.DEFAULT_SETTLE_STEPS,
             dummy_action=eval_policy.DEFAULT_SETTLE_ACTION,
             step_budgets=eval_policy.SUITE_STEP_BUDGETS,
             env_factory=lambda _task_id, _step_budget: env,
@@ -237,7 +237,7 @@ def test_evaluate_benchmark_refuses_to_repeat_fixed_init_states() -> None:
             num_trials_per_task=4,
             suite="libero_spatial",
             seed=0,
-            settle_steps=5,
+            settle_steps=eval_policy.DEFAULT_SETTLE_STEPS,
             dummy_action=eval_policy.DEFAULT_SETTLE_ACTION,
             step_budgets=eval_policy.SUITE_STEP_BUDGETS,
             env_factory=env_factory,
@@ -287,6 +287,7 @@ def test_policy_config_is_the_frozen_benchmark_contract(tmp_path) -> None:
     assert config["suite_max_steps"] == eval_policy.SUITE_STEP_BUDGETS
     assert config["state_dim"] == 8
     assert config["action_dim"] == 7
+    assert config["num_steps_wait"] == eval_policy.DEFAULT_SETTLE_STEPS
     assert config["dummy_action"] == list(eval_policy.DEFAULT_SETTLE_ACTION)
     assert config["model_noise_base_seed"] == 2026080601
     assert config["expected_server_contract"]["benchmark"] == "libero"
