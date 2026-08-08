@@ -24,6 +24,7 @@ from benchmarks.utils import client
 SUPPORTED_EVAL_SUITES = frozenset(
     {"libero_spatial", "libero_object", "libero_goal", "libero_10"}
 )
+SUPPORTED_IMAGE_TRANSPORT_CODECS = client.SUPPORTED_IMAGE_TRANSPORT_CODECS
 STATE_DIM = 8
 ACTION_DIM = 7
 
@@ -254,6 +255,7 @@ class LiberoPolicyClient:
         http_port: int = 8848,
         request_timeout: float = 300.0,
         send_state: bool = True,
+        image_transport_codec: str = "jpeg",
         expected_server_contract: Mapping[str, Any],
         model_noise_base_seed: int,
         run_nonce: str | None = None,
@@ -272,6 +274,13 @@ class LiberoPolicyClient:
         self.server = f"http://{host}:{http_port}"
         self.request_timeout = float(request_timeout)
         self.send_state = bool(send_state)
+        if image_transport_codec not in SUPPORTED_IMAGE_TRANSPORT_CODECS:
+            raise ValueError(
+                "image_transport_codec must be one of "
+                f"{sorted(SUPPORTED_IMAGE_TRANSPORT_CODECS)}, "
+                f"got {image_transport_codec!r}"
+            )
+        self.image_transport_codec = image_transport_codec
         if not isinstance(expected_server_contract, Mapping):
             raise TypeError("expected_server_contract must be a mapping")
         self.expected_server_contract = dict(expected_server_contract)
@@ -409,8 +418,12 @@ class LiberoPolicyClient:
         cameras = extract_libero_cameras(observation)
         state = extract_libero_state(observation) if self.send_state else None
         payload = client.build_payload(
-            head=client.encode_numpy_b64(cameras["head"]),
-            left_wrist=client.encode_numpy_b64(cameras["left"]),
+            head=client.encode_numpy_b64(
+                cameras["head"], codec=self.image_transport_codec
+            ),
+            left_wrist=client.encode_numpy_b64(
+                cameras["left"], codec=self.image_transport_codec
+            ),
             right_wrist=None,
             prompt=prompt,
             state=None if state is None else state.tolist(),

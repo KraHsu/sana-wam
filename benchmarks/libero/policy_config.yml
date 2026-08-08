@@ -17,6 +17,9 @@ host: "127.0.0.1"
 http_port: 8848
 request_timeout: 300
 model_noise_base_seed: 2026080601
+# Existing runs remain JPEG by default. Set this to `png` for the lossless
+# transport A/B; all simulator, policy, solver, and checkpoint settings stay fixed.
+image_transport_codec: jpeg
 
 # Project-specific sana-wam checkpoint observation contract. LIBERO itself can
 # expose additional state fields; this adapter intentionally pins the 8D schema

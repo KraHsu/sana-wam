@@ -7,9 +7,9 @@ Client → server contract (must match ``PolicyServer._decode_obs``):
 
     {
       "images": {
-        "head_camera":        <base64 JPEG>,       # required
-        "left_wrist_camera":  <base64 JPEG>|null,  # optional
-        "right_wrist_camera": <base64 JPEG>|null   # optional
+        "head_camera":        <base64 JPEG/PNG>,       # required
+        "left_wrist_camera":  <base64 JPEG/PNG>|null,  # optional
+        "right_wrist_camera": <base64 JPEG/PNG>|null   # optional
       },
       "prompt": "<base task prompt>",
       "state":  [float, ...]                       # optional
@@ -27,6 +27,9 @@ from pathlib import Path
 from typing import Optional
 from urllib import error as _urlerror
 from urllib import request
+
+
+SUPPORTED_IMAGE_TRANSPORT_CODECS = frozenset({"jpeg", "png"})
 
 
 class ServerError(RuntimeError):
@@ -77,8 +80,11 @@ def encode_path_b64(path: str) -> str:
     return base64.b64encode(Path(path).read_bytes()).decode("utf-8")
 
 
-def encode_numpy_b64(image) -> str:
-    """Encode an H×W×3 RGB uint8 numpy array as base64 JPEG at source resolution.
+def encode_numpy_b64(image, *, codec: str = "jpeg") -> str:
+    """Encode an H×W×3 RGB uint8 array as base64 JPEG or PNG.
+
+    ``jpeg`` remains the default for existing callers. ``png`` provides a
+    lossless transport for controlled train/eval preprocessing comparisons.
 
     **Do not resize on the client.** All crop / resize / multi-view
     composition happens server-side using the canvas size and interpolation
@@ -94,8 +100,13 @@ def encode_numpy_b64(image) -> str:
 
     from PIL import Image
 
+    if codec not in SUPPORTED_IMAGE_TRANSPORT_CODECS:
+        raise ValueError(
+            "image transport codec must be one of "
+            f"{sorted(SUPPORTED_IMAGE_TRANSPORT_CODECS)}, got {codec!r}"
+        )
     buf = io.BytesIO()
-    Image.fromarray(image).save(buf, format="JPEG")
+    Image.fromarray(image).save(buf, format={"jpeg": "JPEG", "png": "PNG"}[codec])
     return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 

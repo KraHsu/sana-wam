@@ -290,7 +290,34 @@ def test_policy_config_is_the_frozen_benchmark_contract(tmp_path) -> None:
     assert config["num_steps_wait"] == eval_policy.DEFAULT_SETTLE_STEPS
     assert config["dummy_action"] == list(eval_policy.DEFAULT_SETTLE_ACTION)
     assert config["model_noise_base_seed"] == 2026080601
+    assert config["image_transport_codec"] == "jpeg"
     assert config["expected_server_contract"]["benchmark"] == "libero"
+
+    png_config = copy.deepcopy(config)
+    png_config["image_transport_codec"] = "png"
+    png_path = tmp_path / "png-transport.yml"
+    png_path.write_text(yaml.safe_dump(png_config), encoding="utf-8")
+    assert (
+        eval_policy.load_and_validate_config(png_path)["image_transport_codec"] == "png"
+    )
+
+    legacy_config = copy.deepcopy(config)
+    legacy_config.pop("image_transport_codec")
+    legacy_path = tmp_path / "legacy-jpeg-transport.yml"
+    legacy_path.write_text(yaml.safe_dump(legacy_config), encoding="utf-8")
+    assert (
+        eval_policy.load_and_validate_config(legacy_path)["image_transport_codec"]
+        == "jpeg"
+    )
+
+    invalid_transport = copy.deepcopy(config)
+    invalid_transport["image_transport_codec"] = "webp"
+    invalid_transport_path = tmp_path / "invalid-transport.yml"
+    invalid_transport_path.write_text(
+        yaml.safe_dump(invalid_transport), encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="image_transport_codec"):
+        eval_policy.load_and_validate_config(invalid_transport_path)
 
     drifted = copy.deepcopy(config)
     drifted["action_dim"] = 14

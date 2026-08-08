@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import ast
+import base64
+import io
 from pathlib import Path
 
 import numpy as np
 import pytest
 import yaml
+from PIL import Image
 
 from benchmarks.libero import sana_wam2libero_interface as adapter
+from benchmarks.utils import client as benchmark_client
 
 
 def _observation() -> dict:
@@ -116,6 +120,20 @@ def test_camera_mapping_rejects_wrong_shape_or_dtype() -> None:
     observation["agentview_image"] = np.zeros((4, 4, 3), dtype=np.float32)
     with pytest.raises(ValueError, match="uint8"):
         adapter.extract_libero_cameras(observation)
+
+
+def test_numpy_transport_defaults_to_jpeg_and_png_is_lossless() -> None:
+    image = _observation()["agentview_image"]
+    jpeg = base64.b64decode(benchmark_client.encode_numpy_b64(image))
+    assert jpeg.startswith(b"\xff\xd8\xff")
+
+    png = base64.b64decode(benchmark_client.encode_numpy_b64(image, codec="png"))
+    assert png.startswith(b"\x89PNG\r\n\x1a\n")
+    decoded = np.asarray(Image.open(io.BytesIO(png)).convert("RGB"))
+    np.testing.assert_array_equal(decoded, image)
+
+    with pytest.raises(ValueError, match="image transport codec"):
+        benchmark_client.encode_numpy_b64(image, codec="webp")
 
 
 def test_policy_action_passes_motion_and_maps_gripper() -> None:
@@ -263,7 +281,10 @@ def test_http_client_uses_named_reset_and_one_current_observation(monkeypatch) -
             "duplicate": False,
         }
 
-    def fake_encode(image):
+    encoded_codecs = []
+
+    def fake_encode(image, *, codec="jpeg"):
+        encoded_codecs.append(codec)
         return f"encoded-{int(np.asarray(image).sum())}"
 
     def fake_post(server, endpoint, payload, timeout=300):
@@ -284,6 +305,7 @@ def test_http_client_uses_named_reset_and_one_current_observation(monkeypatch) -
         host="policy.local",
         http_port=9988,
         request_timeout=12,
+        image_transport_codec="png",
         expected_server_contract=_expected_server_contract(),
         model_noise_base_seed=1234,
         run_nonce="test-run",
@@ -320,6 +342,8 @@ def test_http_client_uses_named_reset_and_one_current_observation(monkeypatch) -
     assert payload["images"]["head_camera"].startswith("encoded-")
     assert payload["images"]["left_wrist_camera"].startswith("encoded-")
     assert payload["images"]["right_wrist_camera"] is None
+    assert encoded_codecs == ["png", "png"]
+    assert policy.image_transport_codec == "png"
     assert len(payload["state"]) == 8
     assert payload["prompt"] == "pick the bowl"
     np.testing.assert_allclose(action[:6], [0.1, -0.2, 0.3, -0.4, 0.5, -0.6])
@@ -351,7 +375,9 @@ def test_http_client_rejects_missing_or_out_of_sequence_server_step(
         }
 
     monkeypatch.setattr(adapter.client, "reset", fake_reset)
-    monkeypatch.setattr(adapter.client, "encode_numpy_b64", lambda _image: "image")
+    monkeypatch.setattr(
+        adapter.client, "encode_numpy_b64", lambda _image, **_kwargs: "image"
+    )
     monkeypatch.setattr(
         adapter.client,
         "post",

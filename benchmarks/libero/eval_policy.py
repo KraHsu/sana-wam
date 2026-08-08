@@ -34,6 +34,7 @@ from benchmarks.libero.sana_wam2libero_interface import (  # noqa: E402
     ACTION_DIM,
     STATE_DIM,
     SUPPORTED_EVAL_SUITES,
+    SUPPORTED_IMAGE_TRANSPORT_CODECS,
     LiberoPolicyClient,
 )
 
@@ -104,6 +105,16 @@ def load_and_validate_config(path: str | os.PathLike[str]) -> dict[str, Any]:
                 f"LIBERO config contract mismatch for {key}: "
                 f"expected {expected!r}, got {config.get(key)!r}"
             )
+    image_transport_codec = config.get("image_transport_codec", "jpeg")
+    if image_transport_codec not in SUPPORTED_IMAGE_TRANSPORT_CODECS:
+        raise ValueError(
+            "image_transport_codec must be one of "
+            f"{sorted(SUPPORTED_IMAGE_TRANSPORT_CODECS)}, "
+            f"got {image_transport_codec!r}"
+        )
+    # Preserve backward compatibility for config files created before this
+    # option existed while making the resolved transport explicit in receipts.
+    config["image_transport_codec"] = image_transport_codec
     if config.get("send_state") is not True:
         raise ValueError("LIBERO benchmark v1 requires send_state: true")
     if config.get("state_layout") != [
@@ -658,6 +669,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         http_port=http_port,
         request_timeout=float(config["request_timeout"]),
         send_state=True,
+        image_transport_codec=config["image_transport_codec"],
         expected_server_contract=config["expected_server_contract"],
         model_noise_base_seed=config["model_noise_base_seed"],
         run_nonce=run_nonce,
@@ -676,6 +688,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "seed": seed,
         "camera_height": camera_height,
         "camera_width": camera_width,
+        "image_transport_codec": policy.image_transport_codec,
         "settle_steps": config["num_steps_wait"],
         "dummy_action": config["dummy_action"],
         "model_noise_base_seed": config["model_noise_base_seed"],
