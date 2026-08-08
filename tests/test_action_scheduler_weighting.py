@@ -42,3 +42,20 @@ def test_low_noise_mode_is_monotonic_and_normalized():
 def test_unknown_mode_raises():
     with pytest.raises(ValueError, match="Unknown ActionScheduler loss_weighting"):
         _weights("bogus")
+
+
+@pytest.mark.parametrize("mode", ["none", "bsmntw", "low_noise"])
+def test_training_loss_weighting_does_not_change_inference_schedule(mode):
+    reference = ActionScheduler()
+    reference.set_timesteps(20, shift=5.0, training=False)
+    candidate = ActionScheduler()
+    candidate.set_timesteps(
+        20,
+        shift=5.0,
+        training=False,
+        loss_weighting=mode,
+    )
+
+    torch.testing.assert_close(candidate.timesteps, reference.timesteps)
+    torch.testing.assert_close(candidate.sigmas, reference.sigmas)
+    assert candidate.linear_timesteps_weights is None

@@ -70,6 +70,7 @@ def test_policy_server_exposes_libero_checkpoint_compatibility_identity() -> Non
                     "state_dim": 8,
                     "use_proprioception": True,
                     "delta_action": False,
+                    "action_loss_weighting": "low_noise",
                 },
                 "video_backbone": {"continuous_timestep_conditioning": True},
             },
@@ -120,6 +121,7 @@ def test_policy_server_exposes_libero_checkpoint_compatibility_identity() -> Non
     ]
     assert identity["target_camera"] == "head_camera"
     assert identity["benchmark_contract"] == expected
+    assert identity["train_deploy_parity"]["action_loss_weighting"] == "low_noise"
     assert identity["normalizers"] == {
         "action": {
             "active": True,
@@ -164,6 +166,24 @@ def _parity_configs():
 
 def test_train_deploy_parity_accepts_matching_temporal_contract() -> None:
     training, runtime = _parity_configs()
+    validate_libero_train_deploy_parity(training, runtime)
+
+
+def test_train_deploy_parity_binds_frozen_low_noise_weighting() -> None:
+    training, runtime = _parity_configs()
+    training.model.architecture.action_loss_weighting = "low_noise"
+    runtime.model.architecture.action_loss_weighting = "low_noise"
+    validate_libero_train_deploy_parity(training, runtime)
+
+    runtime.model.architecture.action_loss_weighting = "none"
+    with pytest.raises(ValueError, match="action_loss_weighting='low_noise'"):
+        validate_libero_train_deploy_parity(training, runtime)
+
+
+def test_train_deploy_parity_defaults_legacy_missing_weighting_to_none() -> None:
+    training, runtime = _parity_configs()
+    del training.model.architecture.action_loss_weighting
+    del runtime.model.architecture.action_loss_weighting
     validate_libero_train_deploy_parity(training, runtime)
 
 

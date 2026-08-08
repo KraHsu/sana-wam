@@ -163,6 +163,20 @@ def test_deploy_config_cannot_override_saved_libero_identity() -> None:
     same = OmegaConf.create({"dataloader": {"action_mode": "libero_relative_eef"}})
     reject_libero_checkpoint_contract_overrides(saved, same)
 
+    OmegaConf.update(
+        saved,
+        "model.architecture.action_loss_weighting",
+        "low_noise",
+        merge=False,
+    )
+    with pytest.raises(ValueError, match="action_loss_weighting"):
+        reject_libero_checkpoint_contract_overrides(
+            saved,
+            OmegaConf.create(
+                {"model": {"architecture": {"action_loss_weighting": "none"}}}
+            ),
+        )
+
 
 @pytest.mark.parametrize(
     ("field", "value"),
@@ -222,6 +236,31 @@ def test_training_contract_rejects_model_or_temporal_semantic_drift() -> None:
         merge=False,
     )
     with pytest.raises(ValueError, match="optimizer_master_weights"):
+        validate_libero_training_config(cfg)
+
+
+@pytest.mark.parametrize("mode", [None, "none", "bsmntw", "low_noise"])
+def test_training_contract_accepts_action_loss_weighting_modes(mode) -> None:
+    cfg = _libero_config()
+    if mode is not None:
+        OmegaConf.update(
+            cfg,
+            "model.architecture.action_loss_weighting",
+            mode,
+            merge=False,
+        )
+    validate_libero_training_config(cfg)
+
+
+def test_training_contract_rejects_unknown_action_loss_weighting() -> None:
+    cfg = _libero_config()
+    OmegaConf.update(
+        cfg,
+        "model.architecture.action_loss_weighting",
+        "mystery",
+        merge=False,
+    )
+    with pytest.raises(ValueError, match="action_loss_weighting to be one of"):
         validate_libero_training_config(cfg)
 
 

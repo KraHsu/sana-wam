@@ -62,6 +62,7 @@ LIBERO_R10_QKV_ADAPT_EVAL_MODULES = ("video_backbone",)
 LIBERO_TASK_BALANCED_GLOBAL_DRAWS = 34_720
 LIBERO_TASK_BALANCED_DRAWS_PER_TASK = 868
 LIBERO_TASK_BALANCED_DRAWS_PER_RANK = 4_340
+LIBERO_ACTION_LOSS_WEIGHTINGS = ("none", "bsmntw", "low_noise")
 
 
 def _config_value(config: Any, path: str, default: Any = None) -> Any:
@@ -310,6 +311,18 @@ def validate_libero_training_config(
                 f"got {observed!r}"
             )
 
+    action_loss_weighting = _config_value(
+        config,
+        "model.architecture.action_loss_weighting",
+        default="none",
+    )
+    if action_loss_weighting not in LIBERO_ACTION_LOSS_WEIGHTINGS:
+        raise ValueError(
+            "LIBERO training contract requires "
+            "model.architecture.action_loss_weighting to be one of "
+            f"{LIBERO_ACTION_LOSS_WEIGHTINGS!r}, got {action_loss_weighting!r}"
+        )
+
     _validate_libero_trainable_config(config)
     _validate_libero_sampler_config(config, dataset)
 
@@ -373,6 +386,7 @@ def validate_libero_training_config(
 
 
 __all__ = [
+    "LIBERO_ACTION_LOSS_WEIGHTINGS",
     "LIBERO_PRODUCTION_DATASET_ROOTS",
     "LIBERO_PRODUCTION_POPULATION_COUNTS",
     "LIBERO_PRODUCTION_STATS_PATH",

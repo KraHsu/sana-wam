@@ -10,7 +10,10 @@ from omegaconf import OmegaConf
 
 from sana_wam.deploy.libero_model_loader import LiberoActionStateNormalizer
 from sana_wam.deploy.policy_server import PolicyServer
-from sana_wam.train.libero_contract import validate_libero_training_config
+from sana_wam.train.libero_contract import (
+    LIBERO_ACTION_LOSS_WEIGHTINGS,
+    validate_libero_training_config,
+)
 
 
 _CRITICAL_CHECKPOINT_PATHS = (
@@ -113,6 +116,23 @@ def validate_libero_train_deploy_parity(training_cfg: Any, runtime_cfg: Any) -> 
     ):
         raise ValueError("LIBERO checkpoint must record a positive action_horizon")
 
+    absent = "__SANA_WAM_LIBERO_CHECKPOINT_FIELD_ABSENT__"
+    saved_action_loss_weighting = OmegaConf.select(
+        training_cfg,
+        "model.architecture.action_loss_weighting",
+        default=absent,
+    )
+    action_loss_weighting = (
+        "none"
+        if saved_action_loss_weighting == absent
+        else saved_action_loss_weighting
+    )
+    if action_loss_weighting not in LIBERO_ACTION_LOSS_WEIGHTINGS:
+        raise ValueError(
+            "LIBERO checkpoint records unsupported action_loss_weighting "
+            f"{action_loss_weighting!r}"
+        )
+
     exact = {
         "policy.history_len": num_frames,
         "policy.temporal_ensemble": False,
@@ -141,7 +161,7 @@ def validate_libero_train_deploy_parity(training_cfg: Any, runtime_cfg: Any) -> 
         "model.architecture.proprio_per_chunk": True,
         "model.architecture.proprio_action_dropout_prob": 0.0,
         "model.architecture.ar_bootstrap_clean_prefix": True,
-        "model.architecture.action_loss_weighting": "none",
+        "model.architecture.action_loss_weighting": action_loss_weighting,
         "model.video_backbone.attn_kernel": "linear_relu",
         "model.video_backbone.continuous_timestep_conditioning": True,
         "model.action_backbone.attn_kernel": "linear_relu",
@@ -157,7 +177,13 @@ def validate_libero_train_deploy_parity(training_cfg: Any, runtime_cfg: Any) -> 
         "dataloader.width": 320,
     }
     for path, expected in exact.items():
-        observed = OmegaConf.select(runtime_cfg, path, default="__ABSENT__")
+        runtime_default = (
+            "none"
+            if path == "model.architecture.action_loss_weighting"
+            and saved_action_loss_weighting == absent
+            else "__ABSENT__"
+        )
+        observed = OmegaConf.select(runtime_cfg, path, default=runtime_default)
         if _plain(observed) != expected:
             raise ValueError(
                 f"LIBERO train/deploy parity requires {path}={expected!r}, "
@@ -305,7 +331,7 @@ class LiberoPolicyServer(PolicyServer):
                     "action_scheduler_shift": _ACTION_SCHEDULER_SHIFT,
                     "action_scheduler_train_timesteps": _ACTION_TRAIN_TIMESTEPS,
                     "action_loss_weighting": select(
-                        "model.architecture.action_loss_weighting"
+                        "model.architecture.action_loss_weighting", "none"
                     ),
                     "temporal_alignment": _LIBERO_TEMPORAL_ALIGNMENT,
                     "ar_obs_chunk_mode": identity.get("ar_obs_chunk_mode"),
