@@ -59,6 +59,24 @@ LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS = (
     "video_backbone.dit.blocks.*.attn.qkv.weight",
 )
 LIBERO_R10_QKV_ADAPT_EVAL_MODULES = ("video_backbone",)
+LIBERO_R11_DIT_TRUNK_ADAPT_TRAINABLE_CONTRACT = "r11_dit_trunk_adapt_v1"
+LIBERO_R11_DIT_TRUNK_ADAPT_TRAINABLE_PARAMETER_PATTERNS = (
+    "action_backbone.*",
+    "proprio_encoder.*",
+    "proprio_video_embed.*",
+    "proprio_action_embed.*",
+    "video_backbone.dit.x_embedder.*",
+    "video_backbone.dit.t_embedder.*",
+    "video_backbone.dit.t_block.*",
+    "video_backbone.dit.y_embedder.*",
+    "video_backbone.dit.attention_y_norm.*",
+    "video_backbone.dit.blocks.*",
+)
+# Keep the entire video path in inference mode so the action-supervised arm has
+# the same caption/drop-path behavior as its control and deployment.  Pattern
+# selection walks named_parameters(), so DiT buffers (pos_embed/y_embedding)
+# are outside the optimizer; final_layer is deliberately absent above.
+LIBERO_R11_DIT_TRUNK_ADAPT_EVAL_MODULES = ("video_backbone",)
 LIBERO_TASK_BALANCED_GLOBAL_DRAWS = 34_720
 LIBERO_TASK_BALANCED_DRAWS_PER_TASK = 868
 LIBERO_TASK_BALANCED_DRAWS_PER_RANK = 4_340
@@ -139,7 +157,7 @@ def validate_libero_production_stats_source_config(cfg: Any) -> None:
 
 
 def _validate_libero_trainable_config(config: Any) -> None:
-    """Keep parameter-pattern training closed except for the named R10 arm."""
+    """Keep parameter-pattern training closed except for named LIBERO arms."""
 
     contract = _config_value(
         config,
@@ -172,15 +190,23 @@ def _validate_libero_trainable_config(config: Any) -> None:
             )
         return
 
-    if contract != LIBERO_R10_QKV_ADAPT_TRAINABLE_CONTRACT:
+    if contract == LIBERO_R10_QKV_ADAPT_TRAINABLE_CONTRACT:
+        expected_patterns = LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS
+        expected_eval_modules = LIBERO_R10_QKV_ADAPT_EVAL_MODULES
+        arm_label = "R10-QKV-ADAPT"
+        pattern_requirement = "the exact frozen"
+    elif contract == LIBERO_R11_DIT_TRUNK_ADAPT_TRAINABLE_CONTRACT:
+        expected_patterns = LIBERO_R11_DIT_TRUNK_ADAPT_TRAINABLE_PARAMETER_PATTERNS
+        expected_eval_modules = LIBERO_R11_DIT_TRUNK_ADAPT_EVAL_MODULES
+        arm_label = "R11-DIT-TRUNK-ADAPT"
+        pattern_requirement = "the exact action-loss-reachable"
+    else:
         raise ValueError(
             f"unknown LIBERO training.libero_trainable_contract: {contract!r}"
         )
-    if type(patterns) is not list or tuple(patterns) != (
-        LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS
-    ):
+    if type(patterns) is not list or tuple(patterns) != expected_patterns:
         raise ValueError(
-            "R10-QKV-ADAPT requires the exact frozen "
+            f"{arm_label} requires {pattern_requirement} "
             "training.trainable_parameter_patterns"
         )
     eval_modules = _config_value(
@@ -188,11 +214,9 @@ def _validate_libero_trainable_config(config: Any) -> None:
         "training.eval_modules",
         default=None,
     )
-    if type(eval_modules) is not list or tuple(eval_modules) != (
-        LIBERO_R10_QKV_ADAPT_EVAL_MODULES
-    ):
+    if type(eval_modules) is not list or tuple(eval_modules) != expected_eval_modules:
         raise ValueError(
-            "R10-QKV-ADAPT requires training.eval_modules=['video_backbone']"
+            f"{arm_label} requires training.eval_modules=['video_backbone']"
         )
     for path in (
         "training.trainable_modules",
@@ -200,7 +224,33 @@ def _validate_libero_trainable_config(config: Any) -> None:
         "training.freeze",
     ):
         if _config_value(config, path, default=None) is not None:
-            raise ValueError(f"R10-QKV-ADAPT requires {path} to be absent")
+            raise ValueError(f"{arm_label} requires {path} to be absent")
+
+    if contract == LIBERO_R11_DIT_TRUNK_ADAPT_TRAINABLE_CONTRACT:
+        exact_scientific_fields = {
+            "model.architecture.action_loss_weighting": "none",
+            "training.lambda_video": 0.0,
+            "training.lambda_action": 1.0,
+            "training.video_lr": 1.5e-5,
+            "training.action_lr": 1.5e-5,
+        }
+        for path, expected in exact_scientific_fields.items():
+            observed = _config_value(config, path, default=None)
+            if type(observed) is not type(expected) or observed != expected:
+                raise ValueError(
+                    f"{arm_label} requires {path}={expected!r}, got {observed!r}"
+                )
+        if (
+            OmegaConf.select(
+                config,
+                "training.trainable_parameter_dtype",
+                default="__ABSENT__",
+            )
+            != "__ABSENT__"
+        ):
+            raise ValueError(
+                f"{arm_label} requires training.trainable_parameter_dtype to be absent"
+            )
 
 
 def _validate_libero_sampler_config(config: Any, dataset: Any | None) -> None:
@@ -393,6 +443,9 @@ __all__ = [
     "LIBERO_R10_QKV_ADAPT_TRAINABLE_CONTRACT",
     "LIBERO_R10_QKV_ADAPT_EVAL_MODULES",
     "LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS",
+    "LIBERO_R11_DIT_TRUNK_ADAPT_TRAINABLE_CONTRACT",
+    "LIBERO_R11_DIT_TRUNK_ADAPT_EVAL_MODULES",
+    "LIBERO_R11_DIT_TRUNK_ADAPT_TRAINABLE_PARAMETER_PATTERNS",
     "LIBERO_TASK_BALANCED_DRAWS_PER_RANK",
     "LIBERO_TASK_BALANCED_DRAWS_PER_TASK",
     "LIBERO_TASK_BALANCED_GLOBAL_DRAWS",

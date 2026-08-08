@@ -21,6 +21,9 @@ from sana_wam.train.libero_contract import (
     LIBERO_R10_QKV_ADAPT_EVAL_MODULES,
     LIBERO_R10_QKV_ADAPT_TRAINABLE_CONTRACT,
     LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS,
+    LIBERO_R11_DIT_TRUNK_ADAPT_EVAL_MODULES,
+    LIBERO_R11_DIT_TRUNK_ADAPT_TRAINABLE_CONTRACT,
+    LIBERO_R11_DIT_TRUNK_ADAPT_TRAINABLE_PARAMETER_PATTERNS,
     validate_libero_training_config,
 )
 
@@ -83,6 +86,26 @@ def _r10_qkv_adapt_config():
         LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS
     )
     cfg.training.eval_modules = list(LIBERO_R10_QKV_ADAPT_EVAL_MODULES)
+    return cfg
+
+
+def _r11_dit_trunk_adapt_config():
+    cfg = _libero_config()
+    del cfg.training.preserve_frozen_input_grad_modules
+    cfg.model.architecture.action_loss_weighting = "none"
+    cfg.training.libero_trainable_contract = (
+        LIBERO_R11_DIT_TRUNK_ADAPT_TRAINABLE_CONTRACT
+    )
+    cfg.training.trainable_parameter_patterns = list(
+        LIBERO_R11_DIT_TRUNK_ADAPT_TRAINABLE_PARAMETER_PATTERNS
+    )
+    cfg.training.eval_modules = list(
+        LIBERO_R11_DIT_TRUNK_ADAPT_EVAL_MODULES
+    )
+    cfg.training.lambda_video = 0.0
+    cfg.training.lambda_action = 1.0
+    cfg.training.video_lr = 1.5e-5
+    cfg.training.action_lr = 1.5e-5
     return cfg
 
 
@@ -326,6 +349,105 @@ def test_r10_qkv_adapt_trainable_contract_fails_closed(
     message: str,
 ) -> None:
     cfg = _r10_qkv_adapt_config()
+    OmegaConf.update(cfg, path, value, merge=False)
+    with pytest.raises(ValueError, match=message):
+        validate_libero_training_config(cfg)
+
+
+def test_r11_dit_trunk_adapt_contract_is_exact_and_accepted() -> None:
+    expected_patterns = (
+        "action_backbone.*",
+        "proprio_encoder.*",
+        "proprio_video_embed.*",
+        "proprio_action_embed.*",
+        "video_backbone.dit.x_embedder.*",
+        "video_backbone.dit.t_embedder.*",
+        "video_backbone.dit.t_block.*",
+        "video_backbone.dit.y_embedder.*",
+        "video_backbone.dit.attention_y_norm.*",
+        "video_backbone.dit.blocks.*",
+    )
+    assert (
+        LIBERO_R11_DIT_TRUNK_ADAPT_TRAINABLE_PARAMETER_PATTERNS
+        == expected_patterns
+    )
+    assert LIBERO_R11_DIT_TRUNK_ADAPT_EVAL_MODULES == (
+        "video_backbone",
+    )
+    assert not any("final_layer" in pattern for pattern in expected_patterns)
+
+    validate_libero_training_config(_r11_dit_trunk_adapt_config())
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "message"),
+    [
+        (
+            "training.trainable_parameter_patterns",
+            list(
+                LIBERO_R11_DIT_TRUNK_ADAPT_TRAINABLE_PARAMETER_PATTERNS[
+                    :-1
+                ]
+            ),
+            "exact action-loss-reachable.*trainable_parameter_patterns",
+        ),
+        (
+            "training.trainable_parameter_patterns",
+            [
+                *LIBERO_R11_DIT_TRUNK_ADAPT_TRAINABLE_PARAMETER_PATTERNS,
+                "video_backbone.dit.final_layer.*",
+            ],
+            "exact action-loss-reachable.*trainable_parameter_patterns",
+        ),
+        (
+            "training.trainable_parameter_patterns",
+            [
+                *LIBERO_R11_DIT_TRUNK_ADAPT_TRAINABLE_PARAMETER_PATTERNS[
+                    :4
+                ],
+                "video_backbone.dit.*",
+            ],
+            "exact action-loss-reachable.*trainable_parameter_patterns",
+        ),
+        (
+            "training.eval_modules",
+            ["video_backbone.vae", "video_backbone.text_encoder"],
+            "eval_modules.*video_backbone",
+        ),
+        (
+            "training.trainable_modules",
+            ["action_backbone"],
+            "trainable_modules.*absent",
+        ),
+        ("training.freeze", [], "training.freeze.*absent"),
+        (
+            "model.architecture.action_loss_weighting",
+            "low_noise",
+            "action_loss_weighting",
+        ),
+        ("training.lambda_video", 1.0, "lambda_video"),
+        ("training.lambda_video", 0, "lambda_video"),
+        ("training.lambda_action", 0.0, "lambda_action"),
+        ("training.video_lr", 1.0e-5, "video_lr"),
+        ("training.action_lr", 1.0e-5, "action_lr"),
+        (
+            "training.trainable_parameter_dtype",
+            "float32",
+            "trainable_parameter_dtype.*absent",
+        ),
+        (
+            "training.trainable_parameter_dtype",
+            None,
+            "trainable_parameter_dtype.*absent",
+        ),
+    ],
+)
+def test_r11_dit_trunk_adapt_contract_fails_closed(
+    path: str,
+    value,
+    message: str,
+) -> None:
+    cfg = _r11_dit_trunk_adapt_config()
     OmegaConf.update(cfg, path, value, merge=False)
     with pytest.raises(ValueError, match=message):
         validate_libero_training_config(cfg)

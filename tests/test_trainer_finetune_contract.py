@@ -13,6 +13,10 @@ import torch.nn as nn
 from omegaconf import OmegaConf
 
 from sana_wam.train import trainer as trainer_module
+from sana_wam.train.libero_contract import (
+    LIBERO_R11_DIT_TRUNK_ADAPT_EVAL_MODULES,
+    LIBERO_R11_DIT_TRUNK_ADAPT_TRAINABLE_PARAMETER_PATTERNS,
+)
 
 
 class _DummyDataset(torch.utils.data.Dataset):
@@ -84,6 +88,42 @@ class _DummyArchitecture(nn.Module):
             if name not in excluded
             and any(parameter.requires_grad for parameter in module.parameters())
         }
+
+
+class _DummyR11CaptionEmbedder(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.proj = nn.Linear(2, 2)
+        self.register_buffer("y_embedding", nn.Parameter(torch.ones(2, 2)))
+
+
+class _DummyR11Dit(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.attention_y_norm = nn.LayerNorm(2)
+        self.blocks = nn.ModuleList([nn.Linear(2, 2)])
+        self.t_block = nn.Sequential(nn.Linear(2, 2))
+        self.t_embedder = nn.Linear(2, 2)
+        self.x_embedder = nn.Linear(2, 2)
+        self.y_embedder = _DummyR11CaptionEmbedder()
+        self.final_layer = nn.Linear(2, 2)
+        self.register_buffer("pos_embed", torch.zeros(1, 2, 2))
+
+
+class _DummyR11VideoBackbone(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.dit = _DummyR11Dit()
+        self.vae = nn.Linear(2, 2)
+        self.text_encoder = nn.Linear(2, 2)
+
+
+class _DummyR11Architecture(_DummyArchitecture):
+    def __init__(self):
+        super().__init__()
+        self.video_backbone = _DummyR11VideoBackbone()
+        self.proprio_video_embed = nn.Linear(2, 2)
+        self.proprio_action_embed = nn.Linear(2, 2)
 
 
 def _config(**training_overrides):
@@ -262,6 +302,75 @@ def test_parameter_patterns_select_only_matching_tensors(tmp_path, monkeypatch):
     trainer._set_training_mode()
     assert architecture.video_backbone.training
     assert not architecture.video_backbone[1].training
+
+
+def test_r11_patterns_train_only_action_reachable_dit_in_video_eval_mode(
+    tmp_path, monkeypatch
+):
+    architecture = _DummyR11Architecture()
+    cfg = _config(
+        trainable_parameter_patterns=list(
+            LIBERO_R11_DIT_TRUNK_ADAPT_TRAINABLE_PARAMETER_PATTERNS
+        ),
+        eval_modules=list(LIBERO_R11_DIT_TRUNK_ADAPT_EVAL_MODULES),
+    )
+    trainer, _, architecture = _make_trainer(
+        tmp_path, monkeypatch, cfg, architecture
+    )
+
+    trainable_names = {
+        name
+        for name, parameter in architecture.named_parameters()
+        if parameter.requires_grad
+    }
+    expected_names = {
+        name
+        for name, _ in architecture.named_parameters()
+        if name.startswith(
+            (
+                "action_backbone.",
+                "proprio_encoder.",
+                "proprio_video_embed.",
+                "proprio_action_embed.",
+            )
+        )
+        or (
+            name.startswith("video_backbone.dit.")
+            and not name.startswith("video_backbone.dit.final_layer.")
+        )
+    }
+    assert trainable_names == expected_names
+    assert not any("final_layer" in name for name in trainable_names)
+    assert not any(".vae." in name for name in trainable_names)
+    assert not any(".text_encoder." in name for name in trainable_names)
+
+    optimizer_ids = {
+        id(parameter)
+        for group in trainer._param_groups()
+        for parameter in group["params"]
+    }
+    assert optimizer_ids == {
+        id(parameter)
+        for name, parameter in architecture.named_parameters()
+        if name in expected_names
+    }
+    assert id(architecture.video_backbone.dit.y_embedder.y_embedding) not in (
+        optimizer_ids
+    )
+    assert id(architecture.video_backbone.dit.pos_embed) not in optimizer_ids
+
+    trainer._set_training_mode()
+    assert all(
+        not module.training for module in architecture.video_backbone.modules()
+    )
+    assert all(
+        not parameter.requires_grad
+        for parameter in architecture.video_backbone.vae.parameters()
+    )
+    assert all(
+        not parameter.requires_grad
+        for parameter in architecture.video_backbone.text_encoder.parameters()
+    )
 
 
 def test_parameter_pattern_warm_start_can_keep_fp32_optimizer_state(
