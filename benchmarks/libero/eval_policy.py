@@ -46,6 +46,7 @@ SUITE_STEP_BUDGETS = {
     "libero_10": 520,
 }
 DEFAULT_SETTLE_STEPS = 5
+DEFAULT_SETTLE_ACTION = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0)
 
 
 @dataclass(frozen=True)
@@ -131,8 +132,11 @@ def load_and_validate_config(path: str | os.PathLike[str]) -> dict[str, Any]:
             "suite_max_steps must exactly match the frozen project budgets: "
             f"{SUITE_STEP_BUDGETS}"
         )
-    if config.get("dummy_action") != [0.0] * ACTION_DIM:
-        raise ValueError("dummy_action must be exactly seven numeric zeros")
+    if config.get("dummy_action") != list(DEFAULT_SETTLE_ACTION):
+        raise ValueError(
+            "dummy_action must keep the LIBERO gripper open during settling: "
+            f"expected {list(DEFAULT_SETTLE_ACTION)!r}"
+        )
     if config.get("dataset_only_suites") != ["libero_90"]:
         raise ValueError("dataset_only_suites must be exactly ['libero_90']")
     if config.get("camera_mapping") != {
@@ -257,6 +261,7 @@ def run_episode(
     init_state_index: int,
     init_state: Any,
     step_budget: int,
+    dummy_action: Sequence[float],
     settle_steps: int = DEFAULT_SETTLE_STEPS,
 ) -> EpisodeResult:
     """Run one fixed-init episode with exactly one policy request per step."""
@@ -269,14 +274,23 @@ def run_episode(
     _plain_int(step_budget, "step_budget", minimum=1)
     _plain_int(settle_steps, "settle_steps")
 
+    settle_action = np.asarray(dummy_action, dtype=np.float32)
+    if settle_action.shape != (ACTION_DIM,) or not np.isfinite(settle_action).all():
+        raise ValueError("dummy_action must be a finite 7D action")
+    expected_settle_action = np.asarray(DEFAULT_SETTLE_ACTION, dtype=np.float32)
+    if not np.array_equal(settle_action, expected_settle_action):
+        raise ValueError(
+            "dummy_action must keep the LIBERO gripper open during settling: "
+            f"expected {expected_settle_action.tolist()!r}"
+        )
+
     env.reset()
     observation = env.set_init_state(init_state)
     if not isinstance(observation, Mapping):
         raise RuntimeError("LIBERO set_init_state returned a non-mapping observation")
 
-    zero_action = np.zeros(ACTION_DIM, dtype=np.float32)
     for _ in range(settle_steps):
-        observation, _ = _step_environment(env, zero_action)
+        observation, _ = _step_environment(env, settle_action)
 
     episode_key = policy.reset_episode(
         suite=suite,
@@ -324,6 +338,7 @@ def evaluate_benchmark(
     suite: str,
     seed: int,
     settle_steps: int,
+    dummy_action: Sequence[float],
     step_budgets: Mapping[str, int],
     env_factory: Callable[[int, int], Any],
     policy: LiberoPolicyClient,
@@ -373,6 +388,7 @@ def evaluate_benchmark(
                     init_state_index=init_index,
                     init_state=init_states[init_index],
                     step_budget=step_budget,
+                    dummy_action=dummy_action,
                     settle_steps=settle_steps,
                 )
                 results.append(result)
@@ -661,6 +677,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "camera_height": camera_height,
         "camera_width": camera_width,
         "settle_steps": config["num_steps_wait"],
+        "dummy_action": config["dummy_action"],
         "model_noise_base_seed": config["model_noise_base_seed"],
         "suite_step_budget": config["suite_max_steps"][suite],
         "libero_git_sha": external_identity["git_sha"],
@@ -709,6 +726,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 suite=suite,
                 seed=seed,
                 settle_steps=config["num_steps_wait"],
+                dummy_action=config["dummy_action"],
                 step_budgets=config["suite_max_steps"],
                 env_factory=env_factory,
                 policy=policy,

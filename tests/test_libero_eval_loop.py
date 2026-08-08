@@ -117,6 +117,7 @@ def test_run_episode_settles_then_requests_one_action_per_policy_step() -> None:
         init_state_index=4,
         init_state="state-four",
         step_budget=20,
+        dummy_action=eval_policy.DEFAULT_SETTLE_ACTION,
         settle_steps=5,
     )
 
@@ -129,7 +130,9 @@ def test_run_episode_settles_then_requests_one_action_per_policy_step() -> None:
     assert env.init_states == ["state-four"]
     assert len(env.actions) == 8
     for action in env.actions[:5]:
-        np.testing.assert_array_equal(action, np.zeros(7, dtype=np.float32))
+        np.testing.assert_array_equal(
+            action, np.asarray(eval_policy.DEFAULT_SETTLE_ACTION, dtype=np.float32)
+        )
     for action in env.actions[5:]:
         assert action[0] == pytest.approx(0.1)
     assert len(policy.reset_calls) == 1
@@ -151,6 +154,7 @@ def test_run_episode_stops_at_budget_without_hidden_retry() -> None:
         init_state_index=0,
         init_state="fixed",
         step_budget=4,
+        dummy_action=eval_policy.DEFAULT_SETTLE_ACTION,
     )
     assert result.success is False
     assert result.policy_steps == 4
@@ -177,6 +181,7 @@ def test_evaluate_benchmark_uses_fixed_init_states_and_closes_each_env() -> None
         suite="libero_spatial",
         seed=0,
         settle_steps=5,
+        dummy_action=eval_policy.DEFAULT_SETTLE_ACTION,
         step_budgets=eval_policy.SUITE_STEP_BUDGETS,
         env_factory=env_factory,
         policy=policy,
@@ -208,6 +213,7 @@ def test_evaluate_benchmark_closes_environment_on_policy_failure() -> None:
             suite="libero_spatial",
             seed=0,
             settle_steps=5,
+            dummy_action=eval_policy.DEFAULT_SETTLE_ACTION,
             step_budgets=eval_policy.SUITE_STEP_BUDGETS,
             env_factory=lambda _task_id, _step_budget: env,
             policy=policy,
@@ -232,6 +238,7 @@ def test_evaluate_benchmark_refuses_to_repeat_fixed_init_states() -> None:
             suite="libero_spatial",
             seed=0,
             settle_steps=5,
+            dummy_action=eval_policy.DEFAULT_SETTLE_ACTION,
             step_budgets=eval_policy.SUITE_STEP_BUDGETS,
             env_factory=env_factory,
             policy=FakePolicy(),
@@ -280,6 +287,7 @@ def test_policy_config_is_the_frozen_benchmark_contract(tmp_path) -> None:
     assert config["suite_max_steps"] == eval_policy.SUITE_STEP_BUDGETS
     assert config["state_dim"] == 8
     assert config["action_dim"] == 7
+    assert config["dummy_action"] == list(eval_policy.DEFAULT_SETTLE_ACTION)
     assert config["model_noise_base_seed"] == 2026080601
     assert config["expected_server_contract"]["benchmark"] == "libero"
 
@@ -288,6 +296,13 @@ def test_policy_config_is_the_frozen_benchmark_contract(tmp_path) -> None:
     drifted_path = tmp_path / "drifted.yml"
     drifted_path.write_text(yaml.safe_dump(drifted), encoding="utf-8")
     with pytest.raises(ValueError, match="action_dim"):
+        eval_policy.load_and_validate_config(drifted_path)
+
+    drifted = copy.deepcopy(config)
+    drifted["dummy_action"][-1] = 0.0
+    drifted_path = tmp_path / "closed-gripper-settle.yml"
+    drifted_path.write_text(yaml.safe_dump(drifted), encoding="utf-8")
+    with pytest.raises(ValueError, match="keep the LIBERO gripper open"):
         eval_policy.load_and_validate_config(drifted_path)
 
 

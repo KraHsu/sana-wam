@@ -143,7 +143,7 @@ client_action_queue: false
 # initial states per task; single_eval.sh keeps the count explicit on its CLI.
 default_num_trials_per_task: 20
 num_steps_wait: 5
-dummy_action: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+dummy_action: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0]
 suite_max_steps:
   libero_spatial: 220
   libero_object: 280
