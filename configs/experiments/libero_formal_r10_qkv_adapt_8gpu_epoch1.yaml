@@ -1,0 +1,242 @@
+# R10-QKV-ADAPT H8 causal single-chunk LIBERO successor (R8 + one R10 epoch).
+# Architecture, data, optimizer, H8 deployment, and the shared FP32 AR
+# operator are inherited byte-for-byte from frozen R8. The candidate jointly
+# continues the exact four R8 action/proprio trainable roots for one epoch and
+# opens all 20 video DiT self-attention qkv.weight tensors. No matched R8
+# continuation control is run, so this candidate does not support isolated
+# causal attribution to QKV adaptation.
+# Each anchor consumes only the previous 16 observations plus current and
+# predicts the next 8 actions. Deployment executes the identical fresh-cache
+# video-0 -> action-1 graph. The 34,693-window dataset is sampled as 34,696
+# draws on 8 ranks (4,337 steps; exactly 3 DistributedSampler padding repeats).
+
+model:
+  architecture:
+    framework: dual_system
+    variant: autoregressive
+    action_dim: 7
+    use_proprioception: true
+    state_dim: 8
+    delta_action: false
+    bridge_layers: null
+    bridge_interval: 1
+    mot_checkpoint_mixed_attn: true
+    attention_mask_mode: joint
+    video_attention_mask_mode: first_frame_causal
+    ar_frame_chunk_size: 2
+    ar_chunkwise_temporal_ops: true
+    # A single video frame-id 0 conditions one action frame-id 1.
+    ar_attn_window: 1
+    # Block frame ids define causality; unique 0..7 RoPE slots identify the
+    # horizon position of every action token in both training and deployment.
+    ar_action_horizon_rope: true
+    # Deploy always ingests a clean causal observation window.  Disable the
+    # legacy noisy "clean-copy" augmentation so the condition path matches.
+    ar_noisy_cond_prob: 0.0
+    ar_cond_max_ratio: 0.0
+    proprio_per_chunk: true
+    ar_bootstrap_clean_prefix: true
+    proprio_action_dropout_prob: 0.0
+    action_loss_weighting: none
+    video_on_path_loss_weight: 0.0
+    video_trajectory_endpoint_weight: 0.0
+    video_trajectory_velocity_weight: 0.0
+    video_trajectory_consistency_weight: 0.0
+    video_local_expansion_weight: 0.0
+    joint_graft: false
+    joint_graft_idx: null
+    joint_graft_every_n: 0
+  video_backbone:
+    name: sana_video_2b
+    model_path: /DATA/share/SANA-Video_2B_480p
+    freeze: false
+    attn_kernel: linear_relu
+    text_encoder_name: /DATA/share/gemma-2-2b-it
+    continuous_timestep_conditioning: true
+    model_kwargs:
+      additional_flash_attn: window_flash
+      flash_attn_window_count: [1, 1, 4]
+      linear_feature_map: learnable
+      # Restore the pretrained caption/text RMSNorm used by SANA-Video.
+      y_norm: true
+      y_norm_scale_factor: 0.01
+  action_backbone:
+    dim: 1152
+    ffn_dim: 4608
+    attn_kernel: linear_relu
+
+dataloader:
+  type: libero
+  dataset_roots:
+    - /DATA/share/LIBERO/libero/libero_spatial_no_noops_1.0.0_lerobot
+    - /DATA/share/LIBERO/libero/libero_object_no_noops_1.0.0_lerobot
+    - /DATA/share/LIBERO/libero/libero_goal_no_noops_1.0.0_lerobot
+    - /DATA/share/LIBERO/libero/libero_10_no_noops_1.0.0_lerobot
+  action_stats_path: /DATA/share/LIBERO/sana_wam_libero_train_all4_excl_goal82_stats_v2.npy
+  action_mode: libero_relative_eef
+  state_mode: libero_eef_axis_angle_gripper
+  normalize_mode: min-max
+  state_normalize_mode: min-max
+  num_frames: 17
+  action_horizon: 8
+  require_full_action_horizon: true
+  include_terminal_full_horizon: true
+  video_context_mode: causal_past
+  video_stride: 4
+  temporal_compression: 4
+  causal_temporal: true
+  window_stride: 8
+  height: 384
+  width: 320
+  split: train
+  val_ratio: 0.0
+  repeat: 1
+  seed: 20260806
+  multiview: true
+  camera_layout: [head_camera, left_wrist_camera, right_wrist_camera]
+  target_camera: head_camera
+  training_video_rotation_degrees: 0
+  delta_action: false
+  filter_static_segments: false
+  verify_stats_source: true
+  verify_known_repairs: true
+  excluded_episodes:
+    - libero_goal_no_noops_1.0.0_lerobot:82
+  benchmark_contract:
+    schema_version: sana-wam-libero-policy-v1
+    benchmark: libero
+    dataloader_type: libero
+    action_mode: libero_relative_eef
+    state_mode: libero_eef_axis_angle_gripper
+    normalize_required: true
+    state_dim: 8
+    state_layout:
+      - eef_x
+      - eef_y
+      - eef_z
+      - eef_axis_angle_x
+      - eef_axis_angle_y
+      - eef_axis_angle_z
+      - gripper_qpos_0
+      - gripper_qpos_1
+    action_dim: 7
+    action_layout:
+      - delta_x
+      - delta_y
+      - delta_z
+      - delta_axis_angle_x
+      - delta_axis_angle_y
+      - delta_axis_angle_z
+      - open_gripper
+    action_representation: relative_delta_pose
+    action_output_space: denormalized_checkpoint_units
+    normalization:
+      action:
+        active: true
+        mode: min-max
+        stats_key: libero_relative_eef
+        dim: 7
+      state:
+        active: true
+        mode: min-max
+        stats_key: libero_eef_axis_angle_gripper
+        dim: 8
+    gripper:
+      model_open: 1.0
+      model_closed: 0.0
+      threshold: 0.5
+      env_open: -1.0
+      env_closed: 1.0
+    multiview: true
+    camera_layout: [head_camera, left_wrist_camera, right_wrist_camera]
+    camera_mapping:
+      agentview_image: head_camera
+      robot0_eye_in_hand_image: left_wrist_camera
+      missing: right_wrist_camera
+    missing_right_camera_fill: black
+    training_video_rotation_degrees: 0
+    simulator_video_rotation_degrees: 180
+    training_dataset_names:
+      - libero_spatial_no_noops_1.0.0_lerobot
+      - libero_object_no_noops_1.0.0_lerobot
+      - libero_goal_no_noops_1.0.0_lerobot
+      - libero_10_no_noops_1.0.0_lerobot
+    excluded_training_episodes:
+      - libero_goal_no_noops_1.0.0_lerobot:82
+
+training:
+  output_dir: /DATA/share/sana_wam_libero_training/formal_epoch1_r10_qkv_adapt/libero-ar-r10-qkv-adapt-h8-ynorm-fp32attn-causal1-warmstart-uniform-8gpu-4337-68ba8d044af41769b1913744d3c1079a
+  max_steps: 4337
+  formal_final_step: 4337
+  lr_schedule_steps: 4337
+  save_steps: 0
+  save_at_steps: []
+  save_initial_checkpoint: false
+  keep_last_k: 1
+  expected_world_size: 8
+  expected_global_batch_size: 8
+  exact_output_dir: true
+  formal_libero_training: true
+  formal_non_resumable: true
+  formal_warm_start: true
+  formal_predecessor_r8_result_sha256: 11b1b68db1b138bbe0c638f0f85beb174c8ebe8c8d1925c5abd06bb1378e966c
+  formal_predecessor_r8_checkpoint_sha256: 4a50f6b90b6d04f7c24a25ad529c2bc96d3a35ac257a6dbe42826f989539ab09
+  scientific_predecessor_r8_formal40_result_sha256: 29eb848d9a25207a109b95b0e576806753fc1a5a7befe8340de2bed395852e22
+  diagnostic_predecessor_r8_k1_ab40_result_sha256: 9d9251880fae1456496b504e6e3ab0df528ca048fe8ab90b4449a458d6c9dd7f
+  cumulative_epochs_after_run: 2
+  epochs_in_this_run: 1
+  qkv_adaptation_epochs: 1
+  init_checkpoint: /DATA/share/sana_wam_libero_training/formal_epoch1_r8_h8_ynorm_fp32attn/libero-ar-r8-h8-ynorm-fp32attn-causal1-warmstart-uniform-8gpu-4337-01b7c080232706dddcdbe20bc0fbcdf5/checkpoint_step_4337.safetensors
+  init_checkpoint_sha256: 4a50f6b90b6d04f7c24a25ad529c2bc96d3a35ac257a6dbe42826f989539ab09
+  batch_size: 1
+  gradient_accumulation_steps: 1
+  num_workers: 2
+  libero_trainable_contract: r10_qkv_adapt_v1
+  trainable_parameter_patterns:
+    - action_backbone.*
+    - proprio_encoder.*
+    - proprio_video_embed.*
+    - proprio_action_embed.*
+    - video_backbone.dit.blocks.*.attn.qkv.weight
+  eval_modules:
+    - video_backbone
+  video_lr: 1.5e-5
+  action_lr: 1.5e-5
+  optimizer_master_weights: true
+  optimizer_foreach: false
+  weight_decay: 0.0
+  grad_clip: 1.0
+  warmup_steps: 50
+  lambda_video: 0.0
+  lambda_action: 1.0
+  use_gradient_checkpointing: true
+  deepspeed: null
+  initialization_seed: 20260810
+  seed: 20260810
+  debug: false
+  action_stats_sha256: e5d985903539c1767a246e63c629b214c47c395d2000dee44122b8a0672253c7
+  action_stats_population_sha256: 7ed9772facf261299022e55169bcdaaa49fe3a7a20e0057e08cf419b5e584146
+  deployment_contract:
+    schema_version: sana-wam-libero-causal-single-chunk-parity-v1
+    history_len: 17
+    action_steps: 20
+    action_scheduler_shift: 5.0
+    action_scheduler_train_timesteps: 1000
+    temporal_alignment: causal_past_video_0_to_future_action_1
+    ar_obs_chunk_mode: rolling_buffer
+    ar_obs_latent_band: auto
+    ar_reset_cache_each_generation: true
+    ar_proprio_mode: per_step
+    cache_feedback_mode: predicted
+    context_proprio_source: current
+    chunk_proprio_source: current
+    video_context_mode: causal_past
+    video_num_frames: 5
+    video_chunks_per_window: 1
+    action_horizon: 8
+    anchor_stride: 8
+    full_horizon_only: true
+    action_tokens_per_chunk: 8
+    action_horizon_rope: unique_0_to_7
+    ar_attention_window: 1
+    resolution: [384, 320]

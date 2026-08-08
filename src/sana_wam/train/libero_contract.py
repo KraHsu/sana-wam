@@ -45,6 +45,15 @@ LIBERO_PRODUCTION_POPULATION_COUNTS = {
     "state_rows": 273_336,
     "suites": 4,
 }
+LIBERO_R10_QKV_ADAPT_TRAINABLE_CONTRACT = "r10_qkv_adapt_v1"
+LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS = (
+    "action_backbone.*",
+    "proprio_encoder.*",
+    "proprio_video_embed.*",
+    "proprio_action_embed.*",
+    "video_backbone.dit.blocks.*.attn.qkv.weight",
+)
+LIBERO_R10_QKV_ADAPT_EVAL_MODULES = ("video_backbone",)
 
 
 def _config_value(config: Any, path: str, default: Any = None) -> Any:
@@ -120,6 +129,71 @@ def validate_libero_production_stats_source_config(cfg: Any) -> None:
     _validate_libero_production_population_config(config)
 
 
+def _validate_libero_trainable_config(config: Any) -> None:
+    """Keep parameter-pattern training closed except for the named R10 arm."""
+
+    contract = _config_value(
+        config,
+        "training.libero_trainable_contract",
+        default=None,
+    )
+    patterns = _config_value(
+        config,
+        "training.trainable_parameter_patterns",
+        default=None,
+    )
+    preserve_input_grad = _config_value(
+        config,
+        "training.preserve_frozen_input_grad_modules",
+        default=None,
+    )
+
+    if contract is None:
+        if patterns is not None:
+            raise ValueError(
+                "LIBERO trainable_parameter_patterns require an explicit "
+                "training.libero_trainable_contract"
+            )
+        if preserve_input_grad is None or tuple(preserve_input_grad) != (
+            "video_backbone",
+        ):
+            raise ValueError(
+                "LIBERO training contract requires "
+                "training.preserve_frozen_input_grad_modules=['video_backbone']"
+            )
+        return
+
+    if contract != LIBERO_R10_QKV_ADAPT_TRAINABLE_CONTRACT:
+        raise ValueError(
+            f"unknown LIBERO training.libero_trainable_contract: {contract!r}"
+        )
+    if type(patterns) is not list or tuple(patterns) != (
+        LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS
+    ):
+        raise ValueError(
+            "R10-QKV-ADAPT requires the exact frozen "
+            "training.trainable_parameter_patterns"
+        )
+    eval_modules = _config_value(
+        config,
+        "training.eval_modules",
+        default=None,
+    )
+    if type(eval_modules) is not list or tuple(eval_modules) != (
+        LIBERO_R10_QKV_ADAPT_EVAL_MODULES
+    ):
+        raise ValueError(
+            "R10-QKV-ADAPT requires training.eval_modules=['video_backbone']"
+        )
+    for path in (
+        "training.trainable_modules",
+        "training.preserve_frozen_input_grad_modules",
+        "training.freeze",
+    ):
+        if _config_value(config, path, default=None) is not None:
+            raise ValueError(f"R10-QKV-ADAPT requires {path} to be absent")
+
+
 def validate_libero_training_config(
     cfg: Any,
     *,
@@ -159,16 +233,7 @@ def validate_libero_training_config(
                 f"got {observed!r}"
             )
 
-    preserve_input_grad = OmegaConf.select(
-        config,
-        "training.preserve_frozen_input_grad_modules",
-        default=None,
-    )
-    if preserve_input_grad is None or tuple(preserve_input_grad) != ("video_backbone",):
-        raise ValueError(
-            "LIBERO training contract requires "
-            "training.preserve_frozen_input_grad_modules=['video_backbone']"
-        )
+    _validate_libero_trainable_config(config)
 
     contract = OmegaConf.select(config, "dataloader.benchmark_contract", default=None)
     if OmegaConf.is_config(contract):
@@ -233,6 +298,9 @@ __all__ = [
     "LIBERO_PRODUCTION_DATASET_ROOTS",
     "LIBERO_PRODUCTION_POPULATION_COUNTS",
     "LIBERO_PRODUCTION_STATS_PATH",
+    "LIBERO_R10_QKV_ADAPT_TRAINABLE_CONTRACT",
+    "LIBERO_R10_QKV_ADAPT_EVAL_MODULES",
+    "LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS",
     "validate_libero_production_stats_source_config",
     "validate_libero_training_config",
 ]

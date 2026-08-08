@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from fnmatch import fnmatchcase
 from types import MethodType, SimpleNamespace
 
 import pytest
@@ -19,6 +20,9 @@ from sana_wam.model.action_facing_cache_consistency import (
 )
 from sana_wam.model.video_backbone.sana.blocks_split import (
     _validate_masked_window_partition,
+)
+from sana_wam.train.libero_contract import (
+    LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS,
 )
 
 
@@ -929,6 +933,81 @@ def test_checkpointed_action_video_numerator_capture_is_differentiable_and_exact
     ]
     assert parameter_grads
     assert all(torch.isfinite(gradient).all() for gradient in parameter_grads)
+
+
+def test_r10_qkv_patterns_receive_action_loss_gradients_without_preserve_mode():
+    torch.manual_seed(2708)
+    architecture, video, action = _mini_full_architecture()
+    architecture.train()
+    # Mirrors Trainer._set_training_mode with eval_modules=['video_backbone'].
+    architecture.video_backbone.eval()
+    assert not architecture.video_backbone.training
+    assert all(
+        not module.training for module in architecture.video_backbone.modules()
+    )
+    for name, parameter in architecture.named_parameters():
+        parameter.requires_grad_(
+            any(
+                fnmatchcase(name, pattern)
+                for pattern in LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS
+            )
+        )
+
+    named_parameters = dict(architecture.named_parameters())
+    qkv_parameters = {
+        name: parameter
+        for name, parameter in named_parameters.items()
+        if fnmatchcase(
+            name,
+            LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS[-1],
+        )
+    }
+    assert len(qkv_parameters) == video.num_layers == 2
+    assert all(parameter.requires_grad for parameter in qkv_parameters.values())
+    assert all(
+        not parameter.requires_grad
+        for name, parameter in named_parameters.items()
+        if name.startswith("video_backbone.") and name not in qkv_parameters
+    )
+
+    batch, frames, action_tokens = 1, 4, 8
+    noisy_video = torch.randn(batch, video._dit.in_channels, frames, 8, 8)
+    clean_video = torch.randn_like(noisy_video)
+    noisy_action = torch.randn(batch, action_tokens, action.action_dim)
+    clean_action = torch.randn_like(noisy_action)
+    context = torch.randn(batch, 4, video.context_dim)
+    context_mask = torch.ones(batch, 4, dtype=torch.bool)
+    video_timesteps = torch.full((batch, frames), 500.0)
+    action_timesteps = torch.full((batch, action_tokens), 500.0)
+
+    _, action_prediction = architecture.forward(
+        noisy_action,
+        None,
+        latents=noisy_video,
+        ar_clean_latents=clean_video,
+        ar_clean_actions=clean_action,
+        ar_video_frame_timesteps=video_timesteps,
+        ar_clean_video_frame_timesteps=torch.zeros_like(video_timesteps),
+        ar_action_token_timesteps=action_timesteps,
+        ar_clean_action_token_timesteps=torch.zeros_like(action_timesteps),
+        ar_frame_chunk_size=2,
+        ar_attn_window=72,
+        context=context,
+        context_mask=context_mask,
+        use_gradient_checkpointing=True,
+    )
+    target = torch.randn_like(action_prediction)
+    action_loss = unweighted_pad_masked_action_mse(
+        action_prediction,
+        target,
+    ).mean()
+    assert torch.isfinite(action_loss)
+    action_loss.backward()
+
+    for parameter in qkv_parameters.values():
+        assert parameter.grad is not None
+        assert torch.isfinite(parameter.grad).all()
+        assert torch.count_nonzero(parameter.grad) > 0
 
 
 def test_afcc_checkpoint_on_off_loss_and_video_gradient_match_with_recompute():

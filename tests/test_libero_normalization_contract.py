@@ -17,7 +17,12 @@ from sana_wam.deploy.libero_model_loader import (
 from sana_wam.deploy.libero_policy_server import (
     reject_libero_checkpoint_contract_overrides,
 )
-from sana_wam.train.libero_contract import validate_libero_training_config
+from sana_wam.train.libero_contract import (
+    LIBERO_R10_QKV_ADAPT_EVAL_MODULES,
+    LIBERO_R10_QKV_ADAPT_TRAINABLE_CONTRACT,
+    LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS,
+    validate_libero_training_config,
+)
 
 
 def _stats(dim: int, *, low: float = -1.0, high: float = 1.0) -> dict:
@@ -68,6 +73,17 @@ def _libero_config(*, stats_sha256: str | None = None):
             },
         }
     )
+
+
+def _r10_qkv_adapt_config():
+    cfg = _libero_config()
+    del cfg.training.preserve_frozen_input_grad_modules
+    cfg.training.libero_trainable_contract = LIBERO_R10_QKV_ADAPT_TRAINABLE_CONTRACT
+    cfg.training.trainable_parameter_patterns = list(
+        LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS
+    )
+    cfg.training.eval_modules = list(LIBERO_R10_QKV_ADAPT_EVAL_MODULES)
+    return cfg
 
 
 def _write_stats(path: Path, *, action_dim: int = 7, include_state: bool = True) -> str:
@@ -206,6 +222,73 @@ def test_training_contract_rejects_model_or_temporal_semantic_drift() -> None:
         merge=False,
     )
     with pytest.raises(ValueError, match="optimizer_master_weights"):
+        validate_libero_training_config(cfg)
+
+
+def test_r10_qkv_adapt_trainable_contract_accepts_only_frozen_patterns() -> None:
+    cfg = _r10_qkv_adapt_config()
+    validate_libero_training_config(cfg)
+
+    without_revision = _libero_config()
+    without_revision.training.trainable_parameter_patterns = list(
+        LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS
+    )
+    with pytest.raises(ValueError, match="explicit.*libero_trainable_contract"):
+        validate_libero_training_config(without_revision)
+
+    without_eval_mode = _r10_qkv_adapt_config()
+    del without_eval_mode.training.eval_modules
+    with pytest.raises(ValueError, match="eval_modules.*video_backbone"):
+        validate_libero_training_config(without_eval_mode)
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "message"),
+    [
+        (
+            "training.libero_trainable_contract",
+            "r10_qkv_adapt_v2",
+            "unknown.*libero_trainable_contract",
+        ),
+        (
+            "training.trainable_parameter_patterns",
+            list(LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS[:-1]),
+            "exact frozen.*trainable_parameter_patterns",
+        ),
+        (
+            "training.trainable_parameter_patterns",
+            [
+                *LIBERO_R10_QKV_ADAPT_TRAINABLE_PARAMETER_PATTERNS[:-1],
+                "video_backbone.dit.blocks.*.attn.*",
+            ],
+            "exact frozen.*trainable_parameter_patterns",
+        ),
+        (
+            "training.trainable_modules",
+            ["action_backbone"],
+            "trainable_modules.*absent",
+        ),
+        (
+            "training.eval_modules",
+            ["video_backbone.vae"],
+            "eval_modules.*video_backbone",
+        ),
+        (
+            "training.preserve_frozen_input_grad_modules",
+            ["video_backbone"],
+            "preserve_frozen_input_grad_modules.*absent",
+        ),
+        ("training.freeze", [], "training.freeze.*absent"),
+    ],
+)
+def test_r10_qkv_adapt_trainable_contract_fails_closed(
+    path: str,
+    value,
+    message: str,
+) -> None:
+    cfg = _r10_qkv_adapt_config()
+    OmegaConf.update(cfg, path, value, merge=False)
+    with pytest.raises(ValueError, match=message):
         validate_libero_training_config(cfg)
 
 
